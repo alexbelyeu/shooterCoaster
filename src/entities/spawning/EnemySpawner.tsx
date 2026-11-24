@@ -261,8 +261,8 @@ export default function EnemySpawner({
       // On their walls already, where they enter: never pushed out of the near field.
       if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position!, wall: e.wall }])
       if (!wave.formation || wave.formation === 'scatter') {
-        // A scatter spot has no approach to be seen from: the clearer's nearest open spot
-        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? (p: Vec3) => clearAir(p, () => []) : (p: Vec3) => p
+        // A scatter spot has no approach to be seen from, so the clearer takes the nearest open spot.
+        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? (p: Vec3) => clearAir(p) : (p: Vec3) => p
         return members.map((e) => [e.id, { position: toVector3(clear(clampToBounds(outsideNearField(e.position!, camera), bounds))) }])
       }
       const placed = placeFormationWave({

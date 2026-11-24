@@ -24,6 +24,12 @@ export const LANDMARK_SITE = { x: -840, z: -600 } as const
 /** Height of the hero tower (world units): the tallest thing in the city. */
 export const SPIRE_HEIGHT = 820
 
+/**
+ * The intro's landmark pass and the results orbit round the hero tower. The orbit (700 out) and the pass (×1.3) cross
+ * the ride's blocks, so they fly over the tallest tower class (480, `cityLayout.ts`) rather than through it (#966).
+ */
+export const HERO_SHOT = { x: LANDMARK_SITE.x, z: LANDMARK_SITE.z, focus: SPIRE_HEIGHT * 0.45, orbitRadius: 700, orbitHeight: 540 } as const
+
 /** The towers the ride is built round (#871): the lift's tower and the two either side of the first drop. */
 export const RIDE_TOWERS = [
   { x: -240, z: -240, w: 170, d: 170, h: 380 },

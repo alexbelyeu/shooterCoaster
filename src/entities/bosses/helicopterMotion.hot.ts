@@ -7,10 +7,15 @@ import { clamp01, smooth, type FlatDir } from './bossCycle.hot'
  * Local frame: +z is the nose, +y up. Distances are world units, angles radians.
  */
 export const HELI = {
-  /** Its anchor ahead of the rider on the rider's heading, above the camera, and never lower than this over the street. */
+  /**
+   * Its anchor ahead of the rider on the rider's heading, `above` the point the camera looks at that far ahead (so it
+   * stays in frame as the car pitches down a descent, #966), and never lower than `minClearance` over the street.
+   */
   ahead: 560,
-  above: 90,
-  minClearance: 160,
+  above: 40,
+  minClearance: 120,
+  /** The camera's pitch it follows, as a slope (rise over run), is held within this either way. */
+  maxLookSlope: 0.4,
   /**
    * It weaves across the street ahead, `side` either way, one sweep every `2π / weaveRate` s: within the street canyon,
    * since any further over the blocks puts the towers between it and the rider (#871).
@@ -18,6 +23,11 @@ export const HELI = {
   side: 24,
   weaveRate: 0.35,
   followTau: 1,
+  /**
+   * It turns with the rider's heading over this many seconds, not the bosses' `HEADING_TAU`: the fight starts coming
+   * out of the helix's turn, and a slower turn leaves it over the blocks beside the avenue, behind their towers (#966).
+   */
+  headingTau: 0.5,
   /** It drops in from `dropIn` above its anchor over `dropSeconds` (the tell's beam comes from up there). */
   dropIn: 260,
   dropSeconds: 1.6,
@@ -125,12 +135,22 @@ export function beamSpot(out: BeamSpot, t: number, tell = 1): BeamSpot {
   return out
 }
 
-/** Where it hovers `age` s into its fight: ahead of the camera on the rider's heading `h`, weaving across the street. */
-export function anchorAt(out: Vector3, cam: Vector3, h: FlatDir, age: number, ground: HeightFunction): Vector3 {
+/**
+ * Where it hovers `age` s into its fight: ahead of the camera on the rider's heading `h`, weaving across the street.
+ * `lookSlope` is the camera's pitch as rise over run (`lookSlope()`), 0 for a level look.
+ */
+export function anchorAt(out: Vector3, cam: Vector3, h: FlatDir, age: number, ground: HeightFunction, lookSlope = 0): Vector3 {
   const side = HELI.side * Math.sin(age * HELI.weaveRate)
   out.set(cam.x + h.x * HELI.ahead - h.z * side, 0, cam.z + h.z * HELI.ahead + h.x * side)
-  out.y = Math.max(cam.y + HELI.above, ground(out.x, out.z) + HELI.minClearance)
+  const slope = Math.min(Math.max(lookSlope, -HELI.maxLookSlope), HELI.maxLookSlope)
+  out.y = Math.max(cam.y + slope * HELI.ahead + HELI.above, ground(out.x, out.z) + HELI.minClearance)
   return out
+}
+
+/** The camera's pitch from its world direction `dir`: rise over run, 0 when it looks straight up or down. */
+export function lookSlope(dir: { x: number; y: number; z: number }): number {
+  const run = Math.hypot(dir.x, dir.z)
+  return run > 1e-3 ? dir.y / run : 0
 }
 
 /** The searchlight's spot on the street for `spot`, on the rider's heading `h` from the camera. */

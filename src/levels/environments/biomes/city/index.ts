@@ -1,6 +1,6 @@
 import type { BiomeDefinition } from '@/levels/environments/shared/types'
 import { PARTICLE_PRESETS } from '@/levels/environments/shared/particlePresets'
-import { COLOR_RAMP, LANDMARK_SITE, SPIRE_HEIGHT } from './config'
+import { COLOR_RAMP, HERO_SHOT } from './config'
 import { createAsphaltMaterial } from './cityShaders'
 import Decorations from './Decorations'
 import { trackExtent } from '@/levels/environments/shared/trackScatter'
@@ -28,5 +28,5 @@ export const city: BiomeDefinition = {
     const index = buildTrackIndex(track)
     return (p, eyesSeeing) => onPavement(towers, index, p, eyesSeeing)
   },
-  hero: { x: LANDMARK_SITE.x, z: LANDMARK_SITE.z, focus: SPIRE_HEIGHT * 0.45, orbitRadius: 700, orbitHeight: 360 },
+  hero: HERO_SHOT,
 }

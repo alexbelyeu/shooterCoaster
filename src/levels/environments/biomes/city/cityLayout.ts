@@ -302,6 +302,12 @@ export function clearOfTowers(
 export const KERB_OFFSET = 22
 /** A pavement spot stays this far from the rails and their towers, as the traffic does (`trafficPaths.ts`). */
 const PAVEMENT_TRACK_CLEARANCE = 44
+/**
+ * The passes over the kerbs: the rail clearance and how many streets out either way. Where the rails take every kerb on
+ * the nearest streets (the helix round the hero tower, #871), the second looks a street further, still clear of the car
+ * and the supports' feet.
+ */
+const PAVEMENT_PASSES: readonly (readonly [number, number])[] = [[PAVEMENT_TRACK_CLEARANCE, 1], [30, 2]]
 const PAVEMENT_TOWER_CLEARANCE = 12
 
 /** Height over its foot of the bot's face, the point a tower must not hide from the rider. */
@@ -327,23 +333,23 @@ function hidden(towers: readonly Tower[], eye: Point, q: Point, ground: number, 
 /**
  * The kerb spot on the nearest streets either way of a ground enemy's `p`, clear of the rails and every tower, that
  * the most of the approach's looks see past the towers (`eyesSeeing`: the eyes whose cone holds a spot, #963); the
- * nearest of equals. Where the rails take every kerb in reach (the helix round the hero tower, #871), the best kerb clear
- * of the towers alone, so nothing stands inside one; else `p`.
+ * nearest of equals; `PAVEMENT_PASSES` widens the search where the rails take every kerb in reach. Else `p`, which the
+ * trackside placement already put clear of the rails.
  */
-export function onPavement(towers: readonly Tower[], index: TrackIndex, p: Point, eyesSeeing: (q: Point) => Point[]): Point {
+export function onPavement(towers: readonly Tower[], index: TrackIndex, p: Point, eyesSeeing: (q: Point) => Point[] = () => []): Point {
   const { pitch } = STREET_GRID
   const clearance = { x: PAVEMENT_TOWER_CLEARANCE, y: 0, z: PAVEMENT_TOWER_CLEARANCE }
   let best = p
   let bestSeen = -1
   let bestDist = Infinity
-  for (const offRails of [true, false]) {
+  for (const [rails, reach] of PAVEMENT_PASSES) {
     for (const alongX of [true, false]) {
       const nearest = Math.round((alongX ? p.z : p.x) / pitch - 0.5)
-      for (let k = -1; k <= 1; k++) {
+      for (let k = -reach; k <= reach; k++) {
         for (const side of [-1, 1]) {
           const across = (nearest + k + 0.5) * pitch + side * KERB_OFFSET
           const q = alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z }
-          if ((offRails && index.near(q.x, q.z, PAVEMENT_TRACK_CLEARANCE)) || !clearOf(towers, q, p.y, clearance)) continue
+          if (index.near(q.x, q.z, rails) || !clearOf(towers, q, p.y, clearance)) continue
           const seen = eyesSeeing(q).filter((eye) => !hidden(towers, eye, q, p.y)).length
           const dist = Math.hypot(q.x - p.x, q.z - p.z)
           if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) [best, bestSeen, bestDist] = [q, seen, dist]

@@ -6,7 +6,9 @@ import { trackExtent } from '../../shared/trackScatter'
 import { buildTrackIndex } from '../../shared/trackClearance'
 import { createRng } from '@/utils/rng'
 import { cityTowers, clearOfTowers, footprintDistance, KERB_OFFSET, layoutCity, onPavement, streetAxis, TRACK_CLEARANCE, type Tower } from './cityLayout'
-import { STREET_GRID } from './config'
+import { HERO_SHOT, STREET_GRID } from './config'
+import { orbitPose } from '@/track/introCamera.hot'
+import { PASS_OUT } from '@/track/introTour'
 
 const table = buildArcTable(createTrackCurve(shippedLevel('level7').track))
 const extent = trackExtent(table)
@@ -84,18 +86,22 @@ describe('onPavement', () => {
     const rng = createRng(963)
     const { pitch } = STREET_GRID
     const misplaced: string[] = []
+    const underCar: string[] = []
     let onRails = 0
     for (let k = 0; k < 400; k++) {
       const p = { x: rng.range(-extent, extent), y: 0, z: rng.range(-extent, extent) }
-      const q = onPavement(towers, index, p, () => [])
+      const q = onPavement(towers, index, p)
       // On a kerb along one street or the other (where streets cross, `streetAxis` reads the one along x)
       const kerbOff = (c: number) => Math.abs(Math.abs(c - (Math.round(c / pitch - 0.5) + 0.5) * pitch) - KERB_OFFSET)
       const onKerb = streetAxis(q.x, q.z) !== null && Math.min(kerbOff(q.x), kerbOff(q.z)) < 1e-6
       const inTower = towers.some((t) => Math.abs(q.x - t.x) < t.w / 2 && Math.abs(q.z - t.z) < t.d / 2)
-      if (!onKerb || inTower || Math.hypot(q.x - p.x, q.z - p.z) > pitch * 1.5) misplaced.push(`${p.x.toFixed(0)},${p.z.toFixed(0)}`)
+      if (!onKerb || inTower || Math.hypot(q.x - p.x, q.z - p.z) > pitch * 2.5) misplaced.push(`${p.x.toFixed(0)},${p.z.toFixed(0)}`)
       if (trackDistance(q.x, q.z) < 40) onRails++
+      // Never under the car: even where the rails take every kerb, a moved spot keeps the smaller rail clearance
+      if (q !== p && trackDistance(q.x, q.z) < 30) underCar.push(`${q.x.toFixed(0)},${q.z.toFixed(0)}`)
     }
     expect(misplaced).toEqual([])
+    expect(underCar).toEqual([])
     // The helix round the hero tower rings its kerbs (#871)
     expect(onRails).toBeLessThan(10)
   })
@@ -105,7 +111,7 @@ describe('onPavement', () => {
     const block = [{ x: 0, z: 0, w: 176, d: 176, h: 200 }]
     const offRails = { near: () => false } as unknown as Parameters<typeof onPavement>[1]
     const p = { x: 0, y: 0, z: 130 }
-    expect(onPavement(block, offRails, p, () => [])).toEqual({ x: 0, y: 0, z: STREET_GRID.pitch / 2 + KERB_OFFSET })
+    expect(onPavement(block, offRails, p)).toEqual({ x: 0, y: 0, z: STREET_GRID.pitch / 2 + KERB_OFFSET })
     expect(onPavement(block, offRails, p, () => [{ x: 0, y: 30, z: -400 }])).toEqual({ x: 0, y: 0, z: -STREET_GRID.pitch / 2 - KERB_OFFSET })
   })
 
@@ -114,5 +120,34 @@ describe('onPavement', () => {
     expect(streetAxis(10, pitch / 2 + KERB_OFFSET)).toBe('x')
     expect(streetAxis(-pitch / 2 - KERB_OFFSET, 10)).toBe('z')
     expect(streetAxis(0, 0)).toBeNull()
+  })
+})
+
+describe('the hero shot', () => {
+  const towers = cityTowers(table, extent)
+  /** Margin round a footprint and over a roof the camera keeps. */
+  const MARGIN = 30
+  const insideTowers = (x: number, y: number, z: number) =>
+    towers.filter((t) => y < t.h + MARGIN && Math.abs(x - t.x) < t.w / 2 + MARGIN && Math.abs(z - t.z) < t.d / 2 + MARGIN)
+
+  it('flies the results orbit over every tower it crosses (#966)', () => {
+    const pos = { x: 0, y: 0, z: 0 }
+    const target = { x: 0, y: 0, z: 0 }
+    const hit: Tower[] = []
+    for (let s = 0; s < 60; s += 0.1) {
+      orbitPose(HERO_SHOT, 0, s, 0, () => 0, undefined, pos, target)
+      hit.push(...insideTowers(pos.x, pos.y, pos.z))
+    }
+    expect(hit).toEqual([])
+  })
+
+  it("flies the intro's landmark pass over every tower round it", () => {
+    const r = HERO_SHOT.orbitRadius * PASS_OUT
+    const hit: Tower[] = []
+    for (let i = 0; i < 720; i++) {
+      const a = (i / 720) * 2 * Math.PI
+      hit.push(...insideTowers(HERO_SHOT.x + Math.cos(a) * r, HERO_SHOT.orbitHeight, HERO_SHOT.z + Math.sin(a) * r))
+    }
+    expect(hit).toEqual([])
   })
 })

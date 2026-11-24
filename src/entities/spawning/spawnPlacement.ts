@@ -793,9 +793,9 @@ function whereTheApproachLooks(
 /**
  * A biome's move of a spot `p` out of its buildings: a ground enemy onto open ground (#963), an air enemy into open air
  * (#871). `eyesSeeing` gives, for a candidate spot, the eyes of the approach's looks that have it in their cone, so the
- * biome can pick the one its own buildings hide least.
+ * biome can pick the one its own buildings hide least; without it (a scatter wave has no approach) the nearest clear spot.
  */
-export type SpotClearer = (p: Vec3, eyesSeeing: (q: Vec3) => Vec3[]) => Vec3
+export type SpotClearer = (p: Vec3, eyesSeeing?: (q: Vec3) => Vec3[]) => Vec3
 
 /** The eyes of the approach's looks, every `FACING_STEP` from `VIEW_LEAD` to `FACING_LAST` before the slot, that have `p` in their cone. */
 function eyesSeeing(table: ArcTable, riderIndex: number, ahead: number, p: Vec3, reach: number, trackScale: number, ground?: HeightFunction): Vec3[] {

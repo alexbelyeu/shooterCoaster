@@ -63,12 +63,12 @@ export interface FlatDir {
   z: number
 }
 
-/** Eases the unit `heading` towards the flat unit forward (`fx`, `fz`) over `HEADING_TAU`; `snap` sets it outright. */
-export function followHeading(heading: FlatDir, fx: number, fz: number, dt: number, snap: boolean): void {
+/** Eases the unit `heading` towards the flat unit forward (`fx`, `fz`) over `tau` s; `snap` sets it outright. */
+export function followHeading(heading: FlatDir, fx: number, fz: number, dt: number, snap: boolean, tau = HEADING_TAU): void {
   let x = fx
   let z = fz
   if (!snap) {
-    const k = 1 - Math.exp(-dt / HEADING_TAU)
+    const k = 1 - Math.exp(-dt / tau)
     const lx = heading.x + (fx - heading.x) * k
     const lz = heading.z + (fz - heading.z) * k
     const len = Math.hypot(lx, lz)
