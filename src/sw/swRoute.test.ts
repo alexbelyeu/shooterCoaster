@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cacheable, staleCaches, swRoute } from './swRoute'
+import { cacheable, keepAtRuntime, staleCaches, swRoute } from './swRoute'
 
 const origin = 'https://scoaster.com'
 const precached = new Set(['/index.html', '/assets/index-Ab12.js', '/fonts/ultra-latin-400.woff2', '/poster/title-portrait.webp'])
@@ -44,6 +44,19 @@ describe('cacheable', () => {
     expect(cacheable({ status: 206, type: 'basic', redirected: false })).toBe(false)
     expect(cacheable({ status: 200, type: 'opaque', redirected: false })).toBe(false)
     expect(cacheable({ status: 200, type: 'basic', redirected: true })).toBe(false)
+  })
+})
+
+describe('keepAtRuntime', () => {
+  it('never stores a page fetched at runtime: a shell from another build would sit next to this build’s chunks', () => {
+    for (const path of ['/', '/index.html', '/go/reddit-launch']) expect(keepAtRuntime(origin + path, precached)).toBe(false)
+  })
+
+  it('stores back only files this worker precached, never another build’s bundles', () => {
+    expect(keepAtRuntime(origin + '/assets/index-Ab12.js', precached)).toBe(true)
+    expect(keepAtRuntime(origin + '/fonts/ultra-latin-400.woff2', precached)).toBe(true)
+    expect(keepAtRuntime(origin + '/assets/index-Cd34.js', precached)).toBe(false)
+    expect(keepAtRuntime(origin + '/assets/world-desert-Zz99.js', precached)).toBe(false)
   })
 })
 

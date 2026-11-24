@@ -5,7 +5,7 @@ serves a stale page ships an old build to every returning player, and one that c
 the site or the online board.
 **Decision:** `src/sw/sw.ts` is TypeScript bundled by esbuild in a Vite plugin (`serviceWorker()` in `vite.config.ts`),
 not a hand-maintained `public/sw.js`, so its routing is the tested `src/sw/swRoute.ts` itself, not a mirror. The page is
-always network-first (the cache only when the network fails); hashed bundles and the precached public files are
+always network-first, falling back to the `index.html` this worker precached and never to one fetched since (a page stored at runtime by the last deploy's worker would sit next to the old build's chunks, and every level it didn't load would fail offline; `keepAtRuntime` stores back only this worker's own precached files); hashed bundles and the precached public files are
 cache-first. One cache per build, named after a digest of the precached files' contents: any deploy changes `sw.js`,
 which `vercel.json` serves `no-cache` and the page registers with `updateViaCache: 'none'`; the new worker
 `skipWaiting`s, claims and deletes the old cache, with no "update available" prompt. A page still running the old build

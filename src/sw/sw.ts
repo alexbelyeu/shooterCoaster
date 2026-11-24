@@ -3,7 +3,7 @@
  * below. A deploy's worker takes over at once and drops the old build's cache, with no update prompt: the page is
  * network-first, so an online load runs the deployed build whichever worker answers (decisions inbox, #999).
  */
-import { cacheable, SHELL, staleCaches, swRoute } from './swRoute'
+import { cacheable, keepAtRuntime, SHELL, staleCaches, swRoute } from './swRoute'
 
 declare const SC_PRECACHE: string[]
 declare const SC_CACHE: string
@@ -47,14 +47,10 @@ sw.addEventListener('activate', (e) => {
   )
 })
 
+// Offline, the page is the one this worker precached, never one fetched since: it always matches this cache's bundles.
 async function fromNetworkThenShell(request: Request): Promise<Response> {
   try {
-    const res = await fetch(request)
-    if (cacheable(res)) {
-      const copy = res.clone()
-      void caches.open(SC_CACHE).then((cache) => cache.put(SHELL, copy))
-    }
-    return res
+    return await fetch(request)
   } catch (err) {
     const shell = await caches.match(SHELL, { cacheName: SC_CACHE })
     if (shell) return shell
@@ -66,7 +62,7 @@ async function fromCacheThenNetwork(request: Request): Promise<Response> {
   const hit = await caches.match(request, { cacheName: SC_CACHE })
   if (hit) return hit
   const res = await fetch(request)
-  if (cacheable(res)) {
+  if (cacheable(res) && keepAtRuntime(request.url, precached)) {
     const copy = res.clone()
     void caches.open(SC_CACHE).then((cache) => cache.put(request, copy))
   }
