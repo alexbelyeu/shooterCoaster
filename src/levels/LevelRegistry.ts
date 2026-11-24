@@ -228,6 +228,8 @@ const LEVELS: LevelConfig[] = [
     maxScore: 83 * 15 + 5 * 65 + 400, // 1245 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 1970
     message: 'You cleared Jungle Ruins!',
     nextLevel: null,
+    // A first cut on the legacy curve1 until the ride kit's storyboard (#1009, `jungleTrack.ts`); `jungleLayout.test.ts`
+    // keeps the temple in front of the drop meanwhile.
     ride: {
       track: {
         varA: 3,

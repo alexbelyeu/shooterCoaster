@@ -93,7 +93,7 @@ export default function JungleFeatures({ groundFn, track }: BiomeFeaturesProps) 
       <mesh geometry={stone} material={stoneMat} />
       <mesh geometry={pool} material={poolMat} />
       <mesh geometry={sheet} material={sheetMat} renderOrder={1} />
-      <mesh geometry={mist} material={mistMat} renderOrder={2} frustumCulled={false} />
+      <mesh geometry={mist} material={mistMat} renderOrder={2} />
     </>
   )
 }

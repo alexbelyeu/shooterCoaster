@@ -128,7 +128,7 @@ export interface Terrace {
 }
 
 /** `height` levelled towards each terrace it stands on or near. */
-function onTerraces(terraces: readonly Terrace[], x: number, z: number, height: number): number {
+export function onTerraces(terraces: readonly Terrace[], x: number, z: number, height: number): number {
   for (const t of terraces) {
     const d = Math.hypot(x - t.x, z - t.z)
     if (d >= t.radius + t.falloff) continue

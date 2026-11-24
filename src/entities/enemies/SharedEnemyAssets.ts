@@ -219,26 +219,26 @@ const CROW_WING_FLAP = /* glsl */ `
 }
 `
 
-export function patchCrowWingVertex(vertexShader: string): string {
+export function patchBirdWingVertex(vertexShader: string): string {
   return vertexShader
     .replace('#include <common>', `#include <common>\n${CROW_WING_PARS}`)
     .replace('#include <begin_vertex>', `#include <begin_vertex>\n${CROW_WING_FLAP}`)
 }
 
 /** Wing angles (arm, hand; radians, + = down): a quick downstroke, and the hand lagging so the wrist bends. */
-export function crowWingPose(phase: number, out: THREE.Vector2): THREE.Vector2 {
+export function birdWingPose(phase: number, out: THREE.Vector2): THREE.Vector2 {
   const p = phase + 0.5 * Math.sin(phase)
   return out.set(0.05 + 0.6 * Math.sin(p), 0.5 * Math.sin(p - 0.9))
 }
 
-/** Flaps `material`'s crow wings by `flap`; every material built the same way shares one program. */
+/** Flaps `material`'s bird wings (crow and toucan) by `flap`; every material built the same way shares one program. */
 function withCrowWings<T extends THREE.Material>(material: T, flap: { value: THREE.Vector2 }): T {
   const base = material.onBeforeCompile
   const baseKey = material.customProgramCacheKey()
   material.onBeforeCompile = (shader, renderer) => {
     base.call(material, shader, renderer)
     shader.uniforms.uWingFlap = flap
-    shader.vertexShader = patchCrowWingVertex(shader.vertexShader)
+    shader.vertexShader = patchBirdWingVertex(shader.vertexShader)
   }
   material.customProgramCacheKey = () => `${baseKey}-crow-wing`
   return material
@@ -248,8 +248,8 @@ function withCrowWings<T extends THREE.Material>(material: T, flap: { value: THR
 // also read against the hazy horizon and the red mesas.
 const CROW_RIM = { color: '#a8bce0', intensity: 0.4, power: 3.5 }
 
-/** One crow's feathers, flapping by `flap` (arm, hand radians); every instance shares one program. */
-export function createCrowFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
+/** One bird's feathers (crow or toucan), flapping by `flap` (arm, hand radians); every instance shares one program. */
+export function createBirdFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
   return withCrowWings(withRim(new THREE.MeshPhysicalMaterial({
     vertexColors: true,
     metalness: 0.1,
@@ -261,10 +261,10 @@ export function createCrowFeatherMaterial(flap: { value: THREE.Vector2 }): THREE
   }), CROW_RIM), flap)
 }
 
-/** Only for ShaderWarmup: crows build their own instances. */
-export const CROW_FEATHER_MAT = createCrowFeatherMaterial({ value: new THREE.Vector2() })
+/** Only for ShaderWarmup: the birds build their own instances. */
+export const BIRD_FEATHER_MAT = createBirdFeatherMaterial({ value: new THREE.Vector2() })
 
-export const CROW_EYE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+export const BIRD_EYE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
 
 // ── Toucan: the crow's wings and flap on a chunkier body, a yellow bib and a big orange bill ─
 // Brief: docs/art/ENEMIES.md (#870). Same axes as the crow; it flaps with the crow's feather material and flinch, so

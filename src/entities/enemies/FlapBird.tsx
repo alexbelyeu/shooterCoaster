@@ -4,7 +4,7 @@ import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { setFlashMaterial } from './hitFlash'
 import { useMarch } from './useMarch'
-import { CROW_EYE_MAT, CROW_FLINCH_MAT, createCrowFeatherMaterial, crowWingPose } from './SharedEnemyAssets'
+import { BIRD_EYE_MAT, CROW_FLINCH_MAT, createBirdFeatherMaterial, birdWingPose } from './SharedEnemyAssets'
 
 /** Flap rates (radians of flap phase per game second) while hovering and in a dive. */
 const CROW_FLAP_HOVER = 4.5
@@ -37,7 +37,7 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
   // The sway's share across the bird's heading (local +x): its bank follows it.
   const sway = Math.sin(moveAngle) - 0.5 * Math.cos(moveAngle)
   const flap = useMemo(() => ({ value: new THREE.Vector2() }), [])
-  const featherMat = useMemo(() => createCrowFeatherMaterial(flap), [flap])
+  const featherMat = useMemo(() => createBirdFeatherMaterial(flap), [flap])
   useEffect(() => () => featherMat.dispose(), [featherMat])
   const rigRef = useRef<THREE.Group>(null)
   const phase = useRef(flapOffset)
@@ -53,7 +53,7 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
 
       const dive = 0.5 + 0.5 * Math.sin(time * 0.7 + flapOffset)
       phase.current += delta * (CROW_FLAP_HOVER + (CROW_FLAP_DIVE - CROW_FLAP_HOVER) * dive)
-      crowWingPose(phase.current, flap.value)
+      birdWingPose(phase.current, flap.value)
 
       const rig = rigRef.current
       if (rig) {
@@ -71,7 +71,7 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
       <group scale={[8, 8, 8]} rotation={[0, -moveAngle + Math.PI / 2, 0]}>
         <group ref={rigRef}>
           <mesh ref={tagFlinch} geometry={body} material={featherMat} />
-          <mesh geometry={eyes} material={CROW_EYE_MAT} />
+          <mesh geometry={eyes} material={BIRD_EYE_MAT} />
         </group>
       </group>
     </EnemyBase>
