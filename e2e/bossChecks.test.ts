@@ -35,6 +35,12 @@ describe('the boss step rides to its boss (#769)', () => {
       expect(t, `rideTo ${check.rideTo} is ridden at ${t} s; the boss arrives at ${at} s`).toBeLessThanOrEqual(at + FACE_OFF_SECONDS)
     })
 
+    it(`${check.level}: summonAt is past rideTo, in the boss's first ${FACE_OFF_SECONDS} s`, () => {
+      if (check.summonAt === undefined) return
+      expect(check.summonAt).toBeGreaterThan(check.rideTo!)
+      expect(secondsAt(lapFractions(check.level), check.summonAt), `summonAt ${check.summonAt}`).toBeLessThanOrEqual(at + FACE_OFF_SECONDS)
+    })
+
     it(`${check.level}: passShots come after rideTo, in order, before the run ends`, () => {
       const fractions = lapFractions(check.level)
       const shots = check.passShots ?? []

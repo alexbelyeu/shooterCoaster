@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import {
+  BOSS_DEFEAT_BURST_OFFSETS,
+  BOSS_DEFEAT_DEATH_STYLE,
   BOSS_PART_DEATH_STYLE,
+  DEATH_SLOTS,
+  drawnSlots,
+  GOLDEN_BALLOON_DEATH_STYLE,
   CHUNKS_PER_SLOT,
   DEATH_STYLES,
   GLOW_PER_SLOT,
@@ -25,10 +30,14 @@ import {
   styleCounts,
   type DeathStyle,
 } from './deathStyles'
+import { MEDUSA_DEFEAT_BURST_YS } from '@/entities/bosses/medusaMotion'
+import { TITAN_BREAK_POINTS } from '@/entities/bosses/titanMotion.hot'
 
 const ALL: [string, DeathStyle][] = [
   ...Object.entries(DEATH_STYLES),
   ['bossPart', BOSS_PART_DEATH_STYLE],
+  ['bossDefeat', BOSS_DEFEAT_DEATH_STYLE],
+  ['goldenBalloon', GOLDEN_BALLOON_DEATH_STYLE],
   ['krakenSplash', KRAKEN_SPLASH_DEATH_STYLE],
   ['whaleSplash', WHALE_SPLASH_DEATH_STYLE],
   ['scorpionShard', SCORPION_SHARD_DEATH_STYLE],
@@ -44,6 +53,28 @@ const ALL: [string, DeathStyle][] = [
 ]
 
 describe('death styles', () => {
+  it("every boss's defeat fits the pool with a slot to spare: its last part, the confetti and its own bursts", () => {
+    // The confetti lives 3.2 s and every boss's own defeat bursts fire within it, so all of these overlap.
+    const lastPart = 1
+    const spareForAKill = 1
+    const ownDefeatBursts = { magmaTitan: TITAN_BREAK_POINTS.length, medusa: MEDUSA_DEFEAT_BURST_YS.length, other: 0 }
+    for (const own of Object.values(ownDefeatBursts)) {
+      expect(lastPart + BOSS_DEFEAT_BURST_OFFSETS.length + own + spareForAKill).toBeLessThanOrEqual(DEATH_SLOTS)
+    }
+    expect(styleCounts(BOSS_DEFEAT_DEATH_STYLE).glow * BOSS_DEFEAT_BURST_OFFSETS.length).toBeGreaterThanOrEqual(180)
+  })
+
+  it('a golden balloon pops in gold: every confetti piece is a warm yellow, unlike a plain balloon', () => {
+    const confetti = GOLDEN_BALLOON_DEATH_STYLE.layers.find((l) => l.shape === 'confetti')!
+    for (const c of confetti.colors) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16))
+      expect(r, c).toBeGreaterThan(200)
+      expect(g, c).toBeGreaterThan(140)
+      expect(b, c).toBeLessThan(g)
+    }
+    expect(GOLDEN_BALLOON_DEATH_STYLE.sound).toBe(DEATH_STYLES.balloon.sound)
+  })
+
   it.each(ALL)('%s fits one pool slot and is well formed', (_, style) => {
     const { glow, chunks } = styleCounts(style)
     expect(glow).toBeLessThanOrEqual(GLOW_PER_SLOT)
@@ -141,5 +172,18 @@ describe('pickDeathSlot', () => {
   it('steals the oldest active slot when full, and clears it', () => {
     const slots = [3, 1, 2].map((serial) => ({ active: true, needsZero: false, serial }))
     expect(pickDeathSlot(slots)).toEqual({ index: 1, clear: true })
+  })
+})
+
+describe('drawnSlots', () => {
+  const slot = (active: boolean) => ({ active, needsZero: !active, serial: 0 })
+
+  it('draws one slot when the pool is idle', () => {
+    expect(drawnSlots(Array.from({ length: DEATH_SLOTS }, () => slot(false)))).toBe(1)
+  })
+
+  it('draws up to the highest live slot, gaps included', () => {
+    expect(drawnSlots([slot(true), slot(false), slot(true), slot(false)])).toBe(3)
+    expect(drawnSlots(Array.from({ length: DEATH_SLOTS }, () => slot(true)))).toBe(DEATH_SLOTS)
   })
 })

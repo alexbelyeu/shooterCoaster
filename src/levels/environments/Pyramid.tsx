@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
+import StaticInstances from './shared/StaticInstances'
 import {
   PYRAMID_BASE_SIZE,
   PYRAMID_HEIGHT,
@@ -8,20 +9,61 @@ import {
   PYRAMID_LAYER_HEIGHT,
   PYRAMID_SHRINK,
 } from './landmarkDimensions'
-import { buildDotTexture } from './shared/lampGlow'
+import { buildDotTexture, LAMP_WARM } from './shared/lampGlow'
 
 interface PyramidProps {
   position?: [number, number, number]
   yaw?: number
   /** A passage through tier `layer` along the Pyramid's x (#864): `width` wide, `height` up from the tier's floor, torchlit. */
   passage?: { layer: number; width: number; height: number }
+  /** The atmosphere's `lampGlow`: torches burning on every layer's corners and the stone warm under them at night (#880). */
+  lampGlow?: number
 }
 
 /** Passage torches; `inset` off the wall exceeds the glow's radius, or the wall cuts its sprite square. */
-const TORCH = { spacing: 110, height: 38, flame: 7, glow: 18, inset: 10 } as const
+const PASSAGE_TORCH = { spacing: 110, height: 38, flame: 7, glow: 18, inset: 10 } as const
+
+/** A torch's flame: a cone standing on its base, sized to read from the ride a couple of kilometres off. */
+const TORCH_RADIUS = 10
+const TORCH_HEIGHT = 34
+
+/** One torch on each top corner of every layer, inset a little so it stands on the step. */
+function torchMatrices(): THREE.Matrix4[] {
+  const out: THREE.Matrix4[] = []
+  let size = PYRAMID_BASE_SIZE
+  for (let i = 0; i < PYRAMID_LAYER_COUNT; i++) {
+    const h = size * 0.5 - TORCH_RADIUS
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      out.push(new THREE.Matrix4().makeTranslation(sx * h, (i + 1) * PYRAMID_LAYER_HEIGHT, sz * h))
+    }
+    size *= PYRAMID_SHRINK
+  }
+  return out
+}
+
+/** The torches: one instanced draw, past white so Bloom takes them, flickering together. */
+function Torches({ glow }: { glow: number }) {
+  const assets = useMemo(() => {
+    const geometry = new THREE.ConeGeometry(TORCH_RADIUS, TORCH_HEIGHT, 6).translate(0, TORCH_HEIGHT / 2, 0)
+    const material = new THREE.MeshBasicMaterial({ toneMapped: false })
+    return { geometry, material, matrices: torchMatrices() }
+  }, [])
+  useEffect(() => () => {
+    assets.geometry.dispose()
+    assets.material.dispose()
+  }, [assets])
+
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    const flicker = glow * (1.5 + 0.2 * Math.sin(t * 9.1) + 0.15 * Math.sin(t * 23.7))
+    assets.material.color.setRGB(flicker, flicker * 0.42, flicker * 0.08)
+  })
+
+  return <StaticInstances matrices={assets.matrices} geometry={assets.geometry} material={assets.material} />
+}
 
 /** Stepped pyramid with glowing hieroglyph panels and a spinning golden capstone. */
-export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage }: PyramidProps) {
+export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage, lampGlow = 0 }: PyramidProps) {
   const capstoneRef = useRef<THREE.Mesh>(null)
   const glyphRefs = useRef<(THREE.Mesh | null)[]>([])
   const torchGlow = useRef<THREE.PointsMaterial>(null)
@@ -89,10 +131,10 @@ export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage }:
       { pos: [0, floor + passage.height + lintel / 2, 0], size: [layer.size, lintel, passage.width] },
     ] as { pos: [number, number, number]; size: [number, number, number] }[]
     const torches: number[] = []
-    const run = Math.floor((layer.size - TORCH.spacing) / TORCH.spacing)
+    const run = Math.floor((layer.size - PASSAGE_TORCH.spacing) / PASSAGE_TORCH.spacing)
     for (let k = 0; k <= run; k++) {
-      const x = (k - run / 2) * TORCH.spacing
-      for (const zSide of [-1, 1]) torches.push(x, floor + TORCH.height, zSide * (passage.width / 2 - TORCH.inset))
+      const x = (k - run / 2) * PASSAGE_TORCH.spacing
+      for (const zSide of [-1, 1]) torches.push(x, floor + PASSAGE_TORCH.height, zSide * (passage.width / 2 - PASSAGE_TORCH.inset))
     }
     return { blocks, torches: new Float32Array(torches), dot: buildDotTexture() }
   }, [layers, passage])
@@ -105,13 +147,13 @@ export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage }:
           cut.blocks.map((b, k) => (
             <mesh key={`layer-${i}-${k}`} position={b.pos}>
               <boxGeometry args={b.size} />
-              <meshPhongMaterial color={layer.color} flatShading />
+              <meshPhongMaterial color={layer.color} emissive={LAMP_WARM} emissiveIntensity={0.08 * lampGlow} flatShading />
             </mesh>
           ))
         ) : (
           <mesh key={`layer-${i}`} position={[0, layer.y, 0]}>
             <boxGeometry args={[layer.size, PYRAMID_LAYER_HEIGHT, layer.size]} />
-            <meshPhongMaterial color={layer.color} flatShading />
+            <meshPhongMaterial color={layer.color} emissive={LAMP_WARM} emissiveIntensity={0.08 * lampGlow} flatShading />
           </mesh>
         ),
       )}
@@ -123,7 +165,7 @@ export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage }:
             <bufferGeometry>
               <bufferAttribute attach="attributes-position" args={[cut.torches, 3]} />
             </bufferGeometry>
-            <pointsMaterial map={cut.dot} color="#ffe2a0" size={TORCH.flame} transparent depthWrite={false} toneMapped={false} />
+            <pointsMaterial map={cut.dot} color="#ffe2a0" size={PASSAGE_TORCH.flame} transparent depthWrite={false} toneMapped={false} />
           </points>
           <points>
             <bufferGeometry>
@@ -133,7 +175,7 @@ export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage }:
               ref={torchGlow}
               map={cut.dot}
               color="#ff8a2a"
-              size={TORCH.glow}
+              size={PASSAGE_TORCH.glow}
               transparent
               depthWrite={false}
               blending={THREE.AdditiveBlending}
@@ -174,6 +216,8 @@ export default function Pyramid({ position = [800, 0, -600], yaw = 0, passage }:
           toneMapped={false}
         />
       </mesh>
+
+      {lampGlow > 0 && <Torches glow={lampGlow} />}
     </group>
   )
 }

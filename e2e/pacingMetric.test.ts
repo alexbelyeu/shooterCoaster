@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { RUN_SECONDS, pacingTimes } from '@/levels/pacing'
 
 /** One sample per `step` s from 0 to `end`, `targets(t)` on screen, track = t / end. */
 function ride(end: number, targets: (t: number) => number, step = 0.5, flags: (t: number) => object = () => ({})) {
@@ -68,12 +69,12 @@ describe('pacingMetrics', () => {
 })
 
 describe('pacingTimeline', () => {
-  it('has one row a level second with the fewest and most targets and the tell flags', () => {
+  it('has one row a level second with the fewest and most targets, the tell flags and the boss', () => {
     const rows = pacingTimeline(ride(3, (t) => (t === 1.5 ? 0 : 3), 0.5, (t) => ({ waveTell: t === 2.5 })))
     expect(rows).toEqual([
-      { t: 0, min: 3, max: 3, track: 0, waveTell: false, bossTell: false },
-      { t: 1, min: 0, max: 3, track: 0.333, waveTell: false, bossTell: false },
-      { t: 2, min: 3, max: 3, track: 0.667, waveTell: true, bossTell: false },
+      { t: 0, min: 3, max: 3, track: 0, waveTell: false, bossTell: false, boss: 'none', bossFramed: false },
+      { t: 1, min: 0, max: 3, track: 0.333, waveTell: false, bossTell: false, boss: 'none', bossFramed: false },
+      { t: 2, min: 3, max: 3, track: 0.667, waveTell: true, bossTell: false, boss: 'none', bossFramed: false },
     ])
   })
 })
@@ -92,5 +93,56 @@ describe('pacing summary and budget', () => {
       'no target 13% of the run over budget 10%',
     ])
     expect(pacingBudgetProblems('level9', m, undefined)).toEqual(['no pacing budget for level9 in budgets.json'])
+  })
+})
+
+describe('bossFraming', () => {
+  const fight = (framed: (t: number) => boolean, arrive = 40, end = 60) => {
+    const samples = []
+    for (let t = 0; t < end; t += 0.5) samples.push({ t, bossStage: t >= arrive ? 'active' : 'none', bossFramed: t >= arrive && framed(t) })
+    return bossFraming(samples, end)
+  }
+
+  it('is null when the boss never fights', () => {
+    expect(bossFraming([{ t: 0, bossStage: 'none' }], 60)).toBeNull()
+  })
+
+  it('counts the seconds a weak point was shootable from her arrival', () => {
+    // Framed 2 s, then the ride turns away for the rest: the gym's Medusa (23 Nov).
+    const m = fight((t) => t < 42)
+    expect(m).toMatchObject({ arrivedAt: 40, fightSeconds: 20, framedSeconds: 2, framedShare: 0.1 })
+    expect(m?.longestUnframed).toEqual({ start: 42, seconds: 18 })
+    expect(bossFramingProblems(m, { bossFramedShare: 0.6 })[0]).toMatch(/shootable 2\.0 s of its 20 s fight \(10%, floor 60%\)/)
+  })
+
+  it('ends the fight at the boss\'s defeat, and the coda after it counts neither way', () => {
+    const samples = []
+    for (let t = 0; t < 60; t += 0.5) {
+      const bossStage = t < 40 ? 'none' : t < 48 ? 'active' : 'defeated'
+      samples.push({ t, targets: t < 40 ? 3 : t < 48 ? 2 : 0, track: t / 60, bossStage, bossFramed: bossStage === 'active' })
+    }
+    expect(bossFraming(samples, 60)).toMatchObject({ beatenAt: 48, fightSeconds: 8, framedShare: 1 })
+    expect(pacingMetrics(samples, 60)).toMatchObject({ longestGapSeconds: 0, noTargetShare: 0 })
+  })
+
+  it('passes a fight the ride faces', () => {
+    const m = fight((t) => t < 44 || t >= 46)
+    expect(m?.framedShare).toBe(0.9)
+    expect(bossFramingProblems(m, { bossFramedShare: 0.6 })).toEqual([])
+    expect(bossFramingProblems(m, {})).toEqual([])
+  })
+})
+
+describe('BOSS_FIGHT_SECONDS', () => {
+  it('is the run left after the boss arrives (pacing.ts)', () => {
+    expect(BOSS_FIGHT_SECONDS).toBe(RUN_SECONDS - pacingTimes().bossAt)
+  })
+})
+
+describe('pacingGate', () => {
+  it('fails every problem without knownOver, warns them all with it, and only the boss floor with knownOverOnly', () => {
+    expect(pacingGate({}, ['gap'], ['boss'])).toEqual({ fail: ['gap', 'boss'], warn: [] })
+    expect(pacingGate({ knownOver: '#1' }, ['gap'], ['boss'])).toEqual({ fail: [], warn: ['gap', 'boss'] })
+    expect(pacingGate({ knownOver: '#1', knownOverOnly: 'boss' }, ['gap'], ['boss'])).toEqual({ fail: ['gap'], warn: ['boss'] })
   })
 })

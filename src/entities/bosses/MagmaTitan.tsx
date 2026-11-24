@@ -5,12 +5,11 @@ import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
-import { LAVA_BURST_DEATH_STYLE, TITAN_BREAK_DEATH_STYLE, TITAN_PART_DEATH_STYLE } from '@/effects/deathStyles'
+import { BOSS_DEFEAT_DEATH_STYLE, LAVA_BURST_DEATH_STYLE, TITAN_BREAK_DEATH_STYLE, TITAN_PART_DEATH_STYLE } from '@/effects/deathStyles'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow } from '@/levels/environments/biomes/volcanic/lavaRiverPaths'
 import { VOLCANO, VOLCANO_SITE } from '@/levels/environments/volcanoGeometry'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
-import BossConfetti from './BossConfetti'
 import { currentPhase, hpFraction, weakPointHp, type WeakPointSpec } from './bossModel'
 import { MAGMA_TITAN } from './bossSpecs'
 import {
@@ -21,7 +20,7 @@ import { approachAngle, firstSlot, pickPerch, type Perch, type PerchInput } from
 import { aimAtRider } from './bossAim.hot'
 import { inWindow, needsRelocate, windowAmount, windowNowEpoch } from './bossCycle.hot'
 import {
-  TITAN_BEAT, TITAN_BODY, TITAN_DEFEAT, TITAN_PERCH, TITAN_RISE, TITAN_WADE, crackGlow, defeatHeat, defeatSink, pickRiverSpot,
+  TITAN_BEAT, TITAN_BODY, TITAN_BREAK_POINTS, TITAN_DEFEAT, TITAN_PERCH, TITAN_RISE, TITAN_WADE, crackGlow, defeatHeat, defeatSink, pickRiverSpot,
   poundAmount, poundBetween, riseOffset, strideAngle, wadeStep, type Point2,
 } from './titanMotion.hot'
 
@@ -39,8 +38,6 @@ const POUND_TRAUMA = [0.18, 220] as const
 const BREAK_TRAUMA = [0.8, 1100] as const
 const BURST_AT = TITAN_DEFEAT.darkS + TITAN_DEFEAT.flashS
 const EXIT_SECONDS = BURST_AT + TITAN_DEFEAT.sinkS + 0.4
-/** Where its break bursts, in its local frame: chest, shoulders, head. */
-const BREAK_POINTS: readonly (readonly [number, number, number])[] = [[0, 820, 60], [300, 1050, 0], [-300, 1050, 0], [0, 1200, 30]]
 
 /** Every 4th row of every lava river: the spots it can climb out of. */
 const RIVER_SPOTS: readonly Point2[] = RIVER_CONFIGS.flatMap((cfg) =>
@@ -220,7 +217,7 @@ export default function MagmaTitan(props: BossProps) {
       TITAN_CRACK_UNIFORMS.uHeat.value = defeatHeat(sinceDefeat)
       if (!fighting && !sim.burst && sinceDefeat >= BURST_AT) {
         sim.burst = true
-        for (const p of BREAK_POINTS) getExplosionPool()?.explode(_p.set(p[0], p[1], p[2]).applyMatrix4(root.matrixWorld), TITAN_BREAK_DEATH_STYLE)
+        for (const p of TITAN_BREAK_POINTS) getExplosionPool()?.explode(_p.set(p[0], p[1], p[2]).applyMatrix4(root.matrixWorld), TITAN_BREAK_DEATH_STYLE)
         eventBus.emit(CAMERA_TRAUMA_EVENT, BREAK_TRAUMA[0], BREAK_TRAUMA[1])
       }
     },
@@ -258,9 +255,8 @@ export default function MagmaTitan(props: BossProps) {
       body={body}
       renderWeakPoint={renderWeakPoint}
       exitSeconds={EXIT_SECONDS}
+      defeatBurst={BOSS_DEFEAT_DEATH_STYLE}
       deathStyle={TITAN_PART_DEATH_STYLE}
-    >
-      <BossConfetti bossId={props.id} />
-    </BossBase>
+    />
   )
 }

@@ -9,15 +9,18 @@
  * in <level>-boss.png, each then shot through processHit as a normal kill that leaves the boss's hp alone. `midPhases`: phases
  * between the first and the last, each cleared after `midSettleS`. `rideTo`: the track fraction to ride to first, for a boss
  * that stays where it is (the Medusa in the Starr) rather than coming to the rider. `passShots`: track fractions ridden to
- * after `midShot`, each a `<level>-boss-pass-<percent>.png` (the ride past the Medusa, ducked for her last phase). Both are fractions of the
- * lap, so they move whenever the track is reshaped: `bossChecks.test.ts` holds `rideTo` to the boss's first 4 s on the
- * ride (#769 moved the Medusa from 0.69 to 0.59 of the lap and the step rode on to 0.7, past her) and `passShots` to after it.
+ * after `midShot`, each a `<level>-boss-pass-<percent>.png` (the ride past the Medusa, ducked for her last phase). `summonAt`:
+ * for a boss that picks its place off the rider's (the Yeti's ridge ahead), the track fraction the ride is frozen at when it
+ * is summoned, the camera then going back to `rideTo`: the rider's view from a little before where it arrived, far enough
+ * back that its lobbed snowball stays inside the frame (#920). All are fractions of the lap, so they move whenever the
+ * track is reshaped: `bossChecks.test.ts` holds `rideTo` and `summonAt` to the boss's first 4 s on the ride (#769 moved
+ * the Medusa from 0.69 to 0.59 of the lap and the step rode on to 0.7, past her), `summonAt` past `rideTo` and `passShots` after it.
  */
 export const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
   { level: 'level2', minWidthFrac: 0.15, weakPoints: 7, firstPhase: ['claw-', 'tail-'], lastPhase: ['stinger'], midShot: 'boss-stinger', minOnScreen: 4, settleS: 2, midSettleS: 1 },
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
-  { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1 },
+  { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1, rideTo: 0.5, summonAt: 0.53 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
   { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.59, passShots: [0.627, 0.64] },
 ]

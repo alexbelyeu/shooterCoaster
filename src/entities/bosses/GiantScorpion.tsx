@@ -5,12 +5,11 @@ import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
-import { SAND_BURST_DEATH_STYLE, SCORPION_SHARD_DEATH_STYLE } from '@/effects/deathStyles'
+import { BOSS_DEFEAT_DEATH_STYLE, SAND_BURST_DEATH_STYLE, SCORPION_SHARD_DEATH_STYLE } from '@/effects/deathStyles'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { desertObstacles, layoutDesert } from '@/levels/environments/biomes/desert/desertLayout'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import { setLimb } from './bossLimbs'
-import BossConfetti from './BossConfetti'
 import { isExposed, type WeakPointSpec } from './bossModel'
 import { GIANT_SCORPION } from './bossSpecs'
 import {
@@ -308,10 +307,10 @@ export default function GiantScorpion(props: BossProps) {
       body={body}
       renderWeakPoint={renderWeakPoint}
       exitSeconds={EXIT_SECONDS}
+      defeatBurst={BOSS_DEFEAT_DEATH_STYLE}
       deathStyle={SCORPION_SHARD_DEATH_STYLE}
     >
       <mesh ref={moundRef} geometry={SCORPION_MOUND_GEO} material={SCORPION_MOUND_MAT} visible={false} />
-      <BossConfetti bossId={props.id} />
     </BossBase>
   )
 }

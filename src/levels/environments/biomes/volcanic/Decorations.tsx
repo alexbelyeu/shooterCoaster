@@ -6,9 +6,13 @@ import { scatterPositions } from '../../shared/scatter'
 import { roundCaster } from '../../shared/contactShadows'
 import { useContactShadows } from '../../shared/ContactShadows'
 
+/** Base radii (scale 1) the geometry and its contact shadow both read. */
+const SHARD_BASE_RADIUS = 2
+const BOULDER_RADIUS = 6
+
 export default function VolcanicDecorations({ heightFn }: BiomeDecorationsProps) {
   const shardPositions = useMemo(() => scatterPositions(createRng(2510), 150, 100, 5000, heightFn), [heightFn])
-  const shardGeo = useMemo(() => new THREE.ConeGeometry(2, 15, 4), [])
+  const shardGeo = useMemo(() => new THREE.ConeGeometry(SHARD_BASE_RADIUS, 15, 4), [])
   const shardMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#0a0a12',
     specular: '#4466aa',
@@ -108,7 +112,7 @@ export default function VolcanicDecorations({ heightFn }: BiomeDecorationsProps)
   }, [emberPositions])
 
   const boulderPositions = useMemo(() => scatterPositions(createRng(2513), 60, 100, 4500, heightFn), [heightFn])
-  const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(6, 0), [])
+  const boulderGeo = useMemo(() => new THREE.DodecahedronGeometry(BOULDER_RADIUS, 0), [])
   const boulderMat = useMemo(() => new THREE.MeshPhongMaterial({
     color: '#2a1a10',
     specular: '#443322',
@@ -141,10 +145,11 @@ export default function VolcanicDecorations({ heightFn }: BiomeDecorationsProps)
   useContactShadows(
     useMemo(
       () => [
-        ...shardPositions.map((p, i) => roundCaster(p.x, p.z, 2 * Math.max(shardConfigs[i].sx, shardConfigs[i].sz), 0.5, 1.2)),
+        ...shardPositions.map((p, i) => roundCaster(p.x, p.z, SHARD_BASE_RADIUS * Math.max(shardConfigs[i].sx, shardConfigs[i].sz), 0.5, 1.2)),
         ...boulderPositions.map((p, i) => {
           const { scale } = boulderConfigs[i]
-          return roundCaster(p.x, p.z, 5.5 * Math.max(scale.x, scale.z), 0.5, 0.8)
+          // Just inside the dodecahedron's corners.
+          return roundCaster(p.x, p.z, BOULDER_RADIUS * 0.92 * Math.max(scale.x, scale.z), 0.5, 0.8)
         }),
       ],
       [shardPositions, shardConfigs, boulderPositions, boulderConfigs],

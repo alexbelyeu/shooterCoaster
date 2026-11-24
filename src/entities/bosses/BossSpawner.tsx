@@ -2,28 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
-import type { BossType, LevelConfig } from '@/types/level'
+import type { LevelConfig } from '@/types/level'
 import { e2eBoss, isE2E, type E2EBossStage } from '@/testing/e2eHook'
 import { BOSS_SPECS } from './bossSpecs'
-import type { BossProps } from './BossBase'
-import GiantScorpion from './GiantScorpion'
-import GoldenBlimp from './GoldenBlimp'
-import Kraken from './Kraken'
-import MagmaTitan from './MagmaTitan'
-import Medusa from './Medusa'
-import Yeti from './Yeti'
+import { useWorld } from '@/levels/environments/worlds'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import { RUN_SECONDS } from '@/levels/pacing'
-
-export const BOSS_COMPONENTS: Record<BossType, React.ComponentType<BossProps>> = {
-  goldenBlimp: GoldenBlimp,
-  kraken: Kraken,
-  giantScorpion: GiantScorpion,
-  yeti: Yeti,
-  magmaTitan: MagmaTitan,
-  medusa: Medusa,
-}
 
 type Stage = Exclude<E2EBossStage, 'none' | 'defeated'>
 
@@ -33,8 +18,12 @@ interface BossSpawnerProps {
   groundFn: HeightFunction
 }
 
-/** Tell and arrival run on GameTimer's `timeRemaining`, which holds through pauses and the countdown. */
+/**
+ * Tell and arrival run on GameTimer's `timeRemaining`, which holds through pauses and the countdown. The boss's
+ * component comes from the level's world chunk (#862).
+ */
 export default function BossSpawner({ boss, track, groundFn }: BossSpawnerProps) {
+  const Boss = useWorld().bosses[boss.type]
   const spec = BOSS_SPECS[boss.type]
   const [stage, setStage] = useState<Stage>('waiting')
   const stageRef = useRef<Stage>('waiting')
@@ -73,8 +62,7 @@ export default function BossSpawner({ boss, track, groundFn }: BossSpawnerProps)
     if (stageRef.current !== 'done') advance('done')
   }, [advance])
 
-  if (stage === 'done') return null
-  const Boss = BOSS_COMPONENTS[boss.type]
+  if (stage === 'done' || !Boss) return null
   return <Boss
       id={boss.type}
       active={stage === 'active'}

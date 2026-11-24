@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HOP, hopRoute, newHopPose, type HopPose } from './hopGlideMotion'
+import { HOP, hopClock, hopRoute, newHopPose, type HopPose } from './hopGlideMotion'
 import { glideWings, hopPose, sitWings } from './hopGlideMotion.hot'
 
 const WALL = { width: 400, height: 240 }
@@ -124,5 +124,31 @@ describe('glideWings', () => {
     expect(glideWings(0)).toBe(0)
     expect(glideWings(1)).toBe(0)
     expect(glideWings(0.5)).toBe(1)
+  })
+})
+
+describe('hopClock (#928)', () => {
+  it('runs on game time, and a startled one takes off from any moment of a sit within a third of a second, moving smoothly', () => {
+    const dt = 1 / 60
+    let slowest = 0
+    let jump = 0
+    for (let t0 = HOP.arrive; t0 < HOP.arrive + route.loop; t0 += 0.05) {
+      if (at(t0).phase !== 'sit') continue
+      let t: number = t0
+      let took = 0
+      let prev = at(t)
+      while (prev.phase === 'sit') {
+        t = hopClock(t, dt, true)
+        took += dt
+        const next = at(t)
+        if (next.phase === 'sit') jump = Math.max(jump, Math.hypot(next.u - prev.u, next.v - prev.v))
+        prev = next
+      }
+      slowest = Math.max(slowest, took)
+    }
+    expect(hopClock(3, 0.5, false)).toBe(3.5)
+    expect(slowest).toBeLessThan(0.35)
+    // Its crawl hurried, never a snap across the wall (its take-off frame is a hop's first, a fast one anyway).
+    expect(jump).toBeLessThan(HOP.crawl / 2)
   })
 })

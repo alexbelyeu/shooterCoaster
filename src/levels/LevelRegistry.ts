@@ -4,7 +4,10 @@ import { paceLevel } from './pacing'
 // Levels 1 and 2's rides as plain numbers: the ride elements that build them stay out of the startup JS.
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
 import { DESERT_LEVEL_TRACK } from './environments/biomes/desert/desertLevel'
-import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
+// Level 4's ride too (#866), level 5's (#867) and level 2's (#864).
+import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
+import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
+import { GYM_LEVEL_TRACK, GYM_LEVEL_WALLS } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
@@ -19,6 +22,7 @@ const LEVELS: LevelConfig[] = [
     nextLevel: 'level2',
     // The ride kit's classic (#863, `parkTrack.ts`): a station launch, a lift hill, camelbacks, past the Ferris wheel.
     track: PARK_LEVEL_TRACK,
+    goldenBalloons: 3,
     ...paceLevel({
       waves: [
         { type: 'balloon', count: 50, waveLabel: 'Pop em!' },
@@ -101,23 +105,15 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: 44 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2660 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3180
+    maxScore: 36 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2540 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3060
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
-    track: {
-      varA: 3,
-      varB: 36,
-      varC: 4,
-      scalar: 35,
-      rollerSpeed: 0.000006,
-      minRollerSpeed: 0.00006,
-      curve: 'curve2',
-      color1: 0x909090,
-      color2: 0xffffff,
-    },
+    track: ARCTIC_LEVEL_TRACK,
     ...paceLevel({
       waves: [
-        { type: 'snowmanScout', count: 44, waveLabel: 'Scout Party', formation: 'line' },
+        // Longer, so the blizzard's wave meets the rider out of the ice cave, on the ridge's lift; 36, not 44: the whole party
+        // stands up the slow first lift in view at once, and 44 put the scene over its draw-call ceiling (#866).
+        { type: 'snowmanScout', count: 36, waveLabel: 'Scout Party', formation: 'line', weight: 1.5 },
         { type: 'snowman', count: 40, waveLabel: 'Snowmen Incoming!', weather: 'blizzard' },
         { type: 'snowmanBrute', count: 16, waveLabel: 'Brutes!' },
       ],
@@ -139,18 +135,7 @@ const LEVELS: LevelConfig[] = [
     maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60 + 3 * 60 + 500, // 2234 + the Magma Titan's vents, heart and reward (bossSpecs.ts) = 2914
     message: 'You conquered the Inferno!',
     nextLevel: 'level6',
-    track: {
-      varA: 3,
-      varB: 40,
-      varC: 5,
-      scalar: 40,
-      rollerSpeed: 0.000005,
-      minRollerSpeed: 0.00005,
-      curve: 'curve2',
-      color1: 0x2a2a2a,
-      color2: 0xff4400,
-      glow: 1.0,
-    },
+    track: INFERNO_LEVEL_TRACK,
     ...paceLevel({
       waves: [
         { type: 'emberWisp', count: 26, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 2 },
@@ -174,17 +159,18 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 14 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1422 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2322
+    maxScore: 24 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1572 (the V8’s rats included) + the Medusa’s eight snakes and reward (bossSpecs.ts) = 2472
     message: 'You sent the Climbing Gym!',
-    nextLevel: null,
+    nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
-    track: GYM_LEVEL.track,
-    walls: [...GYM_LEVEL.walls],
+    track: GYM_LEVEL_TRACK,
+    walls: [...GYM_LEVEL_WALLS],
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
     // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
     // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
-    // along the ride (`placeWallSwarm`): beside the car up Alaska, then on the Starr ahead of the drop, and the pack in the
-    // pit from 25 s, before the dyno.
+    // landing one after another on the Alaska walls beside the climbing car, each where the rider looks as it lands
+    // (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948), the last on the Starr past
+    // the crest, and the pack in the pit from 25 s, before the dyno.
     // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 17 s, once the sign is shot (it can be
     // until the car reaches it, 18.7 s), they line the branch ahead (ridden 18.9–21.5 s), and only that run meets them.
     ...paceLevel({
@@ -192,11 +178,56 @@ const LEVELS: LevelConfig[] = [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
         { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 4 },
         { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 8, bystanders: { type: 'climber', count: 3 } },
-        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 5 },
+        { type: 'lanternfly', count: 24, waveLabel: 'Lanternflies!', weight: 5 },
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
       branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 17 },
+    }),
+    starThresholds: [0.25, 0.55, 0.85],
+    environment: {},
+  },
+  {
+    id: 'level7',
+    name: 'Neon Metropolis',
+    description: 'Drones over the city that never sleeps',
+    order: 7,
+    biome: 'city',
+    maxScore: 112 * 15, // 1680: no boss, a finale wave ends the run
+    message: 'You cleared Neon Metropolis!',
+    nextLevel: null,
+    // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
+    // countdown, GO launches it over the fins and it drops straight into the street canyons; gravity rides the rest,
+    // the beat keeping a run to about half the lap. level1's curve family, extent varC × 13 × scalar = 1040.
+    track: {
+      varA: 3,
+      varB: 17,
+      varC: 4,
+      scalar: 20,
+      curve: 'curve1',
+      ride: 'v2',
+      mechanics: [{ kind: 'station', from: 0, to: 0.012, speed: 260 }],
+      rideV2: { crawl: 100, drag: 0.001 },
+      color1: 0xff3fb4,
+      color2: 0x2ee6ff,
+      glow: 0.6,
+    },
+    // Hover drones patrol the street canyons in Vs and rings; no boss yet (the helicopter is #322's), a finale wave ends the run.
+    // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the finale at 40 s. A wave of drones is
+    // shot down in a few seconds and the towers hide stragglers: four big waves 10 s apart, two scattered over the whole
+    // city, left the rider with nothing to shoot for most of the run (the pacing gate). The ring comes second, centred on
+    // the track, so the drop into the canyons has targets; the last wave and the finale come in three rings each, so
+    // they last until the next arrives and to the end of the run.
+    ...paceLevel({
+      waves: [
+        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
+        { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring' },
+        { type: 'hoverDrone', count: 13, waveLabel: 'Patrol Wing!', formation: 'v' },
+        { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'spiral' },
+        { type: 'hoverDrone', count: 14, waveLabel: 'Swarm Protocol!', formation: 'v' },
+        { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.5 },
+      ],
+      finale: { type: 'hoverDrone', count: 30, waveLabel: 'Final Wave!', formation: 'ring' },
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},

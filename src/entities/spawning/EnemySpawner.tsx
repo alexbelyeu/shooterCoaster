@@ -10,11 +10,11 @@ import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import type { HeightFunction } from '@/utils/terrainNoise'
-import { ENEMY_COMPONENTS } from '../enemies/enemyComponents'
+import { useWorld } from '@/levels/environments/worlds'
 import GoldenBalloon from '../enemies/GoldenBalloon'
 import BossSpawner from '../bosses/BossSpawner'
 import { GOLDEN_BALLOON, SCORE_VALUES } from '@/levels/scoring'
-import { createRng, type Rng } from '@/utils/rng'
+import { createRng, hashString, type Rng } from '@/utils/rng'
 import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import { requestSlowMo } from '@/combat/slowMo.hot'
 import type { EnemyEntry } from '../enemies/EnemyBase'
@@ -23,13 +23,16 @@ import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
   clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge,
   trackPoint, tracksideSlots,
-  type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
+  type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot,
 } from './spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 import {
   ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
 import { enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWaves } from './waveSchedule'
 import type { HardRoute } from '@/track/mechanics'
+import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
+import { ORBITS, placeOrbit, type SwimOrbit } from './swimOrbit'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -47,6 +50,8 @@ interface EnemySpawnerProps {
   bounds?: PlacementBounds
   /** Landmarks a ground enemy stood away from the track keeps out of (`BiomeDefinition.keepOff`). */
   keepOff?: readonly KeepOff[]
+  /** Moves an air enemy's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
+  clearAir?: (p: Vec3) => Vec3
   /** The track's hard route (#720), where a hard-route wave arrives; null without a junction. */
   hardRoute?: HardRoute | null
 }
@@ -73,6 +78,7 @@ interface Placed {
   entry?: EnemyEntry
   motion?: FormationMotion
   wall?: WallSlot
+  orbit?: SwimOrbit
 }
 
 const RADII: Record<EnemyType, number> = {
@@ -93,6 +99,7 @@ const RADII: Record<EnemyType, number> = {
   rat: 50,
   dustBunny: 45,
   lanternfly: 65,
+  hoverDrone: 55,
 }
 
 const NO_WALLS: readonly WallSurface[] = []
@@ -197,9 +204,11 @@ export default function EnemySpawner({
   walls = NO_WALLS,
   bounds,
   keepOff,
+  clearAir,
   hardRoute,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
+  const components = useWorld().enemies
   const getThree = useThree((s) => s.get)
   const runSeed = useGameStore((s) => s.runSeed)
   // One stream per run: the same seed gives the same enemies and golden balloons.
@@ -229,7 +238,13 @@ export default function EnemySpawner({
         const placed = placeTracksideWave({
           table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff,
         })
-        return members.map((e, i) => [e.id, { position: toVector3(placed[i]) }])
+        // A shark's circle, clear of the rails, the stacks and the shore (#922): its own stream, so the placement's is unchanged.
+        const band = ORBITS[wave.type]
+        const world = { index: buildTrackIndex(table), keepOff: keepOff ?? [], groundFn }
+        return members.map((e, i) => [e.id, {
+          position: toVector3(placed[i]),
+          orbit: band && placeOrbit(placed[i], band, world, createRng(runSeed ^ hashString(`orbit:${e.id}`))),
+        }])
       }
       if (members[0]?.swarm) {
         const slots = placeWallSwarm({ table, riderIndex, type: wave.type, walls, slots: members.map((e) => e.swarm!), ride })
@@ -241,7 +256,8 @@ export default function EnemySpawner({
       // On their walls already, where they enter: never pushed out of the near field.
       if (members[0]?.wall) return members.map((e) => [e.id, { position: e.position!, wall: e.wall }])
       if (!wave.formation || wave.formation === 'scatter') {
-        return members.map((e) => [e.id, { position: toVector3(clampToBounds(outsideNearField(e.position!, camera), bounds)) }])
+        const clear = ENEMY_PLACEMENT[wave.type].surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
+        return members.map((e) => [e.id, { position: toVector3(clear(clampToBounds(outsideNearField(e.position!, camera), bounds))) }])
       }
       const placed = placeFormationWave({
         table,
@@ -254,13 +270,14 @@ export default function EnemySpawner({
         slots: members.map((e) => e.slot!),
         ride,
         bounds,
+        clearAir,
       })
       return members.map((e, i) => {
         const p = placed[i]
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [groundFn, bounds, keepOff, walls],
+    [groundFn, bounds, keepOff, clearAir, walls, runSeed],
   )
 
   const placeWave = useCallback(
@@ -455,7 +472,7 @@ export default function EnemySpawner({
       {enemies.map((enemy) => {
         const placed = enemy.waveIndex <= activeWaveIndex ? placements.get(enemy.id) : undefined
         const type = enemy.type as EnemyType
-        const Component = ENEMY_COMPONENTS[type]
+        const Component = components[type]
         if (!placed || !Component) return null
         return (
           <Component
@@ -469,6 +486,7 @@ export default function EnemySpawner({
             radius={enemy.radius}
             onKill={onKill}
             wall={placed.wall}
+            orbit={placed.orbit}
             onEscape={enemy.bystander ? undefined : onEscape}
             bystander={enemy.bystander}
           />

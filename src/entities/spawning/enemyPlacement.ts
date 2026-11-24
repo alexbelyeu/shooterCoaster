@@ -58,6 +58,8 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   rat: { surface: 'ground', scatter: 'trackside' },
   dustBunny: { surface: 'ground', scatter: 'trackside' },
   lanternfly: { surface: 'wall', scatter: 'swarm' },
+  // Hovers in the street canyons ahead of the rider, about the ride's height
+  hoverDrone: { surface: 'air', scatter: band(150, 1400, 50, 150) },
 }
 
 export const GOLDEN_BALLOON_SCATTER = band(0, 3000, 50, 100)
@@ -130,6 +132,8 @@ export interface WallSlot {
   u: number
   v: number
   seed: number
+  /** Seconds after its wave arrives that it does (a swarm's later groups, #928); none, with the wave. */
+  after?: number
 }
 
 /** A wall enemy's origin off the wall's face, world units: its hands and feet on the wall. */
@@ -137,10 +141,16 @@ export const WALL_STANDOFF = 11
 /** Starts within this fraction of the wall's height from its foot, so a wave doesn't climb in lockstep. */
 export const WALL_START_SPREAD = 0.12
 
+/** The walls a climber may go up: every one but the perches (#948). */
+export function climbableWalls(walls: readonly WallSurface[]): readonly WallSurface[] {
+  return walls.filter((w) => !w.perch)
+}
+
 export function wallSlots(count: number, walls: readonly WallSurface[], rng: Rng): WallSlot[] {
-  if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+  const climbable = climbableWalls(walls)
+  if (climbable.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
   return Array.from({ length: count }, () => {
-    const wall = walls[Math.floor(rng() * walls.length)]
+    const wall = climbable[Math.floor(rng() * climbable.length)]
     const margin = Math.min(CLIMB.margin, wall.width / 2)
     return {
       wall,

@@ -70,6 +70,8 @@ const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon', Spec> = {
   dustBunny: { front: 0, holdHeading: 'model', motion: at(DUST_BUNNY_BOUNCE), animated: true },
   // Folded at rest on its wall; the strip is its first hop (after REST_TIME): wings opening red, open, folding.
   lanternfly: { front: 0, motion: at(FIRST_HOP.span, FIRST_HOP.from), animated: true, stage: 'wall', wallGap: HOP.standoff },
+  // Turns to the rider; the strip is one figure-eight (HoverDrone.tsx's FIGURE_EIGHT_RATE).
+  hoverDrone: { front: 0, holdHeading: 'model', motion: at(cycle(0.9)), animated: true },
 }
 
 /** Every boss. A `Record`, so a missing one fails `tsc -b`. */

@@ -11,6 +11,8 @@ export { DbError }
  */
 const MISSING_COLUMN_READ = '42703'
 export const CAMPAIGN = 'is.null'
+/** What `0005_rate_limit.sql`'s trigger raises on an IP's 6th row in 10 minutes. */
+export const RATE_LIMITED = 'PT429'
 
 export interface ScoresDb {
   /** The level's best `BOARD_SIZE` rows scoring at most `maxScore`: the campaign's (`day` null) or that day's daily. */

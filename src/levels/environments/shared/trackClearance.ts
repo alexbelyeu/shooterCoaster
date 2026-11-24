@@ -4,8 +4,9 @@ import type { ArcTable } from '@/track/arcLength'
  * XZ grid over the track's arc-table samples, for keeping props off it. Queries
  * are 2D on purpose: support towers run from the track down to the ground, so
  * anything near the track's ground projection can hit one however high it is.
- * Inside a tunnel (`ArcTable.tunnels`, #332) the track is as wide as the tube:
- * a sample there counts within `radius` + the tunnel's `reach`.
+ * Inside a tunnel (`ArcTable.tunnels`, #332) or another set-piece (`ArcTable.clearances`,
+ * level 4's ice cave, #911) the track is as wide as it: a sample there counts within
+ * `radius` + its `reach`.
  */
 export interface TrackIndex {
   table: ArcTable
@@ -44,11 +45,11 @@ export function buildTrackIndex(table: ArcTable): TrackIndex {
     if (!bucket) cells.set(key, (bucket = []))
     bucket.push(i)
   }
-  const tunnels = table.tunnels ?? []
+  const spans = [...(table.tunnels ?? []), ...(table.clearances ?? [])]
   let maxReach = 0
-  for (const span of tunnels) maxReach = Math.max(maxReach, span.reach)
+  for (const span of spans) maxReach = Math.max(maxReach, span.reach)
   const reachAt = (i: number) => {
-    for (const span of tunnels) if (i >= span.from && i <= span.to) return span.reach
+    for (const span of spans) if (i >= span.from && i <= span.to) return span.reach
     return 0
   }
 

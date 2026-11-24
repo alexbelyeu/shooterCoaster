@@ -5,7 +5,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import type { BiomeFeaturesProps } from '../../shared/types'
 import Volcano from '../../Volcano'
-import { VOLCANO_SITE } from '../../volcanoGeometry'
+import { CONE_HOLE, VOLCANO_SITE, coneCrossings } from '../../volcanoGeometry'
 import { createLavaMaterial } from '../../LavaShader'
 import { useFbmOctaves } from '@/canvas/useRenderBudget'
 import { createLavaRiverGeometries } from './lavaRivers'
@@ -19,7 +19,7 @@ const RIVER_INTENSITY = 1.7
 const RIVER_PULSE = { gain: 1.4, seconds: 1.6 }
 
 /** Volcano, lava rivers and the eruption (camera rumble, fog pulse; the ember burst is the `volcanicAsh` particle preset's boost). */
-export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fog }: BiomeFeaturesProps) {
+export default function VolcanicFeatures({ heightFn, groundFn, track, atmosphere, fog }: BiomeFeaturesProps) {
   const fogPulseRef = useRef({ active: false, startTime: 0, far: ERUPTION_FOG_FAR })
   const riverPulseRef = useRef({ active: false, startTime: 0 })
   const runId = useGameStore((s) => s.runId)
@@ -29,6 +29,8 @@ export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fog }
   const lavaRiverMat = useMemo(() => createLavaMaterial(0.08, RIVER_INTENSITY, true, octaves), [octaves])
   const lavaFlowMat = useMemo(() => createLavaMaterial(0.12, 1.8, false, octaves), [octaves])
 
+  const volcanoY = heightFn(VOLCANO_SITE.x, VOLCANO_SITE.z)
+  const holes = useMemo(() => coneCrossings(track, volcanoY).map((p) => ({ ...p, y: p.y + CONE_HOLE.centreUp })), [track, volcanoY])
   const lavaRiverGeos = useMemo(() => createLavaRiverGeometries(groundFn), [groundFn])
 
   useEffect(() => {
@@ -98,7 +100,7 @@ export default function VolcanicFeatures({ heightFn, groundFn, atmosphere, fog }
 
   return (
     <>
-      <Volcano position={[VOLCANO_SITE.x, heightFn(VOLCANO_SITE.x, VOLCANO_SITE.z), VOLCANO_SITE.z]} lavaMaterial={lavaFlowMat} />
+      <Volcano position={[VOLCANO_SITE.x, volcanoY, VOLCANO_SITE.z]} lavaMaterial={lavaFlowMat} holes={holes} />
       {lavaRiverGeos.map((geo, i) => (
         <mesh
           key={`lava-river-${i}`}

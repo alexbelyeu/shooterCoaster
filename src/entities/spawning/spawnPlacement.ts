@@ -6,27 +6,25 @@ import { RUN_SECONDS } from '@/levels/pacing'
 import { waveWindows } from './waveSchedule'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
+import type { Vec3 } from '@/utils/vec3'
 import { maxReadableDistance } from '../enemies/enemyReadability'
 import {
-  BYSTANDER_SPACING, ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, wallNormal, wallPoint, type Surface, type SwarmSlot, type WallSlot,
+  BYSTANDER_SPACING, ENEMY_PLACEMENT, WATER_DEPTH, WATER_Y, climbableWalls, wallNormal, wallPoint,
+  type Surface, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
 import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { LOOK_AHEAD_UNITS, lookAheadDirection } from '@/track/cameraRig.hot'
 import { BASE_VERTICAL_FOV, MIN_HORIZONTAL_FOV } from '@/track/cameraFov.hot'
 import { EYE_HEIGHT } from '@/track/trackDimensions'
+import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
+import { ORBITS } from './swimOrbit'
 
 /**
  * Formation placement, pure. Slots are seeded at level load (so `spawnDigest` stays
  * deterministic per seed); world positions are only known at activation, once the
  * rider's place on the track is.
  */
-
-export interface Vec3 {
-  x: number
-  y: number
-  z: number
-}
 
 export type ChoreographedFormation = Exclude<Formation, 'scatter'>
 
@@ -179,6 +177,10 @@ export interface RideAhead {
   window: number
   /** The level's structure scale: the rig looks `LOOK_AHEAD_UNITS` × this ahead. */
   trackScale: number
+  /** Seconds of the wave's window (a swarm's groups arrive along it, `placeWallSwarm`); none, every group arrives at once. */
+  seconds?: number
+  /** Arc distance the rider is predicted to cover `t` seconds after the wave activates (its ride profile, no slack): where a group arriving then is seen from. */
+  riddenAfter?: (t: number) => number
   /** Arc ahead where the wave's stretch ends, the trackside band's spread included (a hard-route wave's merge, #720). */
   until?: number
 }
@@ -212,7 +214,13 @@ export function rideAheadOfWaves(
   let everyRun = 0
   return waves.map((wave) => {
     const [from, to] = wave.route ? [wave.spawnDelay ?? 0, wave.spawnDelay ?? 0] : windows[everyRun++]
-    return { entry: riddenBetween(profile, from, from + ENTRY_SECONDS_MAX), window: RIDE_PACE_SLACK * riddenBetween(profile, from, to), trackScale }
+    return {
+      entry: riddenBetween(profile, from, from + ENTRY_SECONDS_MAX),
+      window: RIDE_PACE_SLACK * riddenBetween(profile, from, to),
+      trackScale,
+      seconds: to - from,
+      riddenAfter: (t: number) => riddenBetween(profile, from, from + t),
+    }
   })
 }
 
@@ -261,6 +269,11 @@ export function trackView(table: ArcTable, index: number, trackScale: number): T
     toAhead.z += h * (upAhead.z - up.z)
   }
   const dir = lookAheadDirection(trackTangent(table, index), normalize(toAhead), { x: 0, y: 0, z: 0 })
+  if (table.ups && Math.hypot(dir.x, dir.z) < 1e-3) {
+    // A drop track's shaft points straight down; the car falls upright looking along `dropHeading`, the rails' up there.
+    const up = trackUp(table, index)
+    Object.assign(dir, normalize({ x: up.x, y: 0, z: up.z }))
+  }
   if (facingBack(table, index)) {
     const up = trackUp(table, index)
     const along = 2 * dot(dir, up)
@@ -453,14 +466,17 @@ export interface PlaceWaveInput {
   slots: readonly FormationSlot[]
   ride: RideAhead
   bounds?: PlacementBounds
+  /** Moves an air member's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
+  clearAir?: (p: Vec3) => Vec3
 }
 
 /** World placements for a formation wave's slots, in slot order. */
 export function placeFormationWave(input: PlaceWaveInput): Placement[] {
-  const { table, riderIndex, camera, formation, type, groundFn, slots, ride, bounds } = input
+  const { table, riderIndex, camera, formation, type, groundFn, slots, ride, bounds, clearAir } = input
   // Inside an interior's walls, back on its surface (a clamped air slot keeps its clearance under the roof).
   const keepIn = (p: Vec3) => (bounds ? clampToBounds(settle(clampToBounds(p, bounds), surface, groundFn), bounds) : p)
   const surface = ENEMY_PLACEMENT[type].surface
+  const clear = surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
   const reach = maxReadableDistance(type)
   const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
   const step = groupStep(table, formation, groups, ride)
@@ -497,7 +513,7 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
     }
     const { from, spin } = entryStart(formation, f, position, groundFn)
     return {
-      position: keepIn(outsideNearField(keepIn(position), camera)),
+      position: clear(keepIn(outsideNearField(keepIn(position), camera))),
       from: keepIn(outsideNearField(keepIn(from), camera)),
       spin,
       entrySeconds: ENTRY_SECONDS + (ENTRY_STAGGER * slot.index) / Math.max(1, slot.groupSize - 1),
@@ -680,7 +696,7 @@ export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, 
   return slots.map((slot) => {
     const at = { ahead: tracksideAhead(table, surface, slot, ride), side: slot.side }
     const p = surface === 'water'
-      ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale)
+      ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale, ORBITS[type] ? keepOff : null)
       : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff, roam)
     const placed = outsideNearField(settle(p, surface, groundFn), camera)
     const out = surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
@@ -835,23 +851,34 @@ function clearOfRails(table: ArcTable, index: number, p: Vec3, clearance: number
 }
 
 /**
- * The slot, or across the track, or nearer / further within the band: the first with sea under it
- * that is in view on its approach, else the first with sea under it, else the slot.
+ * The slot, or across the track, or nearer / further within the band: the first with water under it that is in view on
+ * its approach, else the first with water under it, else the slot. A swimmer that laps a circle (`swimOrbit.ts` `ORBITS`,
+ * given `keepOff`) takes only open sea (also `sideMin` off every rail of the lap, not just its own stretch's, and out of
+ * `keepOff`: the sea stacks, #922), out at the band's far side, its middle or near its rails if there is none at the slot's.
  */
 function wetTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, groundFn: HeightFunction, reach: number, trackScale: number,
+  keepOff: readonly KeepOff[] | null,
 ): Vec3 {
-  const { aheadMin, aheadMax } = TRACKSIDE.water
+  const { aheadMin, aheadMax, sideMin, sideMax } = TRACKSIDE.water
+  const index = buildTrackIndex(table)
+  const sign = Math.sign(slot.side)
   let wet: Vec3 | null = null
-  for (let k = 0; k < WATER_SEARCH_TRIES; k++) {
-    const step = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * WATER_SEARCH_STEP
-    const ahead = Math.min(aheadMax, Math.max(aheadMin, slot.ahead + step))
-    for (const side of [slot.side, -slot.side]) {
-      const p = tracksidePoint(table, riderIndex, { ahead, side })
-      if (groundFn(p.x, p.z) >= WATER_DEPTH) continue
-      if (inViewOnApproach(table, riderIndex, ahead, { x: p.x, y: WATER_Y, z: p.z }, reach, trackScale)) return p
-      wet ??= p
+  for (const offset of [Math.abs(slot.side), sideMax, (sideMin + sideMax) / 2, 2 * sideMin]) {
+    let open: Vec3 | null = null
+    for (let k = 0; k < WATER_SEARCH_TRIES; k++) {
+      const step = (k % 2 === 0 ? 1 : -1) * Math.ceil(k / 2) * WATER_SEARCH_STEP
+      const ahead = Math.min(aheadMax, Math.max(aheadMin, slot.ahead + step))
+      for (const side of [sign * offset, -sign * offset]) {
+        const p = tracksidePoint(table, riderIndex, { ahead, side })
+        if (groundFn(p.x, p.z) >= WATER_DEPTH) continue
+        wet ??= p
+        if (keepOff && (index.near(p.x, p.z, sideMin) || !clearOfKeepOff(p, keepOff, 0))) continue
+        if (inViewOnApproach(table, riderIndex, ahead, { x: p.x, y: WATER_Y, z: p.z }, reach, trackScale)) return p
+        open ??= p
+      }
     }
+    if (open || !keepOff) return open ?? wet ?? tracksidePoint(table, riderIndex, slot)
   }
   return wet ?? tracksidePoint(table, riderIndex, slot)
 }
@@ -931,15 +958,23 @@ function horizontal(v: Vec3): Vec3 {
   return len > 1e-9 ? { x: v.x / len, y: 0, z: v.z / len } : { x: 1, y: 0, z: 0 }
 }
 
-/** Views of the rider each of a swarm's groups is judged from, over its part of the first share of the wave's window. */
+/** Views of the rider each of a swarm's groups is judged from, over the part of the ride it is in play. */
 const SWARM_VIEWS = 6
-const SWARM_WINDOW_SHARE = 0.9
+/** A group is judged from the rider's views over this long from its arrival: about as long as it takes to clear. */
+const SWARM_GROUP_SECONDS = 1.5
 /**
- * A swarm of at least twice `SWARM_GROUP_MIN` splits into up to `SWARM_GROUPS` groups, each round the spot the rider sees most
- * over its own stretch of the window (#768): on level 6, beside the car up Alaska, then ahead of it over the dyno and the drop.
+ * A swarm's groups land evenly from the wave's tell to this long after its window closes (#948): the rider clears a small
+ * group in about a second, so the last holds the stretch while the next wave is still arriving.
  */
-const SWARM_GROUPS = 3
-const SWARM_GROUP_MIN = 4
+const SWARM_LAST_LATE = 1
+/**
+ * A swarm splits into groups of at least `SWARM_GROUP_MIN`, up to `SWARM_GROUPS`, each round the spot the rider sees most
+ * while that group is in play (#768), from the moment it arrives (#928): on level 6, one after another on the walls beside
+ * the car up Alaska, then on the roof over its top as it rolls over (#948), the last on the Starr past the crest, so new
+ * ones keep landing in frame through the wave, not one burst.
+ */
+const SWARM_GROUPS = 7
+const SWARM_GROUP_MIN = 3
 /** Candidate centres across and up each wall, about this far apart. */
 const SWARM_CANDIDATE_STEP = 80
 /** The rider must see the wall's face at least this square-on (the cosine), not edge-on: a car climbing beside a wall sees it at a slant. */
@@ -989,23 +1024,24 @@ function bestSwarmSpot(walls: readonly WallSurface[], views: readonly RiderFrame
 
 /**
  * A swarm's walls and its members' spots on them (#516): the members split into groups along the wave's window, each
- * clustered round the spot its stretch of the ride sees most (`bestSwarmSpot`).
+ * clustered round the spot its stretch of the ride sees most (`bestSwarmSpot`) and arriving (`WallSlot.after`) as its
+ * stretch starts, so the wave is a stretch of shooting (#928).
  */
 export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: PlaceSwarmInput): WallSlot[] {
   if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
   const reach = maxReadableDistance(type)
   const groups = Math.max(1, Math.min(SWARM_GROUPS, Math.floor(slots.length / SWARM_GROUP_MIN)))
-  const stretch = (ride.window * SWARM_WINDOW_SHARE) / groups
+  const arrivals = Array.from({ length: groups }, (_, g) => swarmArrival(ride, g, groups))
   const spots = Array.from({ length: groups }, (_, g) => {
     const views: RiderFrame[] = []
     for (let j = 0; j < SWARM_VIEWS; j++) {
-      const ahead = ride.entry + stretch * (g + j / (SWARM_VIEWS - 1))
-      views.push(riderFrame(table, indexAhead(table, riderIndex, ahead), ride.trackScale))
+      views.push(riderFrame(table, indexAhead(table, riderIndex, swarmViewAhead(ride, g, groups, arrivals[g], j / (SWARM_VIEWS - 1))), ride.trackScale))
     }
     return bestSwarmSpot(walls, views, reach)
   })
   return slots.map((s, i) => {
-    const { wall, u, v } = spots[Math.floor((i * groups) / slots.length)]
+    const g = Math.floor((i * groups) / slots.length)
+    const { wall, u, v } = spots[g]
     const mu = Math.min(HOP.margin, wall.width / 2)
     const mv = Math.min(HOP.margin, wall.height / 2)
     return {
@@ -1013,16 +1049,39 @@ export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: 
       u: Math.min(wall.width - mu, Math.max(mu, u + s.du)),
       v: Math.min(wall.height - mv, Math.max(mv, v + s.dv)),
       seed: s.seed,
+      after: arrivals[g],
     }
   })
 }
 
 /**
+ * Seconds after its wave activates that group `g` of a swarm lands: the first with the wave, the rest evenly after it, the
+ * last `SWARM_LAST_LATE` after the window closes, for the stretch after it (on level 6, the Starr past the crest while the
+ * next wave, the pack, is still out of sight in the pit). No window: every group at once.
+ */
+function swarmArrival(ride: RideAhead, g: number, groups: number): number {
+  const seconds = ride.seconds ?? 0
+  if (groups < 2 || seconds <= 0) return 0
+  return (g * (seconds + SWARM_LAST_LATE)) / (groups - 1)
+}
+
+/**
+ * Arc ahead of the rider at fraction `f` of the views group `g` is judged from: with the ride's profile, the ground the
+ * rider covers over `SWARM_GROUP_SECONDS` from the group's arrival, so it lands in frame; without one, or every group
+ * arriving at once, its share of the window's arc after the fly-in.
+ */
+function swarmViewAhead(ride: RideAhead, g: number, groups: number, arrival: number, f: number): number {
+  if (!ride.riddenAfter || !ride.seconds) return ride.entry + (ride.window / groups) * (g + f)
+  return ride.riddenAfter(arrival + SWARM_GROUP_SECONDS * f)
+}
+
+/**
  * Bystander climbers (#518) at the foot of the wall a swarm would take (`placeWallSwarm`: the one the rider sees most over
- * the wave's window), in a row across it round that spot, closer together on a narrow wall. `slots` are `bystanderSlots`.
+ * the wave's window, never a perch), in a row across it round that spot, closer together on a narrow wall. `slots` are
+ * `bystanderSlots`.
  */
 export function placeWallClimbers(input: PlaceSwarmInput): WallSlot[] {
-  const [{ wall, u }] = placeWallSwarm({ ...input, slots: [{ du: 0, dv: 0, seed: 0 }] })
+  const [{ wall, u }] = placeWallSwarm({ ...input, walls: climbableWalls(input.walls), slots: [{ du: 0, dv: 0, seed: 0 }] })
   const n = input.slots.length
   const margin = Math.min(CLIMB.margin, wall.width / 2)
   const spacing = Math.min(BYSTANDER_SPACING, (wall.width - 2 * margin) / Math.max(1, n))

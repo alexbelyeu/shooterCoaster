@@ -23,6 +23,8 @@ export interface EnemyKilledEvent {
   sound?: KillSound
   /** A boss weak point's id instead: the engine picks that part's sound. */
   bossPart?: string
+  /** The big score popup (`ScorePopups`): set on the kill that defeats a boss, never from the score alone. */
+  big?: true
 }
 
 /** Muzzle flash lifetime. */

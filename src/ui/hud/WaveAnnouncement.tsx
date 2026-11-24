@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { m, AnimatePresence } from 'framer-motion'
 import { eventBus } from '@/core/EventBus'
 import { FairBoard } from '@/ui/Fair'
 
@@ -39,11 +39,11 @@ export default function WaveAnnouncement() {
       <div className="wave-announcement">
         <AnimatePresence>
           {text && (
-            <motion.div key={text} className="wave-banner" exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+            <m.div key={text} className="wave-banner" exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
               <FairBoard className="wave-card" shadowClassName="wave-card-shadow fair-hook">
                 <span className="wave-banner-text fair-title">{text}</span>
               </FairBoard>
-            </motion.div>
+            </m.div>
           )}
         </AnimatePresence>
       </div>

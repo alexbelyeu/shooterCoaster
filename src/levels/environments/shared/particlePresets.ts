@@ -169,7 +169,34 @@ const gymChalk: ParticleFieldPreset = {
   secondaryShare: 0.2,
 }
 
-export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk } as const
+/** Neon Metropolis (#323): a sparse, slow drizzle falling through the street canyons, a few drops catching the neon. */
+const cityDrizzle: ParticleFieldPreset = {
+  count: 1300,
+  box: [380, 240, 380],
+  primary: {
+    color: 0x9aa8d8,
+    opacity: 0.4,
+    size: 0.8,
+    maxPixels: 3,
+    velocity: [1.5, -18, 3],
+    sway: 1,
+    flicker: 0,
+    additive: true,
+  },
+  secondary: {
+    color: 0xff7ad8,
+    opacity: 0.5,
+    size: 0.8,
+    maxPixels: 3,
+    velocity: [1.5, -19, 3],
+    sway: 1,
+    flicker: 0.5,
+    additive: true,
+  },
+  secondaryShare: 0.2,
+}
+
+export const PARTICLE_PRESETS = { parkPollen, desertDust, oceanPlankton, arcticSnow, volcanicAsh, gymChalk, cityDrizzle } as const
 
 /** Points to draw: always-on and boost-only. Touch screens get half (as `renderBudget.ts` cuts their pixels); the graphics quality's `particleScale` thins both. */
 export function particleCounts(preset: ParticleFieldPreset, coarsePointer: boolean, qualityScale = 1): { base: number; boost: number } {

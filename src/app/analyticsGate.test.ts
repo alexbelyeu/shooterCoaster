@@ -6,6 +6,7 @@ import {
   INTERNAL_STORAGE_KEY,
   isInternalBrowser,
   isInternalThisLoad,
+  isLiveSite,
   searchWithoutInternalParam,
   setInternalBrowser,
   type FlagStorage,
@@ -32,6 +33,14 @@ const throwing: FlagStorage = {
     throw new Error('SecurityError')
   },
 }
+
+describe('isLiveSite', () => {
+  it('is the Vercel build without ?e2e, internal or not', () => {
+    expect(isLiveSite(true, '?internal=1')).toBe(true)
+    expect(isLiveSite(true, '?e2e=1')).toBe(false)
+    expect(isLiveSite(false, '')).toBe(false)
+  })
+})
 
 describe('analyticsEnabled', () => {
   it('runs on a Vercel build for real visitors', () => {

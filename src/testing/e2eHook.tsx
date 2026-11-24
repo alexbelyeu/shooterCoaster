@@ -41,7 +41,7 @@ import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
 import { levelWeather, weatherSeconds } from '@/levels/environments/shared/weatherPulse'
 import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
-import { fireAtNDC } from '@/combat/useShooting'
+import { fireAtNDC, showShotAtNDC } from '@/combat/useShooting'
 import { hashString } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
 import { startupTimings, type StartupPhase } from '@/core/startupMarks'
@@ -59,8 +59,8 @@ import { musicState, type MusicFade } from '@/audio/musicBus'
 import { scrimPlayer } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
 import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
-import { clipboardText, sharePayloadForRun } from '@/ui/share'
-import { setOnlineEndpointOverride } from '@/store/onlineLeaderboard'
+import { clipboardText, sharePayload } from '@/ui/share'
+import { setOnlineEndpointOverride } from '@/app/onlineLeaderboard'
 import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
 import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
@@ -73,6 +73,7 @@ import { RIG_MAX_PITCH_DEG, RIG_MAX_ROLL_DEG } from '@/track/cameraRig.hot'
 import { STREAK_SPEED_THRESHOLD } from '@/track/windStreaks'
 import { MAX_FOV_KICK_DEG } from '@/track/cameraFov.hot'
 import { programsAfterWarmup } from '@/core/hitchLog'
+import { collectOccluders, countSight, type SightCounts, type SightTarget } from './lineOfSight'
 import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
 import { bystanderCount } from '@/combat/bystanders'
 import { BYSTANDER_PENALTY } from '@/levels/scoring'
@@ -182,6 +183,11 @@ export interface SCTestApi {
    */
   enemies: () => E2EEnemyOnScreen[]
   errors: string[]
+  /**
+   * Every phase or level change since load (#933), oldest first, at most `RUN_LOG_MAX`: the page time (ms), the frame,
+   * and the top of the stack that made it, so a check that finds the page in another run can say what started it.
+   */
+  runLog: { ms: number; frame: number; phase: GamePhase; level: string | null; from: string }[]
   /** Counts of 'weapon:fire' / 'enemy:hit' / 'enemy:killed' since load. */
   combat: { fired: number; hits: number; kills: number }
   /** Camera translation off the track pose this frame, and the max seen.
@@ -250,8 +256,10 @@ export interface SCTestApi {
    */
   sceneStats: () => SceneStats | null
   /** Every 100 ms (real time, at most once per rendered frame) aim at the nearest
-   *  live on-screen enemy and fire a real bullet through the pool. */
-  autoFire: (enabled: boolean) => void
+   *  live on-screen enemy and fire a real bullet through the pool. With `hitsPerSecond` (#925: the pacing step and the
+   *  ride review) it plays as a player instead, on the game clock so any runner gets the same run: that many hits a game
+   *  second on the nearest targets `sight()` counts shootable, the shot's look with no colliding bullet (`showShotAtNDC`) and each hit through processHit, the only path that hits. */
+  autoFire: (enabled: boolean, hitsPerSecond?: number) => void
   /** Kill the n nearest live enemies (on-screen ones first; never a boss weak point, see bossHit). Fires one real shot
    *  at the first on-screen victim (bullet, muzzle flash, weapon recoil; may be
    *  throttled by the fire delay), then resolves each victim through
@@ -269,7 +277,7 @@ export interface SCTestApi {
   primeCombo: (count: number) => void
   /** Force the results phase. */
   endLevel: () => void
-  /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null. */
+  /** What the results share menu's Copy link puts on the clipboard for the current level and score (`text url`), or null (and always null in the portal build, which has no Share). */
   /** `worldRank` (0-based): the line a run on the World top 10 shares (#445). */
   shareText: (worldRank?: number | null) => string | null
   /** The results Share image (#272) for the current level and run, drawn as the share menu draws it: its pixel size,
@@ -343,6 +351,12 @@ export interface SCTestApi {
   summonBoss: () => void
   /** The level's boss: stage, hp, exposed weak points on screen, the body's on-screen box. */
   boss: () => E2EBoss
+  /**
+   * What the rider can shoot right now (#925, `lineOfSight.ts`): live enemies and exposed boss weak points inside the view,
+   * at least `MIN_ENEMY_PX` and not behind the world, plus those hidden (`occluded`) or too small (`tiny`). `bossFramed`:
+   * the boss is in its fight and one of its weak points is shootable. Walks and raycasts the scene: sample it, not per frame.
+   */
+  sight: () => E2ESight
   /** n hits on the boss's exposed weak points (nearest first), each through processHit. Returns how many landed. */
   bossHit: (n: number) => number
   /** One hit on each of the boss's live projectiles (the Yeti's snowballs), through processHit. Returns how many landed. */
@@ -534,6 +548,15 @@ export interface E2EWeaponOnScreen {
   /** Viewport the box was measured in. */
   width: number
   height: number
+}
+
+export interface E2ESight extends SightCounts {
+  /** The level timer's elapsed seconds, unrounded (the store's `timeRemaining` moves in whole seconds). */
+  levelTime: number
+  bossStage: E2EBossStage
+  bossFramed: boolean
+  /** The shootable enemies by type (#928: how long a wave's own enemies last). */
+  byType: Record<string, number>
 }
 
 export interface E2EEnemyOnScreen {
@@ -844,7 +867,8 @@ function readBoss(): E2EBoss {
   return out
 }
 
-const isBossTarget = (t: CollisionTarget) => t.id.startsWith('boss:')
+const isBossId = (id: string) => id.startsWith('boss:')
+const isBossTarget = (t: CollisionTarget) => isBossId(t.id)
 
 function bossHit(n: number): number {
   let landed = 0
@@ -914,6 +938,32 @@ function isMounted(t: CollisionTarget) {
   return t.getPosition().y > -9000
 }
 
+const NO_SIGHT: E2ESight = { levelTime: 0, shootable: 0, occluded: 0, tiny: 0, ids: [], bossStage: 'none', bossFramed: false, byType: {} }
+
+function readSight(): E2ESight {
+  const cam = probeCamera
+  const scene = probeScene
+  if (!cam || !scene) return { ...NO_SIGHT, levelTime: e2eLevelTime, bossStage: e2eBoss.stage }
+  const skip = new Set<THREE.Object3D>()
+  for (const { object } of enemyRegistry.values()) skip.add(object)
+  if (e2eBoss.handle) skip.add(e2eBoss.handle.body)
+  const targets: SightTarget[] = []
+  for (const t of getCollisionTargets()) {
+    if (!isLive(t)) continue
+    const radius = Math.sqrt(t.radiusSq)
+    const type = enemyRegistry.get(t.id)?.type
+    targets.push({ id: t.id, position: t.getPosition().clone(), size: type ? (ENEMY_SILHOUETTE[type] ?? 2 * radius) : 2 * radius, radius })
+  }
+  const counts = countSight(targets, cam, collectOccluders(scene, cam, skip))
+  const bossFramed = e2eBoss.stage === 'active' && counts.ids.some((id) => isBossId(id))
+  const byType: Record<string, number> = {}
+  for (const id of counts.ids) {
+    const type = enemyRegistry.get(id)?.type
+    if (type) byType[type] = (byType[type] ?? 0) + 1
+  }
+  return { ...counts, levelTime: e2eLevelTime, bossStage: e2eBoss.stage, bossFramed, byType }
+}
+
 /** Weapon pickups, a junction's switch and bystanders are targets too, but no enemy. */
 function isLive(t: CollisionTarget) {
   return t.kind === undefined && isMounted(t)
@@ -945,7 +995,34 @@ function liveTargetsByDistance(camera: THREE.Camera | null) {
 }
 
 const _aim = new THREE.Vector3()
+/** Hits a game second for `autoFire`'s player mode, and the game time its last hit was due. */
+let playerRate: number | null = null
+let lastPlayerHit = 0
+/** A long frame's hits are capped: a player doesn't land a burst after a stall. */
+const PLAYER_MAX_HITS_A_FRAME = 4
+
+function playerFireTick(camera: THREE.Camera, rate: number) {
+  const now = gameTime()
+  const due = Math.min(PLAYER_MAX_HITS_A_FRAME, Math.floor((now - lastPlayerHit) * rate))
+  if (due <= 0) return
+  lastPlayerHit = Math.max(lastPlayerHit + due / rate, now - 1 / rate)
+  if (useGameStore.getState().phase !== 'playing') return
+  const shootable = new Set(readSight().ids)
+  camera.getWorldPosition(_w)
+  const victims = getCollisionTargets()
+    .filter((t) => shootable.has(t.id))
+    .map((t) => ({ t, d: t.getPosition().distanceToSquared(_w) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, due)
+  if (!victims.length) return
+  // The shot's look only: a real bullet, throttled on wall-clock time, would land extra hits
+  // that depend on the runner's speed. processHit is the one path that hits here.
+  if (onScreenNDC(victims[0].t, camera, _aim)) showShotAtNDC(_aim.x, _aim.y, victims.length)
+  for (const { t } of victims) processHit(t)
+}
+
 function autoFireTick(camera: THREE.Camera) {
+  if (playerRate) return playerFireTick(camera, playerRate)
   const now = performance.now()
   if (now - lastAutoFire < AUTOFIRE_INTERVAL_MS) return
   if (useGameStore.getState().phase !== 'playing') return
@@ -962,6 +1039,19 @@ function autoFireTick(camera: THREE.Camera) {
   if (!best) return
   onScreenNDC(best, camera, _aim)
   if (fireAtNDC(_aim.x, _aim.y, camera)) lastAutoFire = now
+}
+
+const RUN_LOG_MAX = 40
+
+/** Appends phase / level changes to `runLog`; the subscriber runs inside the store's `set`, so its stack names the caller. */
+function logRunChanges(api: SCTestApi) {
+  useGameStore.subscribe((next, prev) => {
+    if (next.phase === prev.phase && next.currentLevel === prev.currentLevel) return
+    // eslint-disable-next-line sc/no-hot-path-alloc -- a phase change, never per frame
+    const from = (new Error().stack ?? '').split('\n').slice(2, 6).map((l) => l.trim()).join(' < ')
+    api.runLog.push({ ms: Math.round(performance.now()), frame: api.frames, phase: next.phase, level: next.currentLevel, from })
+    if (api.runLog.length > RUN_LOG_MAX) api.runLog.shift()
+  })
 }
 
 export function installE2EApi() {
@@ -1023,6 +1113,7 @@ export function installE2EApi() {
     phase: () => useGameStore.getState().phase,
     enemies: enemiesOnScreen,
     errors: [],
+    runLog: [],
     combat: { fired: 0, hits: 0, kills: 0 },
     cameraTranslation: { current: 0, max: 0 },
     cameraTrauma: { current: 0, max: 0 },
@@ -1051,9 +1142,11 @@ export function installE2EApi() {
     programGrowth: [],
     initTimings: startupTimings,
     sceneStats: () => null,
-    autoFire: (enabled: boolean) => {
+    autoFire: (enabled: boolean, hitsPerSecond?: number) => {
       autoFireEnabled = enabled
       lastAutoFire = 0
+      playerRate = enabled && hitsPerSecond ? hitsPerSecond : null
+      lastPlayerHit = gameTime()
     },
     killNearest: (n: number) => {
       const victims = liveTargetsByDistance(probeCamera).slice(0, Math.max(0, n))
@@ -1133,9 +1226,11 @@ export function installE2EApi() {
       useGameStore.getState().setPhase('results')
     },
     shareText: (worldRank: number | null = null) => {
-      const { currentLevel, score } = useGameStore.getState()
-      const payload = currentLevel ? sharePayloadForRun(currentLevel, Math.round(score), 'copy', worldRank) : null
-      return payload ? clipboardText(payload) : null
+      const s = useGameStore.getState()
+      // The portal build has no Share (#254): its bundle must not carry the share link (scripts/portal/rules.mjs).
+      if (__PORTAL_BUILD__) return null
+      const card = s.currentLevel ? scoreCardRun({ ...s, levelId: s.currentLevel, mode: s.runMode, worldRank }) : null
+      return card ? clipboardText(sharePayload(card, 'copy')) : null
     },
     scoreCard: async (size: CardSize) => {
       const s = useGameStore.getState()
@@ -1165,7 +1260,7 @@ export function installE2EApi() {
       const id = useGameStore.getState().currentLevel
       return (id ? getLevelConfig(id)?.track.rideV2?.beats : undefined) ?? []
     },
-    view: readView,
+    sight: readSight,
     graphics: () => {
       const { quality, reducedMotion } = useSettingsStore.getState()
       return { quality, profile: qualityProfile(quality), adaptiveSteps: getAdaptiveSteps(), reducedMotion }
@@ -1177,6 +1272,7 @@ export function installE2EApi() {
     },
     summonBoss: () => { e2eBoss.summon = useGameStore.getState().runId },
     boss: readBoss,
+    view: readView,
     bossHit,
     projectileHit,
     bossStep: null,
@@ -1207,6 +1303,7 @@ export function installE2EApi() {
   window.addEventListener('error', (e) => api.errors.push(String(e.error?.stack ?? e.message)))
   window.addEventListener('unhandledrejection', (e) => api.errors.push(String(e.reason)))
   window.__SC_TEST__ = api
+  logRunChanges(api)
 }
 
 /** Spin (max 20 ms) until AudioContext.currentTime moves, which it does mid-task. */

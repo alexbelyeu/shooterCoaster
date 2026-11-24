@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accuracyPercent, bulbRing, bulbStar, counterWheels, formatAccuracy, isNewRecord, nextStarLine, runLines, type RunLineInput } from './resultsStats'
+import { accuracyPercent, bulbRing, bulbStar, counterWheels, formatAccuracy, formatBestCombo, isNewRecord, nextStarLine, runLines, type RunLineInput } from './resultsStats'
 
 describe('accuracy', () => {
   it('is hits / shots as a whole percent', () => {
@@ -19,6 +19,13 @@ describe('accuracy', () => {
   })
 })
 
+describe('formatBestCombo', () => {
+  it('is the multiplier sign, or a dash without a combo', () => {
+    expect(formatBestCombo(14)).toBe('×14')
+    expect(formatBestCombo(0)).toBe('—')
+  })
+})
+
 describe('isNewRecord', () => {
   it('needs a non-zero score above the previous best', () => {
     expect(isNewRecord(100, 0)).toBe(true)
@@ -33,7 +40,7 @@ const text = (run: RunLineInput) => runLines(run).map((l) => `${l.stat}=${l.text
 
 describe('runLines', () => {
   it("says the run in the showman's voice", () => {
-    expect(text(RUN)).toEqual(['hits=12 of 86 hit', 'accuracy=64% of shots on target', 'combo=Best combo 3x', 'time=50 seconds to spare'])
+    expect(text(RUN)).toEqual(['hits=12 of 86 hit', 'accuracy=64% of shots on target', 'combo=Best combo ×3', 'time=50 seconds to spare'])
   })
 
   it('has a line for no shots, no combo, one second and none left', () => {

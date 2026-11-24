@@ -36,8 +36,8 @@ import {
   rocketsForStreak,
   slotLifetime,
   type BurstPattern,
-  type Vec3,
 } from './fireworks'
+import type { Vec3 } from '@/utils/vec3'
 
 /** Age of a free slot: before any launch, so every point is hidden. */
 const IDLE_AGE = -1e4

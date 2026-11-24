@@ -120,6 +120,10 @@ commands, whole-file reads of 15–20k-character files, and 260+ turns at 200–
    full smoke or Lighthouse locally: CI runs them on the PR in parallel shards (~5 min), and
    that `verify` is the gate QA reads; the deep checks run in the nightly full smoke. Push, open the PR, label it and finish; don't wait for CI.
    If it goes red, QA sends the PR back with the failing shard and Fix reproduces just that one.
+   A change to a ride, its waves, a boss or a level's effects also runs the ride review,
+   `bash scripts/quiet.sh timeout 280 npm run review -- --level <id>`: look at the whole `e2e-results/review/<id>/sheet.jpg`
+   against `docs/RIDE-KIT.md` "What the rider must see" and put its summary lines in the PR body. Gates green with a
+   sheet full of red labels is not done.
 
 Run `scripts/pause-check.sh` before shipping. If it prints
 PAUSED: commit and push what you have, open (or keep) the PR as a **draft** with a
