@@ -53,7 +53,8 @@ export default function Lanternfly(props: EnemyProps) {
     const at = new THREE.Vector3()
     const onHit = (event: unknown) => {
       const e = event as EnemyHitEvent
-      if (e.id === id || pose.phase !== 'sit') return
+      // Its clock stays at 0 while it waits on `after`: not on the wall yet, nothing to startle.
+      if (e.id === id || clock.current === 0 || pose.phase !== 'sit') return
       wallPoint(slot.wall, pose.u, pose.v, pose.off, at, normal)
       if (at.distanceToSquared(e.position) < HOP.startleRadius * HOP.startleRadius) startled.current = true
     }

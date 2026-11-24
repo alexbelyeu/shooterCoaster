@@ -178,6 +178,8 @@ export interface RideAhead {
   trackScale: number
   /** Seconds of the wave's window (a swarm's groups arrive along it, `placeWallSwarm`); none, every group arrives at once. */
   seconds?: number
+  /** Arc distance the rider is predicted to cover `t` seconds after the wave activates (its ride profile, no slack): where a group arriving then is seen from. */
+  riddenAfter?: (t: number) => number
   /** Arc ahead where the wave's stretch ends, the trackside band's spread included (a hard-route wave's merge, #720). */
   until?: number
 }
@@ -216,6 +218,7 @@ export function rideAheadOfWaves(
       window: RIDE_PACE_SLACK * riddenBetween(profile, from, to),
       trackScale,
       seconds: to - from,
+      riddenAfter: (t: number) => riddenBetween(profile, from, from + t),
     }
   })
 }
@@ -940,14 +943,16 @@ function horizontal(v: Vec3): Vec3 {
   return len > 1e-9 ? { x: v.x / len, y: 0, z: v.z / len } : { x: 1, y: 0, z: 0 }
 }
 
-/** Views of the rider each of a swarm's groups is judged from, over its part of the wave's window. */
+/** Views of the rider each of a swarm's groups is judged from, over the part of the ride it is in play. */
 const SWARM_VIEWS = 6
-/** A swarm's groups arrive over this first share of the wave's seconds: the rider clears a small group in about a second. */
+/** A group is judged from the rider's views over this long from its arrival: about as long as it takes to clear. */
+const SWARM_GROUP_SECONDS = 1.5
+/** All but a swarm's last group arrive over this first share of the wave's seconds: the rider clears a small group in about a second. */
 const SWARM_ARRIVAL_SHARE = 0.8
 /**
  * A swarm splits into groups of at least `SWARM_GROUP_MIN`, up to `SWARM_GROUPS`, each round the spot the rider sees most
- * over its own stretch of the window (#768) and arriving as the rider reaches that stretch (#928): on level 6, beside the
- * car up Alaska, then ahead of it over the dyno and the drop, so new ones keep landing through the wave, not one burst.
+ * while that group is in play (#768), from the moment it arrives (#928): on level 6, one after another on the walls beside
+ * the car up Alaska, the last on the Starr past the crest, so new ones keep landing in frame through the wave, not one burst.
  */
 const SWARM_GROUPS = 6
 const SWARM_GROUP_MIN = 3
@@ -1007,13 +1012,11 @@ export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: 
   if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
   const reach = maxReadableDistance(type)
   const groups = Math.max(1, Math.min(SWARM_GROUPS, Math.floor(slots.length / SWARM_GROUP_MIN)))
-  const stretch = ride.window / groups
-  const arrivalStep = ((ride.seconds ?? 0) * SWARM_ARRIVAL_SHARE) / groups
+  const arrivals = Array.from({ length: groups }, (_, g) => swarmArrival(ride, g, groups))
   const spots = Array.from({ length: groups }, (_, g) => {
     const views: RiderFrame[] = []
     for (let j = 0; j < SWARM_VIEWS; j++) {
-      const ahead = ride.entry + stretch * (g + j / (SWARM_VIEWS - 1))
-      views.push(riderFrame(table, indexAhead(table, riderIndex, ahead), ride.trackScale))
+      views.push(riderFrame(table, indexAhead(table, riderIndex, swarmViewAhead(ride, g, groups, arrivals[g], j / (SWARM_VIEWS - 1))), ride.trackScale))
     }
     return bestSwarmSpot(walls, views, reach)
   })
@@ -1027,9 +1030,30 @@ export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: 
       u: Math.min(wall.width - mu, Math.max(mu, u + s.du)),
       v: Math.min(wall.height - mv, Math.max(mv, v + s.dv)),
       seed: s.seed,
-      after: g * arrivalStep,
+      after: arrivals[g],
     }
   })
+}
+
+/**
+ * Seconds after its wave activates that group `g` of a swarm lands: the first with the wave, the rest but the last over
+ * `SWARM_ARRIVAL_SHARE` of its window, the last as the window closes, for the stretch after it (on level 6, the Starr past
+ * the crest while the next wave, the pack, is still out of sight in the pit). No window: every group at once.
+ */
+function swarmArrival(ride: RideAhead, g: number, groups: number): number {
+  const seconds = ride.seconds ?? 0
+  if (groups < 2 || seconds <= 0) return 0
+  return g === groups - 1 ? seconds : (g * seconds * SWARM_ARRIVAL_SHARE) / (groups - 1)
+}
+
+/**
+ * Arc ahead of the rider at fraction `f` of the views group `g` is judged from: with the ride's profile, the ground the
+ * rider covers over `SWARM_GROUP_SECONDS` from the group's arrival, so it lands in frame; without one, or every group
+ * arriving at once, its share of the window's arc after the fly-in.
+ */
+function swarmViewAhead(ride: RideAhead, g: number, groups: number, arrival: number, f: number): number {
+  if (!ride.riddenAfter || !ride.seconds) return ride.entry + (ride.window / groups) * (g + f)
+  return ride.riddenAfter(arrival + SWARM_GROUP_SECONDS * f)
 }
 
 /**
