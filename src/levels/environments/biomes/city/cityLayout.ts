@@ -1,16 +1,14 @@
 import type { ArcTable } from '@/track/arcLength'
 import { buildTrackIndex, type TrackIndex } from '@/levels/environments/shared/trackClearance'
 import { createRng, type Rng } from '@/utils/rng'
-import { LANDMARK_SITE, SPIRE_HEIGHT } from './config'
+import { LANDMARK_SITE, SPIRE_HEIGHT, STREET_GRID } from './config'
+import { HIGHWAY, highwayObstacles, nearHighway } from './highwayLayout'
 
 /**
  * Neon Metropolis's city plan (#323), pure and seeded: towers on a street grid, kept off the track and its support
  * towers; a skyline ring of taller silhouettes beyond; neon signs on the faces of the towers that look onto the ride.
  * The street grid (`STREET_GRID`) is the one the asphalt shader paints, so the towers stand on blocks, never in a road.
  */
-
-/** Block pitch and street width (world units): the asphalt shader paints the same grid. */
-export const STREET_GRID = { pitch: 240, street: 64 } as const
 
 /** A box tower standing on the ground at (x, z): footprint `w` × `d`, `h` tall, axis-aligned to the grid. */
 export interface Tower {
@@ -48,6 +46,8 @@ const SKYLINE = { inner: 2500, outer: 3300, count: 64 } as const
 const HERO_CLEARANCE = 380
 /** Clearance from the track's ground projection to a tower's corner. */
 const TRACK_CLEARANCE = 30
+/** Clearance from the elevated highway's deck (`highwayLayout.ts`) to a tower's corner. */
+const HIGHWAY_CLEARANCE = 8
 /** Towers within this of the track carry signs. */
 const SIGN_REACH = 420
 const NEON: readonly NeonColor[] = ['magenta', 'cyan', 'magenta', 'cyan', 'amber']
@@ -145,6 +145,7 @@ export function layoutCity(track: ArcTable, extent: number, seed = 7323): CityLa
         const d = l.size * rng.range(0.7, 0.95)
         if (index.near(l.x, l.z, Math.hypot(w, d) / 2 + TRACK_CLEARANCE)) continue
         if (Math.hypot(l.x - LANDMARK_SITE.x, l.z - LANDMARK_SITE.z) < HERO_CLEARANCE) continue
+        if (nearHighway(HIGHWAY, l.x, l.z, Math.hypot(w, d) / 2 + HIGHWAY_CLEARANCE)) continue
         const t = { x: l.x, z: l.z, w, d, h: towerHeight(rng) }
         towers.push(t)
         const near = nearestTrackPoint(track, t.x, t.z)
@@ -201,10 +202,14 @@ export function layoutHeroTower(): { tiers: Tower[]; neon: NeonSign[] } {
   return { tiers, neon }
 }
 
-/** Every tower an air enemy must stay out of: the blocks, the skyline and the hero tower's tiers. */
+/** Every tower standing on the blocks: the blocks', the skyline and the hero tower's tiers (the traffic drives between them). */
+export function streetTowers(layout: Pick<CityLayout, 'towers' | 'skyline'>): Tower[] {
+  return [...layout.towers, ...layout.skyline, ...layoutHeroTower().tiers]
+}
+
+/** Every tower an air enemy must stay out of: the street towers and the elevated highway. */
 export function cityTowers(track: ArcTable, extent: number): Tower[] {
-  const { towers, skyline } = layoutCity(track, extent)
-  return [...towers, ...skyline, ...layoutHeroTower().tiers]
+  return [...streetTowers(layoutCity(track, extent)), ...highwayObstacles(HIGHWAY)]
 }
 
 /** How far an air enemy's centre must stay from a tower's faces (x, z) and above its roof (y). */

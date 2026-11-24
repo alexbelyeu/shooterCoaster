@@ -5,7 +5,8 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { trackExtent } from '../../shared/trackScatter'
 import { buildTrackIndex } from '../../shared/trackClearance'
 import { createRng } from '@/utils/rng'
-import { cityTowers, KERB_OFFSET, layoutCity, onPavement, STREET_GRID, streetAxis } from './cityLayout'
+import { cityTowers, KERB_OFFSET, layoutCity, onPavement, streetAxis } from './cityLayout'
+import { STREET_GRID } from './config'
 
 const table = buildArcTable(createTrackCurve(shippedLevel('level7').track))
 const extent = trackExtent(table)

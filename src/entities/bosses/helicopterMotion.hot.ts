@@ -1,4 +1,6 @@
-import { clamp01, smooth } from './bossCycle.hot'
+import type { Vector3 } from 'three'
+import type { HeightFunction } from '@/utils/terrainNoise'
+import { clamp01, smooth, type FlatDir } from './bossCycle.hot'
 
 /**
  * The Helicopter's motion (Neon Metropolis's finale, #325), pure and on game time so a test can sample it.
@@ -117,5 +119,20 @@ export interface BeamSpot {
 export function beamSpot(out: BeamSpot, t: number, tell = 1): BeamSpot {
   out.ahead = BEAM.ahead + BEAM.aheadSwing * Math.sin(t * BEAM.swingRate)
   out.side = BEAM.side * Math.sin(t * BEAM.sweepRate) + BEAM.tellSide * (1 - smooth(clamp01(tell)))
+  return out
+}
+
+/** Where it hovers `age` s into its fight: ahead of the camera on the rider's heading `h`, weaving across the street. */
+export function anchorAt(out: Vector3, cam: Vector3, h: FlatDir, age: number, ground: HeightFunction): Vector3 {
+  const side = HELI.side * Math.sin(age * HELI.weaveRate)
+  out.set(cam.x + h.x * HELI.ahead - h.z * side, 0, cam.z + h.z * HELI.ahead + h.x * side)
+  out.y = Math.max(cam.y + HELI.above, ground(out.x, out.z) + HELI.minClearance)
+  return out
+}
+
+/** The searchlight's spot on the street for `spot`, on the rider's heading `h` from the camera. */
+export function spotAt(out: Vector3, cam: Vector3, h: FlatDir, spot: BeamSpot, ground: HeightFunction): Vector3 {
+  out.set(cam.x + h.x * spot.ahead - h.z * spot.side, 0, cam.z + h.z * spot.ahead + h.x * spot.side)
+  out.y = ground(out.x, out.z) + 1
   return out
 }
