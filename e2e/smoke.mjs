@@ -4530,8 +4530,10 @@ async function run() {
     await ctx.addInitScript(installSettledStepper)
     const page = await ctx.newPage()
     if (LEVEL_CHUNK_DELAY_MS > 0) await delayLevelChunk(page)
+    { const orig = page.screenshot.bind(page); page.screenshot = async (o) => { const t = Date.now(); try { return await orig(o) } finally { console.log('SHOTMS', path.basename(o?.path ?? '-'), Date.now() - t) } } }
     const errors = []
     collectErrors(page, errors)
+    if (process.env.SC_GPU_SYNC && !query.includes('gpuSync')) query += '&gpuSync=1'
     await page.goto(`${base}/?${query}`, { waitUntil: whileLoading ? 'commit' : 'load' })
     const loading = whileLoading ? await whileLoading(page) : null
     await page.waitForLoadState('load')
