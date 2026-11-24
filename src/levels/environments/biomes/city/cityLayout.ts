@@ -1,5 +1,5 @@
 import type { ArcTable } from '@/track/arcLength'
-import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
+import { buildTrackIndex, type TrackIndex } from '@/levels/environments/shared/trackClearance'
 import { createRng, type Rng } from '@/utils/rng'
 import { LANDMARK_SITE, SPIRE_HEIGHT } from './config'
 
@@ -246,4 +246,38 @@ export function clearOfTowers(towers: readonly Tower[], p: Point, ground: number
     if (clearOf(towers, q, ground, c)) return q
   }
   return p
+}
+
+/** How far off a street's centre line a ground enemy stands: past the traffic lanes, on the pavement's edge (#963). */
+export const KERB_OFFSET = 22
+/** A pavement spot stays this far from the rails and their towers, as the traffic does (`trafficPaths.ts`). */
+const PAVEMENT_TRACK_CLEARANCE = 44
+const PAVEMENT_TOWER_CLEARANCE = 12
+
+/** The nearest kerb spot to a ground enemy's `p` on the nearest streets either way, clear of the rails and every tower; else `p`. */
+export function onPavement(towers: readonly Tower[], index: TrackIndex, p: Point): Point {
+  const { pitch } = STREET_GRID
+  const spots: Point[] = []
+  for (const alongX of [true, false]) {
+    const nearest = Math.round((alongX ? p.z : p.x) / pitch - 0.5)
+    for (let k = -1; k <= 1; k++) {
+      for (const side of [-1, 1]) {
+        const across = (nearest + k + 0.5) * pitch + side * KERB_OFFSET
+        spots.push(alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z })
+      }
+    }
+  }
+  const clearance = { x: PAVEMENT_TOWER_CLEARANCE, y: 0, z: PAVEMENT_TOWER_CLEARANCE }
+  return spots
+    .sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z))
+    .find((q) => !index.near(q.x, q.z, PAVEMENT_TRACK_CLEARANCE) && clearOf(towers, q, p.y, clearance)) ?? p
+}
+
+/** Which way the street under a spot runs (the one along x where two cross); null inside a block. */
+export function streetAxis(x: number, z: number): 'x' | 'z' | null {
+  const { pitch, street } = STREET_GRID
+  const offLine = (c: number) => Math.abs(((c / pitch - 0.5) % 1 + 1.5) % 1 - 0.5) * pitch
+  if (offLine(z) <= street / 2) return 'x'
+  if (offLine(x) <= street / 2) return 'z'
+  return null
 }

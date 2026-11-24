@@ -688,9 +688,11 @@ export interface PlaceTracksideInput {
   ride: RideAhead
   bounds?: PlacementBounds
   keepOff?: readonly KeepOff[]
+  /** Moves a ground spot onto open ground (`BiomeDefinition.clearGround`: the city's pavements). */
+  clearGround?: (p: Vec3) => Vec3
 }
 
-export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds, keepOff = [] }: PlaceTracksideInput): Vec3[] {
+export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, slots, ride, bounds, keepOff = [], clearGround }: PlaceTracksideInput): Vec3[] {
   const { surface, roam = 0 } = ENEMY_PLACEMENT[type]
   const reach = maxReadableDistance(type)
   return slots.map((slot) => {
@@ -698,7 +700,8 @@ export function placeTracksideWave({ table, riderIndex, camera, type, groundFn, 
     const p = surface === 'water'
       ? wetTracksidePoint(table, riderIndex, at, groundFn, reach, ride.trackScale, ORBITS[type] ? keepOff : null)
       : dryTracksidePoint(table, riderIndex, at, surface, groundFn, reach, ride.trackScale, bounds, keepOff, roam)
-    const placed = outsideNearField(settle(p, surface, groundFn), camera)
+    const open = surface === 'ground' && clearGround ? clearGround(settle(p, surface, groundFn)) : p
+    const placed = outsideNearField(settle(open, surface, groundFn), camera)
     const out = surface === 'ground' ? groundedOutsideNearField(placed, camera, groundFn) : placed
     return bounds && !insideBounds(out, bounds) ? settle(clampToBounds(out, bounds), surface, groundFn) : out
   })

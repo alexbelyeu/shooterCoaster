@@ -192,7 +192,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 82 * 15 + 60 + 60 + 400, // 1230 + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1750
+    maxScore: 55 * 15 + 25 * 20 + 60 + 60 + 400, // 55 drones and 25 bots, 1325, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1845
     message: 'You cleared Neon Metropolis!',
     nextLevel: null,
     // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
@@ -213,18 +213,18 @@ const LEVELS: LevelConfig[] = [
         glow: 0.6,
       },
     },
-    // Hover drones patrol the street canyons in Vs and rings, then the Helicopter (#325) drops in over the street ahead.
-    // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the boss at 40 s. A wave of drones is
-    // shot down in a few seconds and the towers hide stragglers: four big waves 10 s apart, two scattered over the whole
-    // city, left the rider with nothing to shoot for most of the run (the pacing gate). The ring comes second, centred on
-    // the track, so the drop into the canyons has targets; the last wave comes in three rings, so it lasts until the boss.
+    // The air and the street take turns (#963): hover drones patrol the canyons in Vs, rings and a spiral, billboard bots
+    // march the pavements beside the track between them, then the Helicopter (#325) drops in over the street ahead.
+    // Every drone wave is a formation ahead of the rider: scattered over the whole city, the towers hid them and left
+    // the rider with nothing to shoot for most of the run (the pacing gate). The ring comes second, centred on the
+    // track, so the drop into the canyons has targets; the last wave comes in three rings, so it lasts until the boss.
     ...paceLevel({
       waves: [
         { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
+        { type: 'billboardBot', count: 12, waveLabel: 'Billboard Bots!' },
         { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring' },
-        { type: 'hoverDrone', count: 13, waveLabel: 'Patrol Wing!', formation: 'v' },
+        { type: 'billboardBot', count: 13, waveLabel: 'Street March!' },
         { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'spiral' },
-        { type: 'hoverDrone', count: 14, waveLabel: 'Swarm Protocol!', formation: 'v' },
         { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.5 },
       ],
       boss: 'helicopter',

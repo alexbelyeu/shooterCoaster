@@ -60,6 +60,8 @@ export const ENEMY_PLACEMENT: Record<EnemyType, EnemyPlacementRule> = {
   lanternfly: { surface: 'wall', scatter: 'swarm' },
   // Hovers in the street canyons ahead of the rider, about the ride's height
   hoverDrone: { surface: 'air', scatter: band(150, 1400, 50, 150) },
+  // On the pavement beside the track (`BiomeDefinition.clearGround`), marching up and down its street
+  billboardBot: { surface: 'ground', scatter: 'trackside', roam: 16 },
 }
 
 export const GOLDEN_BALLOON_SCATTER = band(0, 3000, 50, 100)

@@ -52,6 +52,8 @@ interface EnemySpawnerProps {
   keepOff?: readonly KeepOff[]
   /** Moves an air enemy's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
   clearAir?: (p: Vec3) => Vec3
+  /** Moves a ground enemy's trackside spot onto open ground (`BiomeDefinition.clearGround`). */
+  clearGround?: (p: Vec3) => Vec3
   /** The track's hard route (#720), where a hard-route wave arrives; null without a junction. */
   hardRoute?: HardRoute | null
 }
@@ -100,6 +102,7 @@ const RADII: Record<EnemyType, number> = {
   dustBunny: 45,
   lanternfly: 65,
   hoverDrone: 55,
+  billboardBot: 55,
 }
 
 const NO_WALLS: readonly WallSurface[] = []
@@ -205,6 +208,7 @@ export default function EnemySpawner({
   bounds,
   keepOff,
   clearAir,
+  clearGround,
   hardRoute,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
@@ -236,7 +240,7 @@ export default function EnemySpawner({
     (table: ArcTable, wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
-          table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff,
+          table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff, clearGround,
         })
         // A shark's circle, clear of the rails, the stacks and the shore (#922): its own stream, so the placement's is unchanged.
         const band = ORBITS[wave.type]
@@ -277,7 +281,7 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [groundFn, bounds, keepOff, clearAir, walls, runSeed],
+    [groundFn, bounds, keepOff, clearAir, clearGround, walls, runSeed],
   )
 
   const placeWave = useCallback(

@@ -1,0 +1,5 @@
+## 2026-11-24 — The city's ground enemies stand on its pavements (Builder, #963)
+
+**Context:** Trackside ground placement (`placeTracksideWave`) knows only `keepOff` circles, and only on its blind-approach fallback. Neon Metropolis's towers stand 30 units off the rails, so a billboard bot at a trackside slot's 60–400 side offset often landed inside a tower.
+**Decision:** A biome hook `clearGround` (next to `clearAir`) moves every trackside ground spot onto open ground after it is chosen. The city's (`cityLayout.ts` `onPavement`) puts it on the nearest street's kerb, `KERB_OFFSET` (22) off the centre line, past the traffic lanes (11), clear of the rails (44) and every tower; the bot then marches along that street (`streetAxis`).
+**Consequences:** A new ground enemy in the city needs nothing more to stay out of the towers. Other biomes leave `clearGround` unset and place as before. The kerb spot can be up to a block from the slot, so the readability and pacing gates, not the slot, say whether it is seen.
