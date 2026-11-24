@@ -53,12 +53,15 @@ interface EnemyBaseProps extends EnemyProps {
   onHit?: () => void
   /** Its burst instead of its type's (a golden balloon pops in gold). */
   deathStyle?: DeathStyle
+  /** Game seconds after it mounts that it appears (a swarm's later group, #928): hidden, no target and still until then. */
+  after?: number
 }
 
 /**
  * Shared base for all enemy types.
  * Handles visibility, collision registration, formation entry and death.
  * An entering enemy is not a collision target until it reaches its slot, so touch aim assist never snaps to one still flying in.
+ * One that comes `after` a while is hidden, still and no target until then.
  *
  * Death is the shared kill pop (`killPop.ts`): on hit the enemy is scored immediately, stops moving and
  * flashes white at 1.2x scale for ENEMY_HIT_FLASH_MS (game time); then it emits
@@ -80,6 +83,7 @@ export default function EnemyBase({
   updatePosition,
   onHit,
   deathStyle = DEATH_STYLES[type],
+  after = 0,
 }: EnemyBaseProps) {
   const meshRef = useRef<THREE.Group>(null)
   const [alive, setAlive] = useState(true)
@@ -87,6 +91,8 @@ export default function EnemyBase({
   const entryT = useRef(entry ? 0 : 1)
   const clockAt = useRef<number | null>(null)
   const [entered, setEntered] = useState(!entry)
+  const waitLeft = useRef(after)
+  const [waiting, setWaiting] = useState(after > 0)
   // Mount-time only: a re-render (e.g. `entered` flipping) must not move the enemy back.
   const [startPosition] = useState((): [number, number, number] => {
     const p = entry?.from ?? spawnPosition
@@ -125,7 +131,7 @@ export default function EnemyBase({
   // Register with CollisionManager
   const deadPos = useRef(new THREE.Vector3(0, -9999, 0)).current
   useEffect(() => {
-    if (!entered) return
+    if (!entered || waiting) return
     const getPosition = () => meshRef.current?.position ?? deadPos
     registerCollisionTarget({
       id,
@@ -135,7 +141,7 @@ export default function EnemyBase({
       ...(bystander ? { kind: 'bystander' as const } : {}),
     })
     return () => unregisterCollisionTarget(id)
-  }, [id, radius, kill, spare, bystander, entered])
+  }, [id, radius, kill, spare, bystander, entered, waiting])
 
   // Unregister when dead
   useEffect(() => {
@@ -146,10 +152,10 @@ export default function EnemyBase({
 
   // e2e readability probe (no-op unless ?e2e=1)
   useEffect(() => {
-    if (!alive || !meshRef.current) return
+    if (!alive || waiting || !meshRef.current) return
     registerE2EEnemy(id, type, meshRef.current)
     return () => unregisterE2EEnemy(id)
-  }, [alive, id, type])
+  }, [alive, waiting, id, type])
 
   useFrame((_, delta) => {
     const { phase, timeScale } = useGameStore.getState()
@@ -161,6 +167,12 @@ export default function EnemyBase({
     const moved = Math.max(0, now - (clockAt.current ?? now))
     clockAt.current = now
 
+    if (waitLeft.current > 0) {
+      waitLeft.current -= moved
+      if (waitLeft.current > 0) return
+      // Its first pose before the frame it shows in.
+      setWaiting(false)
+    }
     if (entry && entryT.current < 1) {
       entryT.current = Math.min(1, entryT.current + moved / entry.seconds)
       entryPoint(meshRef.current.position, entry.from, spawnPosition, entryT.current, entry.spin)
@@ -182,7 +194,7 @@ export default function EnemyBase({
   if (!alive) return null
 
   return (
-    <group ref={meshRef} position={startPosition}>
+    <group ref={meshRef} position={startPosition} visible={!waiting}>
       {children}
     </group>
   )

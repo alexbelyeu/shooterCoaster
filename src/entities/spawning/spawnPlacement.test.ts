@@ -592,7 +592,7 @@ describe('placeWallSwarm (#516)', () => {
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
   })
 
-  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, then a wall ahead of the drop", () => {
+  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, the last on a wall past the crest", () => {
     const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
     const wave = level.enemies.find((w) => w.type === 'lanternfly')!
     const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
@@ -603,12 +603,41 @@ describe('placeWallSwarm (#516)', () => {
     const walls = placed.map((p) => p.wall.id)
     expect(walls[0]).toMatch(/alaska/)
     expect(walls[walls.length - 1]).not.toMatch(/alaska/)
-    // Every lanternfly is on the rider's screen at some point of the wave's window, judged in the rails' frame.
+    // Every lanternfly is on the rider's screen at some point of the wave's window or the last group's second after it, as the
+    // ride's profile rides it, judged in the rails' frame.
     const frames = Array.from({ length: 41 }, (_, j) =>
-      riderFrame(gym, indexAhead(gym, riderIndex, ride.entry + (ride.window * j) / 40), ride.trackScale))
+      riderFrame(gym, indexAhead(gym, riderIndex, ride.riddenAfter!(((ride.seconds! + 1.5) * j) / 40)), ride.trackScale))
     const reach = maxReadableDistance(wave.type)
     const unseen = placed.filter((p) => !frames.some((fr) => inRiderFrame(fr, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), reach)))
     expect(unseen.map((p) => p.wall.id)).toEqual([])
+  })
+
+  it('lands level 6\'s lanternflies group by group through the wave (#928), not all at its tell', () => {
+    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+    const wave = level.enemies.find((w) => w.type === 'lanternfly')!
+    const ride = rideFor(wave)
+    const placed = placeWallSwarm({ table: gym, riderIndex: 0, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })
+    const arrivals = [...new Set(placed.map((p) => p.after ?? 0))]
+    expect(arrivals[0]).toBe(0)
+    expect(arrivals.length).toBeGreaterThanOrEqual(5)
+    for (let g = 1; g < arrivals.length; g++) expect(arrivals[g]).toBeGreaterThan(arrivals[g - 1])
+    // The last lands as the wave's window closes, for the stretch after it.
+    expect(arrivals[arrivals.length - 1]).toBeCloseTo(ride.seconds!)
+    // Each group lands in the rider's frame: some member of it is on screen within a second of its landing (#949).
+    const riderIndex = indexAhead(gym, 0, rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)[wave.spawnDelay! * 10])
+    const atRider = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })
+    const reach = maxReadableDistance(wave.type)
+    const landedOutOfView = [...new Set(atRider.map((p) => p.after ?? 0))].filter((after) => {
+      const group = atRider.filter((p) => (p.after ?? 0) === after).map((p) => wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }))
+      const seen = [0, 0.25, 0.5, 0.75, 1].some((dt) => {
+        const frame = riderFrame(gym, indexAhead(gym, riderIndex, ride.riddenAfter!(after + dt)), ride.trackScale)
+        return group.some((p) => inRiderFrame(frame, p, reach))
+      })
+      return !seen
+    })
+    expect(landedOutOfView).toEqual([])
+    // Off a level (no window), a swarm comes at once.
+    expect(placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [wallAt('ahead', 400)], slots, ride: STILL }).every((p) => !p.after)).toBe(true)
   })
 
   it('needs the level to have walls', () => {

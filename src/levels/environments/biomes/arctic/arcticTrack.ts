@@ -132,9 +132,17 @@ export function buildArcticTrack(): SplineTrackParams {
   })
   const rideV2: RideV2Spec = { zones, beats, drag: RIDE_V2_DEFAULTS.drag / 2 }
   const length = buildArcTable(curve).length
-  // Dark from the mouth, fully once under the vault; the snowmen beside the track are within the muzzle flash's reach.
+  // Dark from the mouth, fully once under the vault; the snowmen beside the track are within the muzzle flash's reach. No prop
+  // stands under the vault or in its walls (`reach`, #911).
   const darkSections: DarkSectionSpec[] = [
-    { from: share(ride.cave.from), to: share(ride.cave.to), ramp: ICE_CAVE.mouth / length, flashReach: ICE_CAVE.halfWidth, look: 'ice' },
+    {
+      from: share(ride.cave.from),
+      to: share(ride.cave.to),
+      ramp: ICE_CAVE.mouth / length,
+      flashReach: ICE_CAVE.halfWidth,
+      look: 'ice',
+      reach: ICE_CAVE.halfWidth + ICE_CAVE.wall,
+    },
   ]
   return {
     curve: 'spline',
