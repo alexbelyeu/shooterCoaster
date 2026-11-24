@@ -182,6 +182,11 @@ export interface SCTestApi {
    */
   enemies: () => E2EEnemyOnScreen[]
   errors: string[]
+  /**
+   * Every phase or level change since load (#933), oldest first, at most `RUN_LOG_MAX`: the page time (ms), the frame,
+   * and the top of the stack that made it, so a check that finds the page in another run can say what started it.
+   */
+  runLog: { ms: number; frame: number; phase: GamePhase; level: string | null; from: string }[]
   /** Counts of 'weapon:fire' / 'enemy:hit' / 'enemy:killed' since load. */
   combat: { fired: number; hits: number; kills: number }
   /** Camera translation off the track pose this frame, and the max seen.
@@ -964,6 +969,19 @@ function autoFireTick(camera: THREE.Camera) {
   if (fireAtNDC(_aim.x, _aim.y, camera)) lastAutoFire = now
 }
 
+const RUN_LOG_MAX = 40
+
+/** Appends phase / level changes to `runLog`; the subscriber runs inside the store's `set`, so its stack names the caller. */
+function logRunChanges(api: SCTestApi) {
+  useGameStore.subscribe((next, prev) => {
+    if (next.phase === prev.phase && next.currentLevel === prev.currentLevel) return
+    // eslint-disable-next-line sc/no-hot-path-alloc -- a phase change, never per frame
+    const from = (new Error().stack ?? '').split('\n').slice(2, 6).map((l) => l.trim()).join(' < ')
+    api.runLog.push({ ms: Math.round(performance.now()), frame: api.frames, phase: next.phase, level: next.currentLevel, from })
+    if (api.runLog.length > RUN_LOG_MAX) api.runLog.shift()
+  })
+}
+
 export function installE2EApi() {
   if (!isE2E || window.__SC_TEST__) return
   eventBus.taps.add((event) => frameEvents.add(event))
@@ -1023,6 +1041,7 @@ export function installE2EApi() {
     phase: () => useGameStore.getState().phase,
     enemies: enemiesOnScreen,
     errors: [],
+    runLog: [],
     combat: { fired: 0, hits: 0, kills: 0 },
     cameraTranslation: { current: 0, max: 0 },
     cameraTrauma: { current: 0, max: 0 },
@@ -1209,6 +1228,7 @@ export function installE2EApi() {
   window.addEventListener('error', (e) => api.errors.push(String(e.error?.stack ?? e.message)))
   window.addEventListener('unhandledrejection', (e) => api.errors.push(String(e.reason)))
   window.__SC_TEST__ = api
+  logRunChanges(api)
 }
 
 /** Spin (max 20 ms) until AudioContext.currentTime moves, which it does mid-task. */
