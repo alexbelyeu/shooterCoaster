@@ -20,6 +20,7 @@ import { perfRequested } from '@/perf/perfFlag'
 import { loadLevelScene } from '@/canvas/loadLevelScene'
 import { lazyChunk } from '@/core/staleBuild'
 import {
+  BossRushResults,
   Countdown,
   GhostCrosshair,
   HUD,
@@ -68,6 +69,7 @@ export default function App() {
   const phase = useGameStore((s) => s.phase)
   // A fresh results screen per run: a run ending while the last one's screen fades out must not bring that one back.
   const runId = useGameStore((s) => s.runId)
+  const bossRush = useGameStore((s) => s.runMode.mode === 'bossRush')
   const setPhase = useGameStore((s) => s.setPhase)
   const resuming = useGameStore((s) => s.phase === 'paused' && s.resuming)
   const photo = useGameStore((s) => s.photo)
@@ -183,7 +185,7 @@ export default function App() {
 
           {phase === 'results' && (
             <Screen key={`results-${runId}`} {...fadeVariants} transition={{ duration: 0.4 }}>
-              <ResultsScreen />
+              {bossRush ? <BossRushResults /> : <ResultsScreen />}
             </Screen>
           )}
         </AnimatePresence>

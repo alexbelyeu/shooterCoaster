@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
-import { useGameStore } from '@/store/useGameStore'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { BOSS_RUSH, useGameStore } from '@/store/useGameStore'
+import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
+import { formatRushTime, rushStages, rushUnlocked } from '@/levels/bossRush'
+import type { BiomeType } from '@/types/level'
 import { dailyKey, dailyLevel, msUntilNextUtcDay } from '@/levels/daily'
 import { biomeTheme } from '@/ui/theme'
 import { FairBoard, FairMedal, FairStar, FairStars } from '@/ui/Fair'
@@ -73,7 +75,18 @@ export default function LevelSelectScreen() {
     [today, savedDaily, dailyStreak],
   )
   const dailyIndex = cards.length
+  const rushIndex = dailyIndex + 1
   const total = totalStars(cards)
+  const bossRushBest = useGameStore((s) => s.bossRushBest)
+  const rush = useMemo(() => {
+    const stages = rushStages(getAllLevels())
+    return {
+      first: stages[0].levelId,
+      biome: getLevelConfig(stages[stages.length - 1].levelId)!.biome,
+      bosses: stages.length,
+      unlocked: rushUnlocked(getAllLevels(), (id) => savedScores[id]?.stars ?? 0),
+    }
+  }, [savedScores])
 
   const [launching, setLaunching] = useState<string | null>(null)
   /** Cards whose Night Ride toggle is down (#829): their next launch rides at night. */
@@ -131,15 +144,24 @@ export default function LevelSelectScreen() {
       launch('daily', () => startRun(dailyLevel(dateKey), { mode: { mode: 'daily', dateKey } }))
       return
     }
+    if (i === rushIndex) {
+      if (rush.unlocked) launch('bossRush', () => startRun(rush.first, { mode: BOSS_RUSH }))
+      else deny(i)
+      return
+    }
     const card = cards[i]
     if (!card) return
     if (!card.unlocked) {
-      sfx().ui('back')
-      if (!prefersReducedMotion()) cardRefs.current[i]?.animate(DENIED_SHAKE, { duration: 280, easing: 'ease-out' })
+      deny(i)
       return
     }
     const variant = card.nightRide && nightPicks.has(card.id) ? 'night' : 'day'
     launch(card.id, () => startRun(card.id, { variant }))
+  }
+
+  function deny(i: number) {
+    sfx().ui('back')
+    if (!prefersReducedMotion()) cardRefs.current[i]?.animate(DENIED_SHAKE, { duration: 280, easing: 'ease-out' })
   }
 
   function toggleNight(id: string) {
@@ -282,13 +304,23 @@ export default function LevelSelectScreen() {
           onFocus={() => setFocusIndex(dailyIndex)}
           onClick={() => select(dailyIndex)}
         />
+        <RushCardButton
+          {...rush}
+          best={bossRushBest}
+          ref={(el) => {
+            cardRefs.current[rushIndex] = el
+          }}
+          focused={focusIndex === rushIndex}
+          selected={launching === 'bossRush'}
+          onFocus={() => setFocusIndex(rushIndex)}
+          onClick={() => select(rushIndex)}
+        />
       </div>
     </div>
   )
 }
 
-interface DailyCardButtonProps {
-  card: DailyCard
+interface TicketButtonProps {
   ref: Ref<HTMLButtonElement>
   focused: boolean
   selected: boolean
@@ -297,7 +329,7 @@ interface DailyCardButtonProps {
 }
 
 /** Today's Daily Run: a ticket rather than a ride board, its stub torn off along the perforation. */
-function DailyCardButton({ card, ref, focused, selected, onFocus, onClick }: DailyCardButtonProps) {
+function DailyCardButton({ card, ref, focused, selected, onFocus, onClick }: TicketButtonProps & { card: DailyCard }) {
   const date = dateFmt.format(new Date())
   const best = card.bestScore > 0 ? `Best today ${fmt.format(card.bestScore)}` : 'Not played yet'
   const streak = card.streak > 0 ? `${card.streak}-day streak` : null
@@ -325,6 +357,51 @@ function DailyCardButton({ card, ref, focused, selected, onFocus, onClick }: Dai
             <span className="level-card-best">{best}</span>
             {streak && <span className="level-card-streak">{streak}</span>}
           </span>
+        </span>
+      </span>
+    </button>
+  )
+}
+
+interface RushCardProps extends TicketButtonProps {
+  biome: BiomeType
+  bosses: number
+  unlocked: boolean
+  best: number | null
+}
+
+/** Boss Rush (#1011): the Daily Run's ticket for every boss back to back, shut until every level has its three stars. */
+function RushCardButton({ biome, bosses, unlocked, best, ref, focused, selected, onFocus, onClick }: RushCardProps) {
+  const bestLine = best === null ? 'No time yet' : `Best ${formatRushTime(best)}`
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={`level-card level-card-rush${unlocked ? '' : ' locked'}${selected ? ' is-selected' : ''}`}
+      data-rush={unlocked ? 'open' : 'locked'}
+      tabIndex={focused ? 0 : -1}
+      aria-disabled={!unlocked}
+      aria-label={unlocked ? `Boss Rush: all ${bosses} bosses back to back. ${bestLine}` : 'Boss Rush: locked, earn 3 stars on every level'}
+      onFocus={onFocus}
+      onClick={onClick}
+    >
+      <span className="level-ticket fair-notched">
+        <span className="level-ticket-stub">
+          <span className="level-ticket-title">Boss Rush</span>
+          <span className="level-ticket-date">{bosses} bosses</span>
+        </span>
+        <LevelPostcard biome={biome} />
+        <span className="level-card-body">
+          {unlocked ? (
+            <>
+              <span className="level-card-desc">Every boss back to back, against the clock</span>
+              <span className="level-card-meta">
+                <span className="level-card-best">{bestLine}</span>
+              </span>
+            </>
+          ) : (
+            <span className="level-card-locked-hint">3★ on every level opens it</span>
+          )}
         </span>
       </span>
     </button>

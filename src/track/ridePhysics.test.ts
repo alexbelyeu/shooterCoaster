@@ -3,7 +3,7 @@ import { shippedLevels } from '@/levels/shippedLevels'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable, distanceAtT } from './arcLength'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { advanceRide, curveTangentY, lapSeconds, nextVelocity, rideProfile, rideSpeeds, riddenBetween, type TangentY } from './ridePhysics'
+import { advanceRide, curveTangentY, lapSeconds, nextVelocity, rideProfile, rideSpeeds, rideStartingAt, riddenBetween, type TangentY } from './ridePhysics'
 
 describe('nextVelocity', () => {
   const speeds = { roll: 0.001, min: 0.01, max: 0.05 }
@@ -66,6 +66,16 @@ describe('advanceRide', () => {
     const state = advanceRide({ progress: 0, velocity: speeds.min, time: 0 }, downhill, speeds, 1e6)
     expect(state.velocity).toBe(speeds.max)
     expect(speeds.max / speeds.min).toBe(5)
+  })
+
+  it('picks a run up where the ride from GO would be that many seconds in (a Boss Rush stage)', () => {
+    const ridden = { progress: 0, velocity: 0, time: 0 }
+    for (let step = 0; step < 40; step++) advanceRide(ridden, flat, speeds, 3)
+    const picked = rideStartingAt({ progress: 0.5, velocity: 1, time: 9 }, flat, speeds, 2)
+    expect(picked.progress).toBeCloseTo(ridden.progress, 12)
+    expect(picked.velocity).toBe(ridden.velocity)
+    expect(picked.time).toBeCloseTo(2, 12)
+    expect(rideStartingAt({ progress: 0.5, velocity: 1, time: 9 }, flat, speeds, 0)).toEqual({ progress: 0, velocity: 0, time: 0 })
   })
 })
 

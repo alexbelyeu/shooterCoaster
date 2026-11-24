@@ -1273,12 +1273,13 @@ canvas {
   color: var(--fair-gilt);
 }
 
-/* The ticket has no FairBoard, so it casts the same hard tar shadow itself. */
-.level-card-daily {
+/* The tickets have no FairBoard, so they cast the same hard tar shadow themselves. */
+.level-card-daily,
+.level-card-rush {
   filter: drop-shadow(6px 8px 0 var(--fair-tar));
 }
 
-/* The Daily Run's ticket: cream card, oxblood ink, the stub above a perforation. */
+/* The Daily Run's and Boss Rush's ticket: cream card, oxblood ink, the stub above a perforation. */
 .level-ticket {
   flex: 1;
   display: grid;
@@ -1548,6 +1549,17 @@ canvas {
 /* Space above the score for the record's card, so it covers neither the bulbs nor the line above. */
 .results-score.has-record {
   margin-top: 2.1rem;
+}
+
+/* A Boss Rush's time (#1011) in the score's place, the size of the score's wheels: cream Ultra on its hard shadow. */
+.results-rush-time {
+  margin: 0;
+  font-family: 'Ultra', serif;
+  font-size: 3.25rem;
+  line-height: 1.1;
+  text-align: center;
+  color: var(--fair-cream);
+  text-shadow: 3px 4px 0 var(--fair-tar);
 }
 
 .results-record {

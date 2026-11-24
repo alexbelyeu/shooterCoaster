@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runBest, useGameStore } from './useGameStore'
+import { BOSS_RUSH, runBest, useGameStore } from './useGameStore'
+import { rushStages } from '@/levels/bossRush'
 import { loadFraction, reportLoad } from '@/core/loadProgress'
 import { advanceGameTime, resetGameTime } from '@/core/gameClock'
 import { getAllLevels } from '@/levels/LevelRegistry'
@@ -330,6 +331,69 @@ describe('daily runs', () => {
   })
 })
 
+describe('boss rush (#1011)', () => {
+  const stages = rushStages(getAllLevels())
+  const beatBoss = () => useGameStore.setState({ bossSeconds: 12 })
+
+  it('starts a stage a few seconds before its boss, by day, outside the campaign', () => {
+    store().startRun('level2', { seed: 1 })
+    store().startRun(stages[0].levelId, { mode: BOSS_RUSH, variant: 'night' })
+    expect(store()).toMatchObject({ runMode: BOSS_RUSH, runStartAt: stages[0].startAt, runVariant: 'day', lastLevel: 'level2' })
+    store().startRun('level1', { seed: 2 })
+    expect(store().runStartAt).toBe(0)
+  })
+
+  it('a beaten boss moves on to the next stage with the time so far; the last one ends on the results', () => {
+    store().startRun(stages[0].levelId, { mode: BOSS_RUSH })
+    const firstRun = store().runId
+    beatBoss()
+    store().endRun(stages[0].startAt + 10)
+    expect(store()).toMatchObject({ currentLevel: stages[1].levelId, runStartAt: stages[1].startAt, skipIntro: true, bossSeconds: null })
+    expect(store().runMode).toEqual({ mode: 'bossRush', stage: 1, seconds: 10 })
+    expect(store().runId).toBe(firstRun + 1)
+    const last = stages.length - 1
+    useGameStore.setState({ runMode: { mode: 'bossRush', stage: last, seconds: 100 }, currentLevel: stages[last].levelId })
+    beatBoss()
+    store().endRun(stages[last].startAt + 7.5)
+    expect(store()).toMatchObject({ phase: 'results', runMode: { mode: 'bossRush', stage: last, seconds: 107.5 } })
+  })
+
+  it('the timer running out on a stage ends the rush there', () => {
+    store().startRun(stages[0].levelId, { mode: BOSS_RUSH })
+    store().endRun(70)
+    expect(store()).toMatchObject({ phase: 'results', currentLevel: stages[0].levelId, runMode: { mode: 'bossRush', stage: 0, seconds: 60 - stages[0].startAt } })
+  })
+
+  it('restart goes back to the first stage', () => {
+    store().startRun(stages[0].levelId, { mode: BOSS_RUSH })
+    beatBoss()
+    store().endRun(50)
+    store().restartRun('pause')
+    expect(store()).toMatchObject({ currentLevel: stages[0].levelId, runMode: BOSS_RUSH, skipIntro: true })
+  })
+
+  it('a campaign run ends on the results as before', () => {
+    store().startRun('level1', { seed: 1 })
+    beatBoss()
+    store().endRun(45)
+    expect(store()).toMatchObject({ phase: 'results', currentLevel: 'level1', runMode: { mode: 'campaign' } })
+  })
+
+  it('keeps the fastest whole rush, persisted, and never touches the campaign saves', () => {
+    store().startRun(stages[0].levelId, { mode: BOSS_RUSH })
+    store().saveRunResult(entry(stages[0].levelId, 500, 3))
+    expect(store().savedScores).toEqual({})
+    store().saveBossRushTime(30, false)
+    expect(store().bossRushBest).toBe(null)
+    store().saveBossRushTime(120, true)
+    store().saveBossRushTime(130, true)
+    expect(store().bossRushBest).toBe(120)
+    expect(JSON.parse(memoryStorage.getItem('shootercoaster-scores')!).state.bossRushBest).toBe(120)
+    store().clearLocalData()
+    expect(store().bossRushBest).toBe(null)
+  })
+})
+
 describe('pause and resume', () => {
   it('resume starts the resume countdown only while paused; GO (setPhase) ends it', () => {
     store().setPhase('playing')
@@ -426,11 +490,11 @@ describe('saveScore', () => {
     expect(store().savedScores.level1).toMatchObject({ score: 500, bestCombo: 3 })
   })
 
-  it('persists only saved scores and medals, leaderboards, initials, the daily record and the last level (not score, combo or phase)', () => {
+  it('persists only saved scores and medals, leaderboards, initials, the daily record, the last level and the Boss Rush best (not score, combo or phase)', () => {
     store().addScore(42)
     store().saveScore(entry('level1', 500, 1))
     const persisted = JSON.parse(memoryStorage.getItem('shootercoaster-scores')!)
-    expect(Object.keys(persisted.state)).toEqual(['savedScores', 'savedMedals', 'leaderboards', 'lastInitials', 'savedDaily', 'dailyStreak', 'lastLevel'])
+    expect(Object.keys(persisted.state)).toEqual(['savedScores', 'savedMedals', 'leaderboards', 'lastInitials', 'savedDaily', 'dailyStreak', 'lastLevel', 'bossRushBest'])
     expect(persisted.state.savedScores.level1.score).toBe(500)
   })
 })

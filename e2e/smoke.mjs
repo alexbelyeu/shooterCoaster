@@ -3107,17 +3107,17 @@ async function levelSelectCheck(page, levels) {
       locked: cards.filter((c) => c.dataset.locked === 'true').length,
       total: document.querySelector('.level-select-total')?.dataset.stars ?? null,
       totalText: document.querySelector('.level-select-total')?.textContent ?? '',
-      offscreen: off.map((c) => c.dataset.level ?? (c.classList.contains('level-card-daily') ? 'daily' : '?')),
-      initials: cards.filter((c) => !c.classList.contains('level-card-daily')).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
+      offscreen: off.map((c) => c.dataset.level ?? (c.classList.contains('level-card-daily') ? 'daily' : c.dataset.rush ? 'bossRush' : '?')),
+      initials: cards.filter((c) => c.dataset.level).map((c) => c.querySelector('.level-card-initials')?.textContent ?? null),
       hScroll: root ? root.scrollWidth > root.clientWidth : true,
       focused: document.activeElement?.dataset?.level ?? null,
       medals: cards
-        .filter((c) => !c.classList.contains('level-card-daily'))
+        .filter((c) => c.dataset.level)
         .map((c) => [c.querySelectorAll('.level-medal').length, c.querySelectorAll('.level-medal[data-earned="true"]').length]),
     }
   })
-  // One card per level plus the Daily Run card (#184).
-  if (layout.cards !== levels.length + 1) problems.push(`${layout.cards} cards for ${levels.length} levels + Daily`)
+  // One card per level plus the Daily Run (#184) and Boss Rush (#1011) tickets.
+  if (layout.cards !== levels.length + 2) problems.push(`${layout.cards} cards for ${levels.length} levels + Daily + Boss Rush`)
   if (layout.locked !== levels.length - expectOpen) problems.push(`${layout.locked} locked cards, expected ${levels.length - expectOpen}`)
   if (Number(layout.total) !== expectStars || !layout.totalText.includes(`${expectStars} / ${levels.length * 3}`)) {
     problems.push(`star total "${layout.totalText.trim()}", expected ${expectStars} / ${levels.length * 3}`)
@@ -4433,7 +4433,7 @@ async function runMobile(browser, base) {
       const r = c.getBoundingClientRect()
       return r.left < 0 || r.right > window.innerWidth || r.height < 44
     })
-    const open = cards.filter((c) => !c.dataset.locked && !c.classList.contains('level-card-daily'))
+    const open = cards.filter((c) => c.dataset.level && !c.dataset.locked)
     const noFeats = open.filter((c) => !(c.querySelector('.level-feats')?.getBoundingClientRect().height > 0))
     return { hScroll: root ? root.scrollWidth > root.clientWidth : true, bad: tooNarrow.map((c) => c.dataset.level), noFeats: noFeats.map((c) => c.dataset.level) }
   })

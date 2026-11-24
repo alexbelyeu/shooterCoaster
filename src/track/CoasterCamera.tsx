@@ -7,7 +7,7 @@ import { TRACK_TUNNEL_EVENT, getTunnelDims } from './setPieces'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 import { setRideProgress, setRideSeat } from './rideProgress.hot'
 import {
-  advanceRide, curveTangentY, jumpRide, resetRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStepFrames, rideStopShare, rideTopShare, rideZone, type RideSpeeds,
+  advanceRide, curveTangentY, jumpRide, rideLaunches, rideOnLift, rideSpeedNorm, rideStartingAt, rideStepFrames, rideStopShare, rideTopShare, rideZone, type RideSpeeds,
   type RideState,
 } from './ridePhysics'
 import { planFastestLeadT } from './rideV2'
@@ -88,6 +88,8 @@ export default function CoasterCamera({
   const cameraRef = useRef<THREE.PerspectiveCamera>(null)
 
   const ride = useRef<RideState>({ progress: 0, velocity: 0, time: 0 })
+  /** The ride at the run's `runStartAt`, worked out once per start and ride model. */
+  const start = useRef({ at: 0, speeds: null as RideSpeeds | null, ride: { progress: 0, velocity: 0, time: 0 } as RideState })
   const seat = useRef(createSeatPose())
   const _lookAt = useRef(new THREE.Vector3())
   const scratch = useRef({
@@ -248,7 +250,15 @@ export default function CoasterCamera({
     let jumped = beforeGo || !lookSnapped.current
     if (beforeGo || store.runId !== runId.current) {
       runId.current = store.runId
-      resetRide(ride.current)
+      const from = start.current
+      if (from.at !== store.runStartAt || from.speeds !== speeds) {
+        from.at = store.runStartAt
+        from.speeds = speeds
+        rideStartingAt(from.ride, tangentY, speeds, from.at)
+      }
+      ride.current.progress = from.ride.progress
+      ride.current.velocity = from.ride.velocity
+      ride.current.time = from.ride.time
       jumped = true
     }
     const frameDelta = beforeGo || phase === 'paused' ? 0 : delta
