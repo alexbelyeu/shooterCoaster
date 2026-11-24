@@ -197,14 +197,15 @@ const LEVELS: LevelConfig[] = [
     message: 'You cleared Neon Metropolis!',
     nextLevel: null,
     // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
-    // The air and the street take turns (#963): hover drones patrol the canyons in Vs, rings and a spiral, billboard bots
-    // march the pavements beside the track between them, then the Helicopter (#325) arrives at 40 s over the helix.
-    // Every drone wave is a formation ahead of the rider: scattered over the whole city, the towers hid them and left
-    // the rider with nothing to shoot for most of the run (the pacing gate).
+    // The street and the air take turns (#963): billboard bots line the launch's avenue, where the rider is at street
+    // level, hover drones patrol the canyons in Vs, rings and a spiral from the lift on (the towers hide the pavements
+    // from up there), then the Helicopter (#325) arrives at 40 s over the helix. Every drone wave is a formation ahead
+    // of the rider, each drone moved onto the street its approach sees best (`clearOfTowers`): scattered over the whole
+    // city, or in the cross streets beside the ride's avenue, the towers hid them (the pacing gate, #950).
     ...paceLevel({
       waves: [
-        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
-        { type: 'billboardBot', count: 12, waveLabel: 'Billboard Bots!' },
+        { type: 'billboardBot', count: 12, waveLabel: 'Billboard Bots!', weight: 0.75 },
+        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v' },
         { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring' },
         { type: 'billboardBot', count: 13, waveLabel: 'Street March!' },
         { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'spiral' },

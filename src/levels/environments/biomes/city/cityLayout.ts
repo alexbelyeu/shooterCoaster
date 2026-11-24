@@ -260,27 +260,42 @@ function clearOf(towers: readonly Tower[], p: Point, ground: number, c: Clearanc
   return towers.every((t) => up >= t.h || Math.abs(p.x - t.x) >= t.w / 2 + c.x || Math.abs(p.z - t.z) >= t.d / 2 + c.z)
 }
 
-/** Street centre lines tried for a blocked spot, nearest first. */
-const STREETS_TRIED = 6
+/** Street centre lines tried either way of a spot, along each axis. */
+const STREETS_TRIED = 3
 
 /**
- * `p` if it is `c` clear of every tower, else `p` moved across z onto the nearest centre line of a street running
- * along x that is (`STREET_GRID`: those lines lie at odd multiples of half the pitch). An air enemy whose drift is
- * wide along x and narrow across z keeps it inside that street. `ground` is the ground's height under `p`.
+ * The spot `c` clear of every tower that the most of `eyesSeeing(spot)` see past the towers, the nearest of equals:
+ * `p` itself, or `p` moved across onto the centre line of a nearby street (`STREET_GRID`: those lines lie at odd
+ * multiples of half the pitch), along x or along z. Placed by the nearest open spot alone, a formation's drones sat in
+ * the cross streets beside the ride's avenue, behind its towers (#871, #950). `ground` is the ground's height under
+ * `p`; `p` when nothing in reach is clear.
  */
-export function clearOfTowers(towers: readonly Tower[], p: Point, ground: number, c: Clearance): Point {
-  if (clearOf(towers, p, ground, c)) return p
+export function clearOfTowers(
+  towers: readonly Tower[],
+  p: Point,
+  ground: number,
+  c: Clearance,
+  eyesSeeing: (q: Point) => Point[] = () => [],
+): Point {
   const { pitch } = STREET_GRID
-  const at = p.z / pitch - 0.5
-  const nearest = Math.round(at)
-  const toward = at >= nearest ? 1 : -1
-  for (let k = 0; k < STREETS_TRIED; k++) {
-    // The nearest line, then the next nearest on either side in turn
-    const line = nearest + toward * (k % 2 === 1 ? (k + 1) / 2 : -k / 2)
-    const q = { x: p.x, y: p.y, z: (line + 0.5) * pitch }
-    if (clearOf(towers, q, ground, c)) return q
+  let best = p
+  let bestSeen = -1
+  let bestDist = Infinity
+  const consider = (q: Point) => {
+    if (!clearOf(towers, q, ground, c)) return
+    const seen = eyesSeeing(q).filter((eye) => !hidden(towers, eye, q, ground, 0)).length
+    const dist = Math.hypot(q.x - p.x, q.z - p.z)
+    if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) [best, bestSeen, bestDist] = [q, seen, dist]
   }
-  return p
+  consider(p)
+  for (const alongX of [true, false]) {
+    const nearest = Math.round((alongX ? p.z : p.x) / pitch - 0.5)
+    for (let k = -STREETS_TRIED; k <= STREETS_TRIED; k++) {
+      const across = (nearest + k + 0.5) * pitch
+      consider(alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z })
+    }
+  }
+  return best
 }
 
 /** How far off a street's centre line a ground enemy stands: past the traffic lanes, on the pavement's edge (#963). */
@@ -292,10 +307,10 @@ const PAVEMENT_TOWER_CLEARANCE = 12
 /** Height over its foot of the bot's face, the point a tower must not hide from the rider. */
 const FACE_HEIGHT = 25
 
-/** Whether a tower stands across the line from `eye` to `FACE_HEIGHT` over `q` (`ground` the street's height): the line's lowest point over its footprint is under its roof. */
-function hidden(towers: readonly Tower[], eye: Point, q: Point, ground: number): boolean {
+/** Whether a tower stands across the line from `eye` to `sight` over `q` (`ground` the street's height): the line's lowest point over its footprint is under its roof. */
+function hidden(towers: readonly Tower[], eye: Point, q: Point, ground: number, sight = FACE_HEIGHT): boolean {
   const dx = q.x - eye.x
-  const dy = q.y + FACE_HEIGHT - eye.y
+  const dy = q.y + sight - eye.y
   const dz = q.z - eye.z
   // The slab test: where the line enters and leaves the tower's footprint (a zero d divides to ±Infinity, as it should)
   return towers.some((t) => {

@@ -20,7 +20,7 @@ export const city: BiomeDefinition = {
   // Its air enemies are hover drones: each spot clears the towers by the drone's drift
   clearAir: (groundFn, track) => {
     const towers = cityTowers(track, trackExtent(track))
-    return (p) => clearOfTowers(towers, p, groundFn(p.x, p.z), DRONE_CLEARANCE)
+    return (p, eyesSeeing) => clearOfTowers(towers, p, groundFn(p.x, p.z), DRONE_CLEARANCE, eyesSeeing)
   },
   // Its ground enemies are billboard bots (#963): each trackside spot moves onto the nearby pavement the rider sees best
   clearGround: (_groundFn, track) => {

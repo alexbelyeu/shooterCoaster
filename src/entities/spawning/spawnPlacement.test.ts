@@ -848,7 +848,7 @@ describe('level7 hover drones keep out of the towers (#323)', () => {
       const camera = trackPoint(table, Math.floor(rng() * table.count))
       const p = readableScatterSpawn('hoverDrone', scatter, 'air', table, groundFn, rng)
       if (inTower(p)) raw++
-      if (inTower(clearAir(outsideNearField(p, camera)))) blocked++
+      if (inTower(clearAir(outsideNearField(p, camera), () => []))) blocked++
     }
     expect(raw).toBeGreaterThan(0) // the check would catch an unplaced spawn
     expect(blocked).toBe(0)
