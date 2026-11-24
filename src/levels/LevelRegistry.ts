@@ -197,7 +197,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 102 * 15, // 1530: no boss, a finale wave ends the run
+    maxScore: 112 * 15, // 1680: no boss, a finale wave ends the run
     message: 'You cleared Neon Metropolis!',
     nextLevel: null,
     // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
@@ -217,14 +217,21 @@ const LEVELS: LevelConfig[] = [
       glow: 0.6,
     },
     // Hover drones patrol the street canyons in Vs and rings; no boss yet (the helicopter is #322's), a finale wave ends the run.
+    // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the finale at 40 s. A wave of drones is
+    // shot down in a few seconds and the towers hide stragglers: four big waves 10 s apart, two scattered over the whole
+    // city, left the rider with nothing to shoot for most of the run (the pacing gate). The ring comes second, centred on
+    // the track, so the drop into the canyons has targets; the last wave and the finale come in three rings each, so
+    // they last until the next arrives and to the end of the run.
     ...paceLevel({
       waves: [
-        { type: 'hoverDrone', count: 20, waveLabel: 'Drones Incoming!', weight: 2 },
-        { type: 'hoverDrone', count: 20, waveLabel: 'Patrol Wing!', formation: 'v', weight: 2 },
-        { type: 'hoverDrone', count: 22, waveLabel: 'Surveillance Ring!', formation: 'ring', weight: 2 },
-        { type: 'hoverDrone', count: 20, waveLabel: 'Swarm Protocol!', formation: 'v', weight: 3 },
+        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
+        { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring' },
+        { type: 'hoverDrone', count: 13, waveLabel: 'Patrol Wing!', formation: 'v' },
+        { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'spiral' },
+        { type: 'hoverDrone', count: 14, waveLabel: 'Swarm Protocol!', formation: 'v' },
+        { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.5 },
       ],
-      finale: { type: 'hoverDrone', count: 20, waveLabel: 'Final Wave!', formation: 'ring' },
+      finale: { type: 'hoverDrone', count: 30, waveLabel: 'Final Wave!', formation: 'ring' },
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},

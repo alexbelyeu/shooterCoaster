@@ -7,7 +7,8 @@ import type { DarkSectionSpec, WhaleBreachSpec } from '@/types/level'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 import type { FogModifiers } from './sceneFog'
-import type { KeepOff, PlacementBounds, Vec3 } from '@/entities/spawning/spawnPlacement'
+import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 import type { HeroShot } from '@/track/introCamera.hot'
 
 /** One stop of a terrain colour ramp. */
