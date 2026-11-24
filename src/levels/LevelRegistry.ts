@@ -5,6 +5,7 @@ import { paceLevel } from './pacing'
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
 // Level 4's ride too (#866), and level 5's (#867).
 import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
+import { CITY_LEVEL_TRACK } from './environments/biomes/city/cityLevel'
 import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
 import { GYM_LEVEL_TRACK, GYM_LEVEL_WALLS } from './environments/biomes/gym/gymLevel'
 
@@ -201,22 +202,9 @@ const LEVELS: LevelConfig[] = [
     maxScore: 112 * 15, // 1680: no boss, a finale wave ends the run
     message: 'You cleared Neon Metropolis!',
     nextLevel: null,
-    // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
-    // countdown, GO launches it over the fins and it drops straight into the street canyons; gravity rides the rest,
-    // the beat keeping a run to about half the lap. level1's curve family, extent varC × 13 × scalar = 1040.
-    track: {
-      varA: 3,
-      varB: 17,
-      varC: 4,
-      scalar: 20,
-      curve: 'curve1',
-      ride: 'v2',
-      mechanics: [{ kind: 'station', from: 0, to: 0.012, speed: 260 }],
-      rideV2: { crawl: 100, drag: 0.001 },
-      color1: 0xff3fb4,
-      color2: 0x2ee6ff,
-      glow: 0.6,
-    },
+    // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`): a station launch down an avenue, a lift
+    // beside a tower, the first drop between two, under the elevated train, an airtime crest and a helix round the hero tower.
+    track: CITY_LEVEL_TRACK,
     // Hover drones patrol the street canyons in Vs and rings; no boss yet (the helicopter is #322's), a finale wave ends the run.
     // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the finale at 40 s. A wave of drones is
     // shot down in a few seconds and the towers hide stragglers: four big waves 10 s apart, two scattered over the whole

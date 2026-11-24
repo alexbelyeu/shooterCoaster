@@ -126,6 +126,10 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   launch through a glowing lava tube, a lift up the volcano's flank into a hole, a drop track falling inside the cone
   (18 s), out through a second hole a few metres round the rider (the near miss), two camelbacks (30 s), a turntable
   (38 s) and the Titan's whole fight ridden backwards facing him (40–57 s).
+- **Neon Metropolis (7):** built (#871, `city/cityTrack.ts`, its storyboard and seconds at the top): a station launch down
+  an avenue, a lift up a street beside the lift tower, a 66° first drop between two towers, the head-chopper under the
+  elevated train line (20.5 s), an airtime crest (26 s), a climbing helix round the hero tower to 40 s and a slow run
+  south through the west side's streets for the fight. The ride runs down the streets' centre lines, towers on both sides.
 
 ## Rules for building rides
 

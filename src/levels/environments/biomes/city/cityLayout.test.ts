@@ -3,7 +3,7 @@ import { getLevelConfig } from '@/levels/LevelRegistry'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { trackExtent } from '../../shared/trackScatter'
-import { layoutCity, STREET_GRID } from './cityLayout'
+import { footprintDistance, layoutCity, STREET_GRID, TRACK_CLEARANCE, type Tower } from './cityLayout'
 
 const table = buildArcTable(createTrackCurve(getLevelConfig('level7')!.track))
 const extent = trackExtent(table)
@@ -25,8 +25,10 @@ describe('layoutCity', () => {
     const heights = layout.towers.map((t) => t.h)
     expect(Math.min(...heights)).toBeLessThan(120)
     expect(Math.max(...heights)).toBeGreaterThan(340)
-    const clashes = layout.towers.filter((t) => trackDistance(t.x, t.z) < Math.hypot(t.w, t.d) / 2 + 20)
-    expect(clashes).toEqual([])
+    // Off the rails by the clearance, the ride's streets lined with them (#871)
+    const clearance = (t: Tower) => Math.min(...Array.from({ length: table.count }, (_, i) => footprintDistance(t, table.x[i], table.z[i])))
+    expect(layout.towers.filter((t) => clearance(t) < TRACK_CLEARANCE)).toEqual([])
+    expect(layout.towers.filter((t) => clearance(t) < 2 * TRACK_CLEARANCE).length).toBeGreaterThan(40)
   })
 
   it('keeps every tower inside its block, off the streets', () => {

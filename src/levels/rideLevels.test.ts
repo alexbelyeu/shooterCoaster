@@ -10,6 +10,8 @@ import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel
 import { INFERNO_TRACK } from './environments/biomes/volcanic/infernoTrack'
 import { GYM_LEVEL_TRACK } from './environments/biomes/gym/gymLevel'
 import { GYM_TRACK } from './environments/biomes/gym/gymTrack'
+import { CITY_LEVEL_TRACK } from './environments/biomes/city/cityLevel'
+import { CITY_TRACK } from './environments/biomes/city/cityTrack'
 
 const KIT: RidePrecision = { position: 0, up: 2 }
 
@@ -20,6 +22,7 @@ describe.each([
   ['level4', ARCTIC_LEVEL_TRACK, ARCTIC_TRACK, KIT],
   ['level5', INFERNO_LEVEL_TRACK, INFERNO_TRACK, KIT],
   ['level6', GYM_LEVEL_TRACK, GYM_TRACK, { position: 2, up: 4 }],
+  ['level7', CITY_LEVEL_TRACK, CITY_TRACK, KIT],
 ] as [string, TrackParams, SplineTrackParams, RidePrecision][])('%s ride data', (id, shipped, built, precision) => {
   it(`is the built ride (regenerate with \`node scripts/gen-ride-levels.mjs ${id}\`)`, () => {
     expect(shipped).toEqual({ ...roundNumbers(built), controlPoints: roundPoints(built.controlPoints, precision) })
