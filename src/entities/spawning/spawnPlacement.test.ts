@@ -596,7 +596,7 @@ describe('placeWallSwarm (#516)', () => {
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
   })
 
-  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, the last on a wall past the crest", () => {
+  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, the last ones on the walls seen from the Shield's top and its drop", () => {
     const { level, table: gym, rideFor } = world(shippedLevels().find((l) => l.id === 'level6')!)
     const wave = level.enemies.find((w) => w.type === 'lanternfly')!
     const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
@@ -609,10 +609,10 @@ describe('placeWallSwarm (#516)', () => {
     expect(walls[walls.length - 1]).not.toMatch(/alaska/)
     // The crest (#948): over Alaska's top no wall is in frame, so a group lands on the roof the rider looks up into.
     expect(walls).toContain('roof-alaska')
-    // Every lanternfly is on the rider's screen at some point of the wave's window or the last group's second after it, as the
+    // Every lanternfly is on the rider's screen at some point of the wave's window or the late groups' seconds after it, as the
     // ride's profile rides it, judged in the rails' frame.
     const frames = Array.from({ length: 41 }, (_, j) =>
-      riderFrame(gym, indexAhead(gym, riderIndex, ride.riddenAfter!(((ride.seconds! + 1.5) * j) / 40)), ride.trackScale))
+      riderFrame(gym, indexAhead(gym, riderIndex, ride.riddenAfter!(((ride.seconds! + 7) * j) / 40)), ride.trackScale))
     const reach = maxReadableDistance(wave.type)
     const unseen = placed.filter((p) => !frames.some((fr) => inRiderFrame(fr, wallPoint(p.wall, p.u, p.v, 0, { x: 0, y: 0, z: 0 }), reach)))
     expect(unseen.map((p) => p.wall.id)).toEqual([])
@@ -627,9 +627,9 @@ describe('placeWallSwarm (#516)', () => {
     expect(arrivals[0]).toBe(0)
     expect(arrivals.length).toBeGreaterThanOrEqual(5)
     for (let g = 1; g < arrivals.length; g++) expect(arrivals[g]).toBeGreaterThan(arrivals[g - 1])
-    // The last lands just after the wave's window closes, for the stretch after it.
-    expect(arrivals[arrivals.length - 1]).toBeGreaterThan(ride.seconds!)
-    expect(arrivals[arrivals.length - 1]).toBeLessThan(ride.seconds! + 1.5)
+    // The last ones land after the wave's window closes, for the stretch after it: the Shield's top and the fall (#957).
+    expect(arrivals[arrivals.length - 1]).toBeGreaterThan(ride.seconds! + 4)
+    expect(arrivals[arrivals.length - 1]).toBeLessThan(ride.seconds! + 6)
     // Each group lands in the rider's frame: some member of it is on screen within a second of its landing (#949).
     const riderIndex = indexAhead(gym, 0, rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)[wave.spawnDelay! * 10])
     const atRider = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })

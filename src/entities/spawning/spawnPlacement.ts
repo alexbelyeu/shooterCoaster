@@ -979,17 +979,18 @@ const SWARM_VIEWS = 6
 /** A group is judged from the rider's views over this long from its arrival: about as long as it takes to clear. */
 const SWARM_GROUP_SECONDS = 1.5
 /**
- * A swarm's groups land evenly from the wave's tell to this long after its window closes (#948): the rider clears a small
- * group in about a second, so the last holds the stretch while the next wave is still arriving.
+ * A swarm's groups land evenly from the wave's tell to this long after its window closes (#948, #957): the rider clears a
+ * small group in about a second, so the late ones hold the stretch while the next wave is still out of sight (on level 6,
+ * the Shield's top, its stop and the auto belay's fall to the pit, where the pack is first seen).
  */
-const SWARM_LAST_LATE = 1
+const SWARM_LAST_LATE = 5.5
 /**
  * A swarm splits into groups of at least `SWARM_GROUP_MIN`, up to `SWARM_GROUPS`, each round the spot the rider sees most
  * while that group is in play (#768), from the moment it arrives (#928): on level 6, one after another on the walls beside
- * the car up Alaska, then on the roof over its top as it rolls over (#948), the last on the Starr past the crest, so new
- * ones keep landing in frame through the wave, not one burst.
+ * the car up Alaska, then on the roof over its top as it rolls over (#948), the last ones on the Starr and the Shield the
+ * car looks at from the Shield's top and on its fall (#957), so new ones keep landing in frame through the wave, not one burst.
  */
-const SWARM_GROUPS = 7
+const SWARM_GROUPS = 12
 const SWARM_GROUP_MIN = 3
 /** Candidate centres across and up each wall, about this far apart. */
 const SWARM_CANDIDATE_STEP = 80
@@ -1072,8 +1073,8 @@ export function placeWallSwarm({ table, riderIndex, type, walls, slots, ride }: 
 
 /**
  * Seconds after its wave activates that group `g` of a swarm lands: the first with the wave, the rest evenly after it, the
- * last `SWARM_LAST_LATE` after the window closes, for the stretch after it (on level 6, the Starr past the crest while the
- * next wave, the pack, is still out of sight in the pit). No window: every group at once.
+ * last `SWARM_LAST_LATE` after the window closes, for the stretch after it (on level 6, the Starr and the Shield from the
+ * crest to the bottom of the drop while the next wave, the pack, is still out of sight in the pit). No window: every group at once.
  */
 function swarmArrival(ride: RideAhead, g: number, groups: number): number {
   const seconds = ride.seconds ?? 0
