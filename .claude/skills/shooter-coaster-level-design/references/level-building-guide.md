@@ -71,7 +71,8 @@ maxExtent = varC * 13 * scalar
 Examples:
 - Desert: 2 * 13 * 60 = 1560
 - Ocean: 4 * 13 * 20 = 1040
-- Arctic: 4 * 13 * 35 = 1820
+
+A spline ride (levels 1 and 4–6) has no formula: `trackExtent(table)` (`shared/trackScatter.ts`) measures it.
 
 This value is critical for:
 - Placing landmarks BEYOND the track
