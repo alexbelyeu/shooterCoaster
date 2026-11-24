@@ -193,7 +193,7 @@ and land a frame or more after the frame that caused them, more frames on a slow
 enemies by whole steps, so the ride shot's enemy count and the pacing gaps differed run to run and between a local session
 and CI. React reports commits to a devtools hook `newPage` defines before the page loads (`ctx.addInitScript`). Bosses move
 on the game clock (`core/gameClock.ts` `gameClockStep`), never the frame's delta, so they keep pace with the level too.
-A `pacing` step (#450) rides every level's whole run, GO to the end, in settled steps of `--pacing-step` level seconds
+A `pacing` step (#450) rides every level's whole run, GO to the end (a boss win with nothing left ends it early, #961: `samplingCutShort`), in settled steps of `--pacing-step` level seconds
 (default 0.5, so the run is the same on any runner; `rideRate` 1, the ride a 60 fps player gets), the level time never held,
 played as a player (#925): `autoFire(true, PLAYER_HITS_PER_SECOND)` lands 3 hits a game second on the nearest targets
 `sight()` counts shootable, on the game clock (each through `processHit`, the only path that hits; the shot's look is `showShotAtNDC`, no colliding bullet), so a stretch a player clears goes empty as it would for them (unfired, the

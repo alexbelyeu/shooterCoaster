@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOSS_FIGHT_SECONDS, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
 import { RUN_SECONDS, pacingTimes } from '@/levels/pacing'
 
 /** One sample per `step` s from 0 to `end`, `targets(t)` on screen, track = t / end. */
@@ -65,6 +65,18 @@ describe('pacingMetrics', () => {
 
   it('reports nothing for an empty sample list', () => {
     expect(pacingMetrics([], 60)).toMatchObject({ countedSeconds: 0, noTargetShare: 0, longestGap: null })
+  })
+})
+
+describe('samplingCutShort', () => {
+  it('flags sampling that stopped before the run ended', () => {
+    expect(samplingCutShort([{ t: 0 }, { t: 40 }], 60, 0.25)).toBe(true)
+    expect(samplingCutShort([{ t: 0 }, { t: 59.6 }], 60, 0.25)).toBe(false)
+  })
+
+  it('accepts a run a boss win ended early (#961)', () => {
+    expect(samplingCutShort([{ t: 0, bossStage: 'active' }, { t: 51, bossStage: 'defeated' }], 60, 0.25)).toBe(false)
+    expect(samplingCutShort([{ t: 0 }, { t: 51, bossStage: 'active' }], 60, 0.25)).toBe(true)
   })
 })
 
