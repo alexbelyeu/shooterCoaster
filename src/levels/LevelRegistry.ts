@@ -196,14 +196,10 @@ const LEVELS: LevelConfig[] = [
     maxScore: 82 * 15 + 60 + 60 + 400, // 1230 + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1750
     message: 'You cleared Neon Metropolis!',
     nextLevel: null,
-    // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`): a station launch down an avenue, a lift
-    // beside a tower, the first drop between two, under the elevated train, an airtime crest and a helix round the hero
-    // tower to the Helicopter at 40 s. The ride is the city world chunk's (`World.rides`, #960).
-    // Hover drones patrol the street canyons in Vs and rings, one wave every ~6 s to 29 s, then the Helicopter (#325) at
-    // 40 s over the helix. The towers hide stragglers, so the waves are big; the ring comes second, centred on the track,
-    // so the first drop between the towers has targets; the last wave comes in three rings, so it lasts until the boss.
-    // The ride winds through a compact city: a second group of a 'v' is within a drone's reach of the rider from the
-    // moment it activates and so marches at once (#472), hence 'Patrol Wing!' is one group of 9 and the spiral takes the rest.
+    // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
+    // Drone waves every ~6 s to 29 s, then the Helicopter (#325) at 40 s over the helix; the towers hide stragglers, so
+    // the waves are big. 'Patrol Wing!' is one group: on this compact ride a second 'v' group is in reach from activation
+    // and would march before the rider got there (#472).
     ...paceLevel({
       waves: [
         { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
