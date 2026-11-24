@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { sightClear, type HeightFunction } from '@/utils/terrainNoise'
 import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
@@ -25,7 +24,7 @@ import { approachAngle, firstSlot, pickPerch, type Perch, type PerchInput } from
 import { aimAtRider } from './bossAim.hot'
 import { inWindow, needsRelocate, timeToWindow, windowAmount, windowNowEpoch } from './bossCycle.hot'
 import {
-  YETI_BODY, YETI_PERCH, YETI_RISE, YETI_SIGHT_HEIGHT, YETI_ROAM, YETI_ROAR, YETI_THROW, THROW_S, chestRetracted, elbowPose, fistPose, lopeAt,
+  YETI_BODY, YETI_PERCH, YETI_RISE, YETI_ROAM, YETI_ROAR, YETI_THROW, THROW_S, chestRetracted, elbowPose, fistPose, lopeAt,
   passedCamera, riseOffset, snowballAt, throwArmAlive, throwSwing, toppleAngle, toppleSink, type Lope, type Point3,
 } from './yetiMotion.hot'
 
@@ -47,20 +46,6 @@ const _right = new THREE.Vector3()
 const _up = new THREE.Vector3()
 const _to = new THREE.Vector3()
 const _p = new THREE.Vector3()
-const _seen = new THREE.Vector3()
-/** How far from the view's centre its chest may stand (NDC), so its fists and head stay in frame too. */
-const SEEN_NDC = 0.75
-/** Seconds between looks for a ridge in view while none is. */
-const HIDDEN_RETRY_S = 0.3
-
-/** Its chest at (`x`, `z`) inside the view, no terrain between it and the rider's eye (#937: the valley's walls hid its ridges). */
-function seesChest(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number): boolean {
-  const chest = groundFn(x, z) + YETI_SIGHT_HEIGHT
-  _seen.set(x, chest, z).project(camera)
-  if (_seen.z >= 1 || Math.abs(_seen.x) >= SEEN_NDC || Math.abs(_seen.y) >= SEEN_NDC) return false
-  camera.getWorldPosition(_seen)
-  return sightClear(groundFn, _seen.x, _seen.y, _seen.z, x, chest, z)
-}
 const _m = new THREE.Matrix4()
 const _q = new THREE.Quaternion()
 const _e = new THREE.Euler()
@@ -92,15 +77,8 @@ export default function Yeti(props: BossProps) {
   const ballsRef = useRef<THREE.InstancedMesh>(null)
 
   const input = useMemo<PerchInput>(
-    () => ({
-      index: buildTrackIndex(track),
-      avoid: [],
-      camera: { x: 0, z: 0 },
-      forwardX: 0,
-      forwardZ: -1,
-      sees: (x, z) => seesChest(camera, groundFn, x, z),
-    }),
-    [track, groundFn, camera],
+    () => ({ index: buildTrackIndex(track), avoid: [], camera: { x: 0, z: 0 }, forwardX: 0, forwardZ: -1 }),
+    [track],
   )
 
   const [tellStep] = useState(gameClockStep)
@@ -113,8 +91,6 @@ export default function Yeti(props: BossProps) {
       anchorX: 0,
       anchorZ: 0,
       holdStart: 0,
-      /** Seconds its ridge has been out of the rider's view, off screen or behind the terrain. */
-      unseen: 0,
       lopeStart: -1,
       fromX: 0,
       fromZ: 0,
@@ -258,29 +234,18 @@ export default function Yeti(props: BossProps) {
       }
       retract('chest', chestRetracted(lastPhase, roarT))
 
-      // The track turns and the valley's walls rise: a ridge the rider no longer sees is left (#937).
-      const seen = !sim.placed || sim.lopeStart >= 0 || seesChest(camera, groundFn, sim.anchorX, sim.anchorZ)
-      sim.unseen = seen ? 0 : sim.unseen + dt
       if (!sim.placed) {
         aim(0, true)
         sim.anchorX = sim.perch.x
         sim.anchorZ = sim.perch.z
         sim.holdStart = age
-      } else if (fighting && sim.lopeStart < 0 && sim.throwArm < 0) {
+      } else if (fighting && sim.lopeStart < 0 && !roaring && sim.throwArm < 0 && timeToWindow(YETI_ROAR, roarT) > YETI_ROAM.lopeS) {
         const dx = sim.anchorX - _cam.x
         const dz = sim.anchorZ - _cam.z
         const ahead = dx * sim.heading.x + dz * sim.heading.z
         const side = dz * sim.heading.x - dx * sim.heading.z
-        const calm = !roaring && timeToWindow(YETI_ROAR, roarT) > YETI_ROAM.lopeS
-        const due = calm && needsRelocate(YETI_ROAM, age - sim.holdStart, ahead, side)
-        // Out of the rider's sight it goes even mid-roar: a roar nobody sees is no tell.
-        const hidden = !due && sim.unseen >= YETI_ROAM.hiddenHoldS
-        // Lost from view, it picks its ridge off where the rider looks now, not the heading that lags it.
-        if (hidden) sim.headed = false
-        if (due || hidden) aim(0, true)
-        // No ridge in view to go to: it holds this one and looks again shortly.
-        if (hidden && !seesChest(camera, groundFn, sim.perch.x, sim.perch.z)) sim.unseen = YETI_ROAM.hiddenHoldS - HIDDEN_RETRY_S
-        else if (due || hidden) {
+        if (needsRelocate(YETI_ROAM, age - sim.holdStart, ahead, side)) {
+          aim(0, true)
           sim.fromX = sim.anchorX
           sim.fromZ = sim.anchorZ
           sim.anchorX = sim.perch.x

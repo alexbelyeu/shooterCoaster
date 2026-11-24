@@ -113,8 +113,6 @@ export interface Perch {
 export interface PerchInput {
   index: TrackIndex
   camera: { x: number; z: number }
-  /** Whether the rider sees a boss standing at (`x`, `z`): given it, a clear slot it sees comes before any other. */
-  sees?: (x: number, z: number) => boolean
   forwardX: number
   forwardZ: number
   avoid: readonly Circle[]
@@ -135,26 +133,20 @@ function slotAt(input: PerchInput, config: PerchConfig, slot: number, sign: numb
 
 const _at = { x: 0, z: 0 }
 
-/**
- * Keeps `out`'s slot and side while clear (and seen), so it doesn't hop about; a clear slot the rider sees before any
- * other clear one; false (and `out` unchanged) if all are blocked.
- */
+/** Keeps `out`'s slot and side while clear, so it doesn't hop about; false (and `out` unchanged) if all are blocked. */
 export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = PERCH): boolean {
   const n = config.slots.length
-  for (let pass = 0; pass < 2; pass++) {
-    for (let s = 0; s < 2; s++) {
-      const sign = s === 0 ? out.sign : (-out.sign as 1 | -1)
-      for (let k = 0; k < n; k++) {
-        const slot = s === 0 ? (out.slot + k) % n : k
-        slotAt(input, config, slot, sign, _at)
-        if (!perchClear(input, _at.x, _at.z, config)) continue
-        if (pass === 0 && input.sees && !input.sees(_at.x, _at.z)) continue
-        out.x = _at.x
-        out.z = _at.z
-        out.slot = slot
-        out.sign = sign
-        return true
-      }
+  for (let s = 0; s < 2; s++) {
+    const sign = s === 0 ? out.sign : (-out.sign as 1 | -1)
+    for (let k = 0; k < n; k++) {
+      const slot = s === 0 ? (out.slot + k) % n : k
+      slotAt(input, config, slot, sign, _at)
+      if (!perchClear(input, _at.x, _at.z, config)) continue
+      out.x = _at.x
+      out.z = _at.z
+      out.slot = slot
+      out.sign = sign
+      return true
     }
   }
   return false

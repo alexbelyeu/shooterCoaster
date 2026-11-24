@@ -61,8 +61,6 @@ export const YETI_ROAM = {
   hopHeight: 70,
   minAhead: 520,
   maxOffAngle: 1.05,
-  /** Seconds it holds a ridge out of the rider's view (off screen, behind the terrain) before it lopes on. */
-  hiddenHoldS: 1.2,
 } as const
 
 export const YETI_PERCH: PerchConfig = {
@@ -75,17 +73,10 @@ export const YETI_PERCH: PerchConfig = {
     [1250, 760],
     [1600, 480],
     [1100, 860],
-    // Nearer the line, for a narrow valley whose walls hide the ridges above (#937).
-    [1000, 360],
-    [1350, 380],
-    [820, 340],
   ],
   footprint: 230,
   clearance: 45,
 }
-
-/** Its chest over its feet: what the rider must see of it on a ridge (the fists and chest are what it shoots). */
-export const YETI_SIGHT_HEIGHT = 420
 
 /** Never retracted before the last phase (its phase hides it), so the hit that breaks the last fist exposes it in the same turn. */
 export function chestRetracted(lastPhase: boolean, roarT: number): boolean {
