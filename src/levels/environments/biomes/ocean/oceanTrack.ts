@@ -15,8 +15,11 @@
  * - **28–34 s, the sea arch**: round the south-west corner and north in a slow corkscrew through a rock arch (31 s, the
  *   near miss: the arch's crown a few metres over the rider's head as they roll under it).
  * - **35–40 s, the second lift** east across the lagoon, cresting as the Kraken rises (40 s).
- * - **40–46 s, the finale**: a quarter helix down round to the north for the boss fight, under the first lift (44 s).
- * - **46–61 s, the brake run** west along the north shore and round the station's west end: home.
+ * - **40–50 s, the fight run**: on east from the crest, slowly down across the open lagoon facing the Kraken, under the
+ *   first drop's crest (48 s). It is the fight's longest look at open water (`pacing.bossFramedShare`): a turn costs the
+ *   Kraken a sink and a rise, and north of the lagoon the hills hide it.
+ * - **50–56 s, the finale**: a quarter helix round to the north and the corner west along the north shore.
+ * - **56–70 s, the brake run** west along the north shore and round the station's west end: home.
  *
  * `oceanTrack.test.ts` holds it to the beats and to its clearances (the seabed, the arch, the water over the tunnel).
  */
@@ -41,7 +44,7 @@ const DEG = Math.PI / 180
 const EAST = Math.PI / 2
 
 /** Speeds, world units a second. */
-const SPEED = { launch: 130, lift: 70, crest: 45, tunnel: 80, relaunch: 220, cork: 90, lift2: 75, helix: 90, home: 90, brake: 50 } as const
+const SPEED = { launch: 130, lift: 70, crest: 45, tunnel: 80, relaunch: 220, cork: 90, lift2: 75, helix: 90, home: 90, brake: 50, fight: 50 } as const
 
 const STATION = { x: -480, y: 12, z: 350 } as const
 const LIFT = { from: -250, to: 200, topY: 175 } as const
@@ -60,8 +63,8 @@ const ARCH = { span: 56, crownOver: 3.5 * EYE } as const
 const INNER_Z = 150
 const CORNER = 110
 const LIFT2 = { from: -450, to: -150, topY: 120 } as const
-/** The finale: a quarter helix round to the north, under the first lift and back west along the north shore. */
-const FINALE = { helixFrom: -40, helixRadius: 90, helixDrop: 80, northZ: 560, corner: 90, brakeFrom: -300 } as const
+/** The finale: the fight run east down to `fightY`, a quarter helix round to the north and back west along the north shore. */
+const FINALE = { helixFrom: 410, fightY: 40, helixRadius: 90, helixDrop: 20, northZ: 560, corner: 90, brakeFrom: -300 } as const
 /** Home: round the station's west end (`radius`) and east into it. */
 const HOME = { x: -560, radius: 80 } as const
 
@@ -122,7 +125,7 @@ export function buildOceanRide(): OceanRide {
   turn(Math.PI / 2, CORNER)
   b.mark('straight', () => straightTo(b, 'x', LIFT2.from))
   zone('lift', SPEED.lift2, () => b.mark('liftHill', () => straightTo(b, 'x', LIFT2.to, { rise: LIFT2.topY - y(), ease: 8 * EYE })))
-  b.mark('straight', () => straightTo(b, 'x', FINALE.helixFrom))
+  zone('brake', SPEED.fight, () => b.mark('straight', () => straightTo(b, 'x', FINALE.helixFrom, { rise: FINALE.fightY - y(), ease: 12 * EYE })))
   zone('brake', SPEED.helix, () =>
     helix(b, { radius: FINALE.helixRadius, turns: 0.25, drop: FINALE.helixDrop, bank: 30 * DEG, hand: -1 }),
   )

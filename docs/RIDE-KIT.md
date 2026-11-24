@@ -118,8 +118,8 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   gap over a canyon between mesas.
 - **Ocean (3):** built (#865, `ocean/oceanTrack.ts`, its storyboard and seconds at the top): a lift east, a crawl
   south along its crest with the whale breaching ahead, the drop's splashdown into a glass tunnel under the sea, camelbacks,
-  a slow corkscrew through a sea arch (`environment.seaArch`), the second lift cresting as the Kraken rises, and a
-  quarter helix home under the first lift. No U-turns after the corkscrew: a hairpin or a half helix puts trackside
+  a slow corkscrew through a sea arch (`environment.seaArch`), the second lift cresting as the Kraken rises, the fight run
+  east across the open lagoon facing it (40–50 s), and a quarter helix home along the north shore. No U-turns after the corkscrew: a hairpin or a half helix puts trackside
   waves behind the rider on their approach (`spawnPlacement.test.ts`).
 - **Antarctica (4):** built (#866, `arctic/arcticTrack.ts`, its storyboard and seconds at the top): a station launch,
   a lift up the valley, a 71° first drop into the ice cave (a dark section with the `ice` look, `IceCave.tsx`, its mouth
