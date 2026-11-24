@@ -15,7 +15,7 @@
  * is summoned, the camera then going back to `rideTo`: the rider's view from a little before where it arrived, far enough
  * back that its lobbed snowball stays inside the frame (#920). All are fractions of the lap, so they move whenever the
  * track is reshaped: `bossChecks.test.ts` holds `rideTo` and `summonAt` to the boss's first 4 s on the ride (#769 moved
- * the Medusa from 0.69 to 0.59 of the lap and the step rode on to 0.7, past her), `summonAt` past `rideTo` and `passShots` after it.
+ * the Medusa from 0.69 to 0.59 of the lap and the step rode on to 0.7, past her; #926 moved her finale to 0.68–0.75), `summonAt` past `rideTo` and `passShots` after it.
  */
 export const BOSS_CHECKS = [
   { level: 'level1', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'balloon-', lastPhase: ['gondola'], midShot: 'boss-gondola', minOnScreen: 1, settleS: 0, midSettleS: 0 },
@@ -23,6 +23,6 @@ export const BOSS_CHECKS = [
   { level: 'level3', minWidthFrac: 0.15, weakPoints: 6, firstPhase: 'pad-', lastPhase: ['eye'], midShot: 'boss-head', minOnScreen: 3, settleS: 3, midSettleS: 3 },
   { level: 'level4', minWidthFrac: 0.15, weakPoints: 3, firstPhase: 'fist-', lastPhase: ['chest'], midShot: 'boss-chest', minOnScreen: 2, settleS: 4, midSettleS: 1, minProjectiles: 1, rideTo: 0.5, summonAt: 0.53 },
   { level: 'level5', minWidthFrac: 0.15, weakPoints: 4, firstPhase: ['vent-', 'heart'], lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 3, midSettleS: 0 },
-  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.59, passShots: [0.627, 0.64] },
+  { level: 'level6', minWidthFrac: 0.15, weakPoints: 9, firstPhase: 'snake-', midPhases: 1, lastPhase: ['crown'], midShot: 'boss-crown', minOnScreen: 3, settleS: 2, midSettleS: 1, rideTo: 0.69, passShots: [0.71, 0.73] },
   { level: 'level7', minWidthFrac: 0.15, weakPoints: 3, firstPhase: ['searchlight', 'tail-rotor'], lastPhase: ['hub'], midShot: 'boss-hub', minOnScreen: 2, settleS: 2, midSettleS: 0, rideTo: 0.82 },
 ]

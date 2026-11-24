@@ -171,8 +171,8 @@ const LEVELS: LevelConfig[] = [
     // (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948), the last ones on the Starr
     // and the Shield the car looks at from the Shield's top and on the auto belay's fall (#957), and the pack in the pit
     // from 25 s, before the dyno.
-    // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 17 s, once the sign is shot (it can be
-    // until the car reaches it, 18.7 s), they line the branch ahead (ridden 18.9–21.5 s), and only that run meets them.
+    // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 19 s, once the sign is shot (it can be
+    // until the car reaches it, ~20 s), they line the branch ahead (ridden 20.2–22.5 s), and only that run meets them.
     ...paceLevel({
       waves: [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
@@ -182,7 +182,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
-      branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 17 },
+      branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 19 },
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},
