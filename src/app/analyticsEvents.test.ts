@@ -33,6 +33,14 @@ describe('analyticsEventFor', () => {
     expect(analyticsEventFor(snap('results'), snap('countdown', { ...daily, runFrom: 'results' }))).toEqual(event)
   })
 
+  it('sends nothing for a Boss Rush stage: its start, its end or a quit (#1011)', () => {
+    const rush = { runMode: { mode: 'bossRush', stage: 1, seconds: 20 } } as const
+    expect(analyticsEventFor(snap('levelSelect', rush), snap('countdown', rush))).toBeNull()
+    expect(analyticsEventFor(snap('playing', rush), snap('loading', { ...rush, runId: 2 }))).toBeNull()
+    expect(analyticsEventFor(snap('playing', rush), snap('results', rush))).toBeNull()
+    expect(analyticsEventFor(snap('paused', rush), snap('title', rush))).toBeNull()
+  })
+
   it('counts a countdown that ends in GO as one start', () => {
     expect(analyticsEventFor(snap('countdown'), snap('playing'))).toBeNull()
     expect(analyticsEventFor(snap('countdown'), snap('paused'))).toBeNull()

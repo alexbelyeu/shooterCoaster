@@ -3,6 +3,7 @@ import type { BiomeType } from '@/types/level'
 import type { LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { currentStreak, dailyKey, dailyLevel, type DailyStreak } from '@/levels/daily'
 import { previousLevel } from '@/levels/LevelRegistry'
+import { rushStages, rushUnlocked, type RushLevel } from '@/levels/bossRush'
 import { hasNightRide } from '@/levels/environments/nightPreset'
 import type { Medal } from '@/levels/medals'
 
@@ -104,6 +105,26 @@ export function buildDailyCard(
     biome: level?.biome ?? 'themePark',
     bestScore: Math.max(0, savedDaily[dateKey]?.score ?? 0),
     streak: currentStreak(streak, dateKey),
+  }
+}
+
+export interface RushCard {
+  first: string
+  /** The last stage's biome, the ticket's colours. */
+  biome: BiomeType
+  bosses: number
+  unlocked: boolean
+}
+
+/** The Boss Rush ticket (#1011): its stages from every level with a boss, open once every level has all its stars. */
+export function buildRushCard(levels: readonly (LevelSelectSource & RushLevel)[], stars: (levelId: string) => number): RushCard {
+  const stages = rushStages(levels)
+  const last = levels.find((l) => l.id === stages[stages.length - 1]?.levelId)
+  return {
+    first: stages[0]?.levelId ?? '',
+    biome: last?.biome ?? 'themePark',
+    bosses: stages.length,
+    unlocked: stages.length > 0 && rushUnlocked(levels, stars),
   }
 }
 

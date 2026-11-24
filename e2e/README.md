@@ -91,6 +91,7 @@ daily mode, a second load must give the same `spawnDigest()`, the results must s
 send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
 run, with the stub answering 503, must show no board, New best and save the local record (`daily-results-offline.png`)
 ( its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
+A `bossRush` step (#1011, nightly) saves 3 stars on every level, opens the Boss Rush ticket on level select, checks the first stage shows no wave enemies, beats its boss (`summonBoss` + `bossHit`), must move on to the next level's stage with the time carried and the HUD's "Boss 2 of N", then runs the timer out (`timerStep` 1): the rush's results (`bossrush-results.png`) must read 1 boss beaten and offer Replay, with the campaign saves, boards and the Boss Rush best untouched.
 `?e2e=1` skips the loading screen, the intro and the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
 loads the first level with `?e2e=1&countdown=1` (#674): the loading screen must show (`loading.png`) and hold until the shader
 warm-up is done, then the intro must run its fixed length before Ready (`intro.seconds`, `INTRO_HANDOFF_SECONDS` late by at most two
@@ -284,6 +285,7 @@ ridden on the PR, that the nightly job runs the full smoke, and that the shards,
 | Nightly-only step | Logic a unit test covers | Browser-only part (nightly) |
 |---|---|---|
 | `daily` | `levels/daily.test.ts` (key, seed, level, streak), `useGameStore.test.ts` "daily runs" (date seed, Replay keeps it, saves apart from the campaign) | the Daily card flow and results badge |
+| `bossRush` | `levels/bossRush.test.ts` (stages, unlock, best time), `useGameStore.test.ts` "boss rush" (stage chain, restart, saves), `ridePhysics.test.ts` (`rideStartingAt`) | the ticket, a stage change, the rush's results |
 | `frenzy` | `comboTiers.test.ts`, `comboRuntime.test.ts` (5×, slow-mo, `endFrenzy` → 1), `fireworks.test.ts`, `leaderboard.test.ts`, `initialsEntry.test.ts`, `onlineLeaderboard.test.ts`, `api/_lib/handler.test.ts` | the FRENZY flash and firework on screen, initials typed into the board |
 | `seed` | `spawnPlacement.test.ts` (deterministic per seed, differs between seeds), `utils/rng.test.ts` | the same digest after a reload |
 | `pause` | `waveSchedule.test.ts` (#152, #198), `useGameStore.test.ts` "pause and resume", "combo" (ignores the wall clock), `pauseMenu.test.ts` | tab hide / blur, the pause card |
