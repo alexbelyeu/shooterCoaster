@@ -158,6 +158,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
             speeds={speeds}
             darkSections={track.darkSections}
             weather={levelWeather(enemies)?.kind}
+            seaArch={environment.seaArch}
             whale={environment.whale}
             hasWater={environment.hasWater}
             hasTrees={environment.hasTrees}

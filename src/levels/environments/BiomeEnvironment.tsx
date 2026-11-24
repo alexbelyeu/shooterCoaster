@@ -2,7 +2,7 @@ import { useMemo, useRef, useEffect, useContext, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { atmosphereFor } from './nightPreset'
-import type { BiomeType, DarkSectionSpec, WeatherKind, WhaleBreachSpec } from '@/types/level'
+import type { BiomeType, DarkSectionSpec, SeaArchSpec, WeatherKind, WhaleBreachSpec } from '@/types/level'
 import type { ArcTable } from '@/track/arcLength'
 import type { RideSpeeds } from '@/track/ridePhysics'
 import {
@@ -35,6 +35,7 @@ interface BiomeEnvironmentProps {
   /** The weather its waves bring (#798): fog and driven streaks with the wave. */
   weather?: WeatherKind
   whale?: WhaleBreachSpec
+  seaArch?: SeaArchSpec
   hasWater?: boolean
   hasTrees?: boolean
   treeCount?: number
@@ -57,6 +58,7 @@ export default function BiomeEnvironment({
   darkSections,
   weather,
   whale,
+  seaArch,
   hasWater = false,
   hasTrees = false,
   treeCount = 0,
@@ -129,7 +131,7 @@ export default function BiomeEnvironment({
       {Decorations && <Decorations heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} />}
 
       {/* Biome landmarks, terrain features and events */}
-      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} speeds={speeds} whale={whale} darkSections={darkSections} atmosphere={atmosphere} fog={fogMods} />}
+      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} speeds={speeds} whale={whale} seaArch={seaArch} darkSections={darkSections} atmosphere={atmosphere} fog={fogMods} />}
 
       {/* Ambient air particles around the camera */}
       {particles && <ParticleField preset={particles} />}

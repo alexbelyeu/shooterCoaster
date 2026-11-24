@@ -4,7 +4,8 @@ import { paceLevel } from './pacing'
 // Levels 1 and 2's rides as plain numbers: the ride elements that build them stay out of the startup JS.
 import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
 import { DESERT_LEVEL_TRACK } from './environments/biomes/desert/desertLevel'
-// Level 4's ride too (#866), level 5's (#867) and level 2's (#864).
+// Level 3's ride too (#865), level 4's (#866), level 5's (#867) and level 2's (#864).
+import { OCEAN_LEVEL_TRACK, OCEAN_SEA_ARCH } from './environments/biomes/ocean/oceanLevel'
 import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
 import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
 import { GYM_LEVEL_TRACK, GYM_LEVEL_WALLS } from './environments/biomes/gym/gymLevel'
@@ -82,19 +83,11 @@ const LEVELS: LevelConfig[] = [
     maxScore: 44 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 1924 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 2624
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
-    track: {
-      varA: 3,
-      varB: 36,
-      varC: 4,
-      scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.0001,
-      curve: 'curve1',
-      color1: 0x416fa0,
-      color2: 0x31ffd5,
-    },
+    // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
+    track: OCEAN_LEVEL_TRACK,
     ...paceLevel({
       waves: [
+        // "Into the Deep!": the jellyfish arrive as the car dives into the glass tunnel (~14 s).
         { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 3 },
         { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
         { type: 'jellyfish', count: 24, waveLabel: 'Jellyfish Bloom!', weight: 2 },
@@ -105,8 +98,9 @@ const LEVELS: LevelConfig[] = [
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
       hasWater: true,
-      /** Through the gap between two islands, out where the sea runs on past the drawn terrain, ~30 s in and gone before the Kraken. */
-      whale: { startSeconds: 31.25, lead: 3700, aim: 0.1 },
+      /** Out to sea down the south channel, past the drawn terrain, dead ahead as the car tips over the first drop (~12 s). */
+      whale: { startSeconds: 11, lead: 4000, aim: 0.2 },
+      seaArch: OCEAN_SEA_ARCH,
     },
   },
   {

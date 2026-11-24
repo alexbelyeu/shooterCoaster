@@ -6,6 +6,8 @@ import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
 import { PARK_TRACK } from './environments/biomes/themePark/parkTrack'
 import { DESERT_LEVEL_TRACK } from './environments/biomes/desert/desertLevel'
 import { DESERT_RIDE_YAW, DESERT_TRACK } from './environments/biomes/desert/desertTrack'
+import { OCEAN_LEVEL_TRACK } from './environments/biomes/ocean/oceanLevel'
+import { OCEAN_TRACK } from './environments/biomes/ocean/oceanTrack'
 import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
 import { ARCTIC_TRACK } from './environments/biomes/arctic/arcticTrack'
 import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
@@ -20,6 +22,7 @@ const KIT: RidePrecision = { position: 0, up: 2 }
 describe.each([
   ['level1', PARK_LEVEL_TRACK, PARK_TRACK, KIT, 0],
   ['level2', DESERT_LEVEL_TRACK, DESERT_TRACK, KIT, DESERT_RIDE_YAW],
+  ['level3', OCEAN_LEVEL_TRACK, OCEAN_TRACK, KIT, 0],
   ['level4', ARCTIC_LEVEL_TRACK, ARCTIC_TRACK, KIT, 0],
   ['level5', INFERNO_LEVEL_TRACK, INFERNO_TRACK, KIT, 0],
   ['level6', GYM_LEVEL_TRACK, GYM_TRACK, { position: 2, up: 4 }, 0],
