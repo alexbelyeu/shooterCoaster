@@ -124,7 +124,9 @@ on the arcade SFX twice (never more live sources than the budget: counted from e
 follow the combo with its intensity layers (time frozen, `primeCombo(8)` → 2, `primeCombo(15)` → 3, held through the pause, `primeCombo(0)`
 → back to 0 through 2 or 1, not in one cut), hold its song position while paused and resume there through the pause menu's Resume, whose Ready / GO must play its two countdown sounds while the run is still paused (#246: `sfxVoices.ui`), then crossfade to the results score (the cut its stars pick, `results-win` or `results-lose`, #792; the summary prints which), and on to the title score on level select without opening a level score on the way (#236), with no page errors or dropped sounds.
 When level1 is in the run, a `boss` step summons the Golden Blimp (`summonBoss()`): the tell and `boss:spawn` must fire, the
-hull must be ≥ 15% of the frame wide with the boss bar clear of the HUD (`level1-boss.png`), only the balloons exposed; a real
+hull must be ≥ 15% of the frame wide and ≥ 1 balloon on screen (every boss is summoned into a ride frozen where it stands, and
+moved alone until its first phase is on screen, at most 20 s: the blimp places itself off the camera's heading, which riding on
+through its arrival had turned away from on some runners, #905), with the boss bar clear of the HUD (`level1-boss.png`), only the balloons exposed; a real
 bullet must hit one, `bossHit` clears them and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
 `boss:defeated`, one kill per weak point and the big score popup over the confetti (`level1-boss-down.png`). The phone run
 resumes after its Pause tap with the boss summoned: the bar must sit inside the viewport and clear of the HUD in portrait and
