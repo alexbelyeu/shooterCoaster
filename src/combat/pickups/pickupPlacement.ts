@@ -1,7 +1,7 @@
 /** Where a level's weapon pickups float (#185); pure, so keep React / three imports out. */
 import { PICKUP_WEAPONS, type PickupWeaponId } from '@/combat/weapons/weaponTypes'
 import { createRng, hashString } from '@/utils/rng'
-import type { Vec3 } from '@/entities/spawning/spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 
 export interface PickupSpot {
   id: PickupWeaponId

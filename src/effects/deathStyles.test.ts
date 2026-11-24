@@ -5,6 +5,7 @@ import {
   BOSS_DEFEAT_DEATH_STYLE,
   BOSS_PART_DEATH_STYLE,
   DEATH_SLOTS,
+  drawnSlots,
   GOLDEN_BALLOON_DEATH_STYLE,
   CHUNKS_PER_SLOT,
   DEATH_STYLES,
@@ -29,6 +30,8 @@ import {
   styleCounts,
   type DeathStyle,
 } from './deathStyles'
+import { MEDUSA_DEFEAT_BURST_YS } from '@/entities/bosses/medusaMotion'
+import { TITAN_BREAK_POINTS } from '@/entities/bosses/titanMotion.hot'
 
 const ALL: [string, DeathStyle][] = [
   ...Object.entries(DEATH_STYLES),
@@ -50,8 +53,14 @@ const ALL: [string, DeathStyle][] = [
 ]
 
 describe('death styles', () => {
-  it("a boss defeat bursts in at most half the pool, so the boss's own break and the last part still fit", () => {
-    expect(BOSS_DEFEAT_BURST_OFFSETS.length).toBeLessThanOrEqual(DEATH_SLOTS / 2)
+  it("every boss's defeat fits the pool with a slot to spare: its last part, the confetti and its own bursts", () => {
+    // The confetti lives 3.2 s and every boss's own defeat bursts fire within it, so all of these overlap.
+    const lastPart = 1
+    const spareForAKill = 1
+    const ownDefeatBursts = { magmaTitan: TITAN_BREAK_POINTS.length, medusa: MEDUSA_DEFEAT_BURST_YS.length, other: 0 }
+    for (const own of Object.values(ownDefeatBursts)) {
+      expect(lastPart + BOSS_DEFEAT_BURST_OFFSETS.length + own + spareForAKill).toBeLessThanOrEqual(DEATH_SLOTS)
+    }
     expect(styleCounts(BOSS_DEFEAT_DEATH_STYLE).glow * BOSS_DEFEAT_BURST_OFFSETS.length).toBeGreaterThanOrEqual(180)
   })
 
@@ -163,5 +172,18 @@ describe('pickDeathSlot', () => {
   it('steals the oldest active slot when full, and clears it', () => {
     const slots = [3, 1, 2].map((serial) => ({ active: true, needsZero: false, serial }))
     expect(pickDeathSlot(slots)).toEqual({ index: 1, clear: true })
+  })
+})
+
+describe('drawnSlots', () => {
+  const slot = (active: boolean) => ({ active, needsZero: !active, serial: 0 })
+
+  it('draws one slot when the pool is idle', () => {
+    expect(drawnSlots(Array.from({ length: DEATH_SLOTS }, () => slot(false)))).toBe(1)
+  })
+
+  it('draws up to the highest live slot, gaps included', () => {
+    expect(drawnSlots([slot(true), slot(false), slot(true), slot(false)])).toBe(3)
+    expect(drawnSlots(Array.from({ length: DEATH_SLOTS }, () => slot(true)))).toBe(DEATH_SLOTS)
   })
 })

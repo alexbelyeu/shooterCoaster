@@ -18,7 +18,7 @@ import {
   MEDUSA_SNAKE_HEAD_GEO, MEDUSA_SNAKE_HEAD_MAT, MEDUSA_SNAKE_MAT, MEDUSA_STAR_GLOW_GEO, MEDUSA_STAR_GLOW_MAT,
 } from './bossAssets'
 import {
-  MEDUSA_DEFEAT, MEDUSA_RISE, MEDUSA_SIZE, SNAKE, SNAKE_SLOTS, MEDUSA_HUB, bodyPlacement, defeatSink, laughShake, laySnake, yawToward,
+  MEDUSA_DEFEAT, MEDUSA_DEFEAT_BURST_YS, MEDUSA_RISE, MEDUSA_SIZE, SNAKE, SNAKE_SLOTS, MEDUSA_HUB, bodyPlacement, defeatSink, laughShake, laySnake, yawToward,
   snakeLength, snakeRadius, strikeLandsBetween,
 } from './medusaMotion'
 
@@ -168,7 +168,7 @@ export default function Medusa(props: BossProps) {
       showStar(Math.max(fade, defeatGlow), Math.max(fade, fighting ? 0 : sunk * defeatGlow), flash)
       if (!fighting && !sim.burst) {
         sim.burst = true
-        for (const y of [40, -60, 140]) getExplosionPool()?.explode(_p.set(0, y, 30).applyMatrix4(root.matrixWorld), MEDUSA_CHALK_BURST_DEATH_STYLE)
+        for (const y of MEDUSA_DEFEAT_BURST_YS) getExplosionPool()?.explode(_p.set(0, y, 30).applyMatrix4(root.matrixWorld), MEDUSA_CHALK_BURST_DEATH_STYLE)
         eventBus.emit(CAMERA_TRAUMA_EVENT, DEFEAT_TRAUMA[0], DEFEAT_TRAUMA[1])
       }
 
