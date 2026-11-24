@@ -256,17 +256,19 @@ describe('nextStar', () => {
 
   it('agrees with computeStars at every whole score on every level', () => {
     for (const l of levels) {
-      for (let score = 0; score <= l.maxScore; score++) {
+      // One assertion per level after the loop (scripts/vitestAssertionBudget.ts): the first score that disagrees.
+      let wrong: number | null = null
+      for (let score = 0; score <= l.maxScore && wrong === null; score++) {
         const earned = computeStars(score, l.maxScore, l.starThresholds)
         const next = nextStar(score, l.maxScore, l.starThresholds)
-        if (earned === 3) {
-          expect(next, `${l.id} @ ${score}`).toBeNull()
-          continue
-        }
-        expect(next?.stars, `${l.id} @ ${score}`).toBe(earned + 1)
-        expect(computeStars(score + next!.points, l.maxScore, l.starThresholds), `${l.id} @ ${score}`).toBe(earned + 1)
-        expect(computeStars(score + next!.points - 1, l.maxScore, l.starThresholds), `${l.id} @ ${score}`).toBe(earned)
+        const agrees = earned === 3
+          ? next === null
+          : next?.stars === earned + 1 &&
+            computeStars(score + next.points, l.maxScore, l.starThresholds) === earned + 1 &&
+            computeStars(score + next.points - 1, l.maxScore, l.starThresholds) === earned
+        if (!agrees) wrong = score
       }
+      expect(wrong, `${l.id}: nextStar disagrees with computeStars at this score`).toBeNull()
     }
   })
 })

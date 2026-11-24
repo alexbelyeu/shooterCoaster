@@ -299,7 +299,7 @@ export const BIOME_REVERB: Record<BiomeType, BiomeReverb> = {
   // A big hard-walled hall: dense early reflections.
   gym: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9, preDelayMs: 30, early: 0.4, slap: null },
   city: { seconds: 1.6, decayPow: 3.2, toneHz: 7000, level: 0.8, preDelayMs: 16, early: 0.08, slap: null },
-  jungle: { seconds: 1.6, decayPow: 3.2, toneHz: 7000, level: 0.8, preDelayMs: 16, early: 0.08, slap: null },
+  jungle: { seconds: 1.1, decayPow: 3.6, toneHz: 4200, level: 0.6, preDelayMs: 10, early: 0.12, slap: null }, // leaves soak it up: short and dark
 }
 
 /** Where the early reflections land, as a share of the pre-delay gap, and their relative amplitudes. */

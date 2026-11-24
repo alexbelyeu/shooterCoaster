@@ -1,15 +1,15 @@
 import type { BiomeDefinition } from '@/levels/environments/shared/types'
 import { PARTICLE_PRESETS } from '@/levels/environments/shared/particlePresets'
-import { COLOR_RAMP, LANDMARK_SITE, SPIRE_HEIGHT, TREES } from './config'
+import { COLOR_RAMP, TEMPLE, TEMPLE_HEIGHT, TREES } from './config'
 import Decorations from './Decorations'
 import Features from './Features'
 
-/** Jungle Ruins (level8): an outdoor world on the shared noise terrain. */
+/** Jungle Ruins (level8, #870): wooded hills on the shared noise terrain, the stepped temple its hero. */
 export const jungle: BiomeDefinition = {
   colorRamp: COLOR_RAMP,
   trees: TREES,
   Decorations,
   Features,
-  particles: PARTICLE_PRESETS.parkPollen,
-  hero: { x: LANDMARK_SITE.x, z: LANDMARK_SITE.z, focus: SPIRE_HEIGHT * 0.5, orbitRadius: 500, orbitHeight: 260 },
+  particles: PARTICLE_PRESETS.jungleSpores,
+  hero: { x: TEMPLE.x, z: TEMPLE.z, ground: TEMPLE.ground, focus: TEMPLE_HEIGHT * 0.45, orbitRadius: 820, orbitHeight: 360 },
 }

@@ -245,17 +245,17 @@ const LEVELS: LevelConfig[] = [
     maxScore: 60 * 13 + 44 * 15, // 1440: no boss, a finale wave ends the run
     message: 'You cleared Jungle Ruins!',
     nextLevel: null,
-    // Scaffolded by npm run new-world: level1's curve family; tune it inside the track extent formula (level-design skill).
     track: {
       varA: 3,
       varB: 17,
       varC: 4,
       scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.00008,
       curve: 'curve1',
-      color1: 0xffffff,
-      color2: 0x44aaff,
+      ride: 'v2',
+      mechanics: [{ kind: 'station', from: 0, to: 0.01, speed: 120 }],
+      rideV2: { gravity: 480, crawl: 90, drag: 0.0012, zones: [{ kind: 'lift', from: 0.085, to: 0.122, speed: 60 }] },
+      color1: 0xd8c9a0,
+      color2: 0x3f8a4a,
     },
     ...paceLevel({
       waves: [
