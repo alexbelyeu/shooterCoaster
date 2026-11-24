@@ -3796,24 +3796,45 @@ async function countdownCheck(page, levelId) {
   const skipped = await waitPhase('countdown', 30000)
   const introSkip = await page.evaluate(() => ({ skipped: window.__SC_TEST__.intro.skipped, seconds: window.__SC_TEST__.intro.seconds }))
 
-  // 5. Leave a fresh level mid-warm-up (#141); polled in the page so the unmount beats the warm-up's first check.
-  // Level select first unmounts the level (a transition, several frames at ~2 fps), so the start below remounts it.
+  // 5. Leave a fresh level mid-warm-up (#141). Level select first unmounts the level: its scene swap is a transition
+  // (#597) that a software renderer's slow frames starve, and a start before it commits keeps the mounted level, so
+  // nothing remounts (#646: at a 2-core runner's ~1.5 s frames that outlasted the 30 s this wait used to give up after,
+  // silently, and the check below found no warm-up; 11 s at ~1 s frames). Both waits
+  // are on their event, under the first warm-up's bound: a fast machine passes as soon as they happen.
   await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
-  await page.waitForFunction(() => !window.__SC_TEST__.levelReady(), null, { timeout: 30000, polling: 100 }).catch(() => {})
+  const leftAt = Date.now()
+  const unmountMs = await page
+    .waitForFunction(() => !window.__SC_TEST__.levelReady(), null, { timeout: 180000, polling: 100 })
+    .then(() => Date.now() - leftAt, () => null)
+  const unmounted = unmountMs !== null
   await waitFrames(page, 2, { maxMs: 30000 })
-  const leftDuringWarmup = await page.evaluate(([lid, seed]) => new Promise((resolve) => {
+  // The remount's first write of `shaderWarmup` (its mount effect, before the warm-up's first step) leaves: `true`
+  // when that write is a warm-up under way, `false` when the level reported itself warm without one, `null` for none.
+  const leftDuringWarmup = !unmounted ? null : await page.evaluate(([lid, seed]) => new Promise((resolve) => {
     const api = window.__SC_TEST__
-    api.shaderWarmup = null
-    api.startLevel(lid, seed)
-    const until = performance.now() + 30000
-    const poll = () => {
-      const w = api.shaderWarmup
-      if (w || performance.now() > until) {
-        api.setPhase('levelSelect')
-        resolve(w ? !w.done : null)
-      } else setTimeout(poll, 0)
+    let warmup = null
+    let first = null
+    const leave = () => {
+      clearTimeout(timer)
+      delete api.shaderWarmup
+      api.shaderWarmup = warmup
+      api.setPhase('levelSelect')
+      resolve(first && !first.done)
     }
-    poll()
+    const timer = setTimeout(leave, 180000)
+    Object.defineProperty(api, 'shaderWarmup', {
+      configurable: true,
+      enumerable: true,
+      get: () => warmup,
+      set: (w) => {
+        warmup = w
+        if (!w || first) return
+        first = w
+        // Once the mount effect has returned, as a player's click would land.
+        setTimeout(leave, 0)
+      },
+    })
+    api.startLevel(lid, seed)
   }), [levelId, SEED])
   await waitFrames(page, 3, { minMs: 1500, maxMs: 30000 })
   const initTimings = await page.evaluate(() => window.__SC_TEST__.initTimings())
@@ -3858,7 +3879,9 @@ async function countdownCheck(page, levelId) {
   else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
   if (!warmIntro) problems.push('a new start of the warm level never reached its intro')
   else if (!skipped || !introSkip.skipped) problems.push('a tap did not skip the intro')
-  if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
+  if (!unmounted) problems.push('level select never unmounted the level')
+  else if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
+  else if (!leftDuringWarmup) problems.push('the remounted level reported itself warm without a shader warm-up')
   return {
     id: 'countdown',
     ok: problems.length === 0,
@@ -3875,6 +3898,7 @@ async function countdownCheck(page, levelId) {
       replayPhase,
       skipTapIn: tappedIn,
       swoop,
+      unmountMs,
       leftDuringWarmup,
       warmup,
       firstShot,
