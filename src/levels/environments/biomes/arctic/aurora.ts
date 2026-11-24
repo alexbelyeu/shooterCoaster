@@ -25,7 +25,7 @@ interface RibbonSpec {
 
 // Every vertex stays within ~9000 of the camera (far plane 11000); the bright edge
 // hangs ~12-16° above the horizon, clear of the mountains.
-const RIBBONS: RibbonSpec[] = [
+export const RIBBONS: RibbonSpec[] = [
   { azimuth: 0.2, span: 2.6, radius: 7200, foldAmp: 900, foldFreq: 3.0, base: 1300, top: 4600, seed: 0 },
   { azimuth: 2.4, span: 2.4, radius: 7600, foldAmp: 1100, foldFreq: 2.5, base: 1700, top: 5000, seed: 3.7 },
   { azimuth: 4.4, span: 2.3, radius: 6800, foldAmp: 800, foldFreq: 3.5, base: 1100, top: 4200, seed: 7.9 },

@@ -124,14 +124,14 @@ export default function BiomeEnvironment({
 
       {/* Trees */}
       {hasTrees && treeCount > 0 && def.trees && (
-        <TreeField count={treeCount} config={def.trees} heightFn={heightFn} seed={hashString(`trees:${biome}`)} />
+        <TreeField count={treeCount} config={def.trees} heightFn={heightFn} track={track} seed={hashString(`trees:${biome}`)} />
       )}
 
       {/* Biome-specific InstancedMesh decorations */}
       {Decorations && <Decorations heightFn={heightFn} groundFn={groundFn} track={track} atmosphere={atmosphere} />}
 
       {/* Biome landmarks, terrain features and events */}
-      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} speeds={speeds} whale={whale} seaArch={seaArch} atmosphere={atmosphere} fog={fogMods} />}
+      {Features && <Features heightFn={heightFn} groundFn={groundFn} track={track} speeds={speeds} whale={whale} seaArch={seaArch} darkSections={darkSections} atmosphere={atmosphere} fog={fogMods} />}
 
       {/* Ambient air particles around the camera */}
       {particles && <ParticleField preset={particles} />}

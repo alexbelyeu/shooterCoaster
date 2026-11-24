@@ -3,11 +3,12 @@ import type * as THREE from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import type { ArcTable } from '@/track/arcLength'
 import type { RideSpeeds } from '@/track/ridePhysics'
-import type { SeaArchSpec, WhaleBreachSpec } from '@/types/level'
+import type { DarkSectionSpec, SeaArchSpec, WhaleBreachSpec } from '@/types/level'
 import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 import type { FogModifiers } from './sceneFog'
 import type { KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 import type { HeroShot } from '@/track/introCamera.hot'
 
 /** One stop of a terrain colour ramp. */
@@ -65,6 +66,8 @@ export interface BiomeFeaturesProps {
   whale?: WhaleBreachSpec
   /** The level's sea arch over the rails (`environment.seaArch`), when it has one (Ocean's Features). */
   seaArch?: SeaArchSpec
+  /** The track's dark sections (#752), for a biome that builds round one (Arctic's ice cave). */
+  darkSections?: readonly DarkSectionSpec[]
   atmosphere: AtmosphereConfig
   /** The scene fog's modifiers, for biome events that pull it in (the volcanic eruption publishes `fog.eruption`). */
   fog: FogModifiers
@@ -143,8 +146,10 @@ export interface BiomeDefinition {
   floor?: HeightFunction
   /** An interior's walls and roof, inset: enemies are placed inside them, never behind a wall. */
   bounds?: PlacementBounds
-  /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`). */
+  /** Landmarks and big props a ground enemy stood away from the track keeps out of (`spawnPlacement.ts` `whereTheApproachLooks`), and a swimmer's circle (`swimOrbit.ts`). */
   keepOff?: (groundFn: HeightFunction, track: ArcTable) => readonly KeepOff[]
+  /** Moves an air enemy's placed spot out of the world's buildings (the city's towers, #323): scatter and formation alike. */
+  clearAir?: (groundFn: HeightFunction, track: ArcTable) => (p: Vec3) => Vec3
   /** The hero landmark the intro's tour passes (#675) and the results orbit circles (#328). */
   hero: HeroShot
 }

@@ -11,7 +11,7 @@ import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
 import { buildOceanRide, OCEAN_SEA_ARCH, OCEAN_TRACK } from './oceanTrack'
 import { ARCH_LEG_ANGLE, seaArchClearance, seaArchShape } from './seaArch'
 
-// The authored ride and the one the game ships (`oceanLevel.ts`, rounded by `gen-ocean-level.mjs`).
+// The authored ride and the one the game ships (`oceanLevel.ts`, rounded by `gen-ride-levels.mjs`).
 describe.each([
   ['as shipped', getLevelConfig('level3')!.track],
   ['as authored', OCEAN_TRACK],

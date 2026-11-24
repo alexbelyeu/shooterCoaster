@@ -8,8 +8,11 @@ import { setExplosionPool } from './explosionPoolHandle'
 import {
   CHUNKS_PER_SLOT,
   DEATH_SLOTS,
+  drawnSlots,
+  BOSS_DEFEAT_DEATH_STYLE,
   BOSS_PART_DEATH_STYLE,
   DEATH_STYLES,
+  GOLDEN_BALLOON_DEATH_STYLE,
   KRAKEN_SPLASH_DEATH_STYLE,
   GLOW_PER_SLOT,
   SHAPE_STRETCH,
@@ -45,9 +48,11 @@ interface Slot extends SlotState {
   chunkCount: number
 }
 
-function createSet(perSlot: number, geometry: THREE.BufferGeometry, material: THREE.Material): ParticleSet {
+function createSet(name: string, perSlot: number, geometry: THREE.BufferGeometry, material: THREE.Material): ParticleSet {
   const cap = perSlot * DEATH_SLOTS
   const mesh = new THREE.InstancedMesh(geometry, material, cap)
+  mesh.name = name
+  mesh.count = perSlot // `setDrawn` widens it as slots go live
   // Created up front: an instanceColor added later would compile a second program mid-run.
   mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3)
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
@@ -140,6 +145,13 @@ function place(set: ParticleSet, s: number, count: number, slot: Slot, life: num
   }
 }
 
+/** Draws only the slots up to the highest live one (`drawnSlots`). */
+function setDrawn(glow: ParticleSet, chunks: ParticleSet, slots: readonly Slot[]): void {
+  const n = drawnSlots(slots)
+  glow.mesh.count = n * glow.perSlot
+  chunks.mesh.count = n * chunks.perSlot
+}
+
 function zero(set: ParticleSet, s: number): void {
   const base = s * set.perSlot
   for (let n = 0; n < set.perSlot; n++) set.mesh.setMatrixAt(base + n, ZERO_MATRIX)
@@ -147,6 +159,8 @@ function zero(set: ParticleSet, s: number): void {
 
 function styleName(style: DeathStyle): string {
   for (const [type, s] of Object.entries(DEATH_STYLES)) if (s === style) return type
+  if (style === GOLDEN_BALLOON_DEATH_STYLE) return 'goldenBalloon'
+  if (style === BOSS_DEFEAT_DEATH_STYLE) return 'bossDefeat'
   return style === BOSS_PART_DEATH_STYLE || style === KRAKEN_SPLASH_DEATH_STYLE ? 'bossPart' : 'custom'
 }
 
@@ -162,8 +176,8 @@ export default function ParticleExplosionPool() {
     return {
       glowMat,
       chunkMat,
-      glow: createSet(GLOW_PER_SLOT, GLOW_GEO, glowMat),
-      chunks: createSet(CHUNKS_PER_SLOT, CHUNK_GEO, chunkMat),
+      glow: createSet('death-glow', GLOW_PER_SLOT, GLOW_GEO, glowMat),
+      chunks: createSet('death-chunks', CHUNKS_PER_SLOT, CHUNK_GEO, chunkMat),
       slots,
       serial: 0,
     }
@@ -187,6 +201,7 @@ export default function ParticleExplosionPool() {
       slot.origin.set(position.x, position.y + style.lift, position.z)
       slot.glowCount = launch(pool.glow, s, style, false)
       slot.chunkCount = launch(pool.chunks, s, style, true)
+      setDrawn(pool.glow, pool.chunks, slots)
       if (isE2E) {
         e2eDeaths.spawned += 1
         e2eDeaths.lastStyle = styleName(style)
@@ -243,6 +258,7 @@ export default function ParticleExplosionPool() {
     if (dirty) {
       glow.mesh.instanceMatrix.needsUpdate = true
       chunks.mesh.instanceMatrix.needsUpdate = true
+      setDrawn(glow, chunks, slots)
     }
     if (isE2E) e2eDeaths.live = live
 

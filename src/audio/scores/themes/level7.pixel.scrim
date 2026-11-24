@@ -1,0 +1,106 @@
+title    Pixel Avenue
+composer Claude (ShooterCoaster)
+about    Neon Metropolis (level7) option: bright arcade house in A-flat major at 144, the city as a pinball table. A bouncy square-wave hook over house-organ stabs and an FM bass hopping octaves on the offbeats; I-V-vi-IV in the A section, IV-V-I-vi in the B. The last eight bars lift a tone, to B-flat. Layers: hook, organ and bass from the start, then bigkick four on the floor, 909 clap with a gated snare and open hats on the offbeats at 2x, the hook doubled on glockenspiel at 3x, a supersaw on the hook and sixteenth hats at FRENZY. The helicopter's boss section drops to the relative minor (F minor, a C major turnaround) with orchestra hits in base; the sting is E-flat 7 to A-flat.
+tempo    144
+beats    4
+steps    4
+reverb   0.22
+
+# untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
+voice lead   square    vol=0.62 gate=0.85
+voice organ  organ     vol=0.56 pan=-0.3 center=Eb4 gate=0.45
+voice bass   fmbass    vol=0.56 gate=0.6
+voice stab   orchhit   vol=0.41 pan=0.1
+voice rise   riser     vol=0.34
+voice kick   bigkick   vol=0.52 layer=drums
+voice clap   clap909   vol=0.53 pan=-0.1 layer=drums
+voice snare  gatesnare vol=0.50 pan=0.05 layer=drums
+voice ohat   ohat909   vol=0.29 pan=0.3 layer=drums
+voice crash  crash     vol=0.36 pan=-0.2 layer=drums
+voice glock  glock     vol=0.24 pan=0.25 oct=1 layer=lead
+voice saw    supersaw  vol=0.34 pan=-0.1 layer=frenzy
+voice hat    hat909    vol=0.29 pan=-0.35 layer=frenzy
+
+pattern intro
+stab  | [Ab]!-- . [Ab]!-- . [Ab]!------- | [Db]!--- [Eb]!--- [Eb7]!------- |
+bass  | Ab2--- .--- Ab2--- .--- | Db2--- Eb2--- Eb2------- |
+rise  | _ | Eb5--------------- |
+kick  | X... X... X... X... | X... X... X... X.X. |
+clap  | .... .... .... .... | .... .... xxxx XXXX |
+
+pattern A
+lead  | Eb5- Ab5- .- Ab5- G5- Ab5- Bb5- C6- | Bb5--- G5- Eb5- .- Eb5- F5- G5- | Ab5- .- Ab5- G5- F5- C5- F5- G5- | Ab5------- .- F5- Eb5- Db5- |
+glock | Eb5- Ab5- .- Ab5- G5- Ab5- Bb5- C6- | Bb5--- G5- Eb5- .- Eb5- F5- G5- | Ab5- .- Ab5- G5- F5- C5- F5- G5- | Ab5------- .- F5- Eb5- Db5- |
+saw   | Eb5- Ab5- .- Ab5- G5- Ab5- Bb5- C6- | Bb5--- G5- Eb5- .- Eb5- F5- G5- | Ab5- .- Ab5- G5- F5- C5- F5- G5- | Ab5------- .- F5- Eb5- Db5- |
+bass  | Ab2- Ab3- .- Ab2- Ab3- .- Ab2- Ab3- | Eb2- Eb3- .- Eb2- Eb3- .- Eb2- Eb3- | F2- F3- .- F2- F3- .- F2- F3- | Db2- Db3- .- Db2- Db3- .- Db2- Db3- |
+organ | .- [Ab]- .- [Ab]-- [Ab]- .- [Ab]-- | .- [Eb]- .- [Eb]-- [Eb]- .- [Eb]-- | .- [Fm]- .- [Fm]-- [Fm]- .- [Fm]-- | .- [Db]- .- [Db]-- [Db]- .- [Db]-- |
+kick  | x... x... x... x... | % | % | % |
+clap  | .... x... .... x... | % | % | % |
+snare | .... x... .... x... | % | % | .... x... .... x.xx |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+hat   | xxxx xxxx xxxx xxxx | % | % | % |
+
+pattern A2 from A
+lead  | Eb5- Ab5- .- Ab5- G5- Ab5- Bb5- C6- | Bb5--- G5- Eb5- .- Eb5- F5- G5- | Ab5- .- Ab5- G5- F5- C5- F5- G5- | F5--- Eb5--- Db5- Eb5- F5- G5- |
+glock | Eb5- Ab5- .- Ab5- G5- Ab5- Bb5- C6- | Bb5--- G5- Eb5- .- Eb5- F5- G5- | Ab5- .- Ab5- G5- F5- C5- F5- G5- | F5--- Eb5--- Db5- Eb5- F5- G5- |
+saw   | Eb5- Ab5- .- Ab5- G5- Ab5- Bb5- C6- | Bb5--- G5- Eb5- .- Eb5- F5- G5- | Ab5- .- Ab5- G5- F5- C5- F5- G5- | F5--- Eb5--- Db5- Eb5- F5- G5- |
+bass  | Ab2- Ab3- .- Ab2- Ab3- .- Ab2- Ab3- | Eb2- Eb3- .- Eb2- Eb3- .- Eb2- Eb3- | F2- F3- .- F2- F3- .- F2- F3- | Db2- Db3- .- Db2- Eb2- Eb3- .- Eb3- |
+organ | .- [Ab]- .- [Ab]-- [Ab]- .- [Ab]-- | .- [Eb]- .- [Eb]-- [Eb]- .- [Eb]-- | .- [Fm]- .- [Fm]-- [Fm]- .- [Fm]-- | .- [Db]- .- [Db]-- [Eb]- .- [Eb]-- |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+lead  | F5--- Ab5--- F5- Db5- .- Db5- | G5--- Bb5--- G5- Eb5- .- Eb5- | Eb5- Ab5- C6--- Bb5- Ab5- Eb5- C5- | F5------- G5- Ab5- Bb5- C6- |
+glock | F5--- Ab5--- F5- Db5- .- Db5- | G5--- Bb5--- G5- Eb5- .- Eb5- | Eb5- Ab5- C6--- Bb5- Ab5- Eb5- C5- | F5------- G5- Ab5- Bb5- C6- |
+saw   | F5--- Ab5--- F5- Db5- .- Db5- | G5--- Bb5--- G5- Eb5- .- Eb5- | Eb5- Ab5- C6--- Bb5- Ab5- Eb5- C5- | F5------- G5- Ab5- Bb5- C6- |
+bass  | Db2- Db3- .- Db2- Db3- .- Db2- Db3- | Eb2- Eb3- .- Eb2- Eb3- .- Eb2- Eb3- | Ab2- Ab3- .- Ab2- Ab3- .- Ab2- Ab3- | F2- F3- .- F2- F3- .- F2- F3- |
+organ | .- [Db]- .- [Db]-- [Db]- .- [Db]-- | .- [Eb]- .- [Eb]-- [Eb]- .- [Eb]-- | .- [Ab]- .- [Ab]-- [Ab]- .- [Ab]-- | .- [Fm]- .- [Fm]-- [Fm]- .- [Fm7]-- |
+
+pattern B2 from B
+lead  | F5--- Ab5--- F5- Db5- .- Db5- | G5--- Bb5--- G5- Eb5- .- Eb5- | Ab5- C6- Eb6--- Db6- C6- Ab5- F5- | G5------- .--- Bb4- C5- |
+glock | F5--- Ab5--- F5- Db5- .- Db5- | G5--- Bb5--- G5- Eb5- .- Eb5- | Ab5- C6- Eb6--- Db6- C6- Ab5- F5- | G5------- .--- Bb4- C5- |
+saw   | F5--- Ab5--- F5- Db5- .- Db5- | G5--- Bb5--- G5- Eb5- .- Eb5- | Ab5- C6- Eb6--- Db6- C6- Ab5- F5- | G5------- .--- Bb4- C5- |
+bass  | Db2- Db3- .- Db2- Db3- .- Db2- Db3- | Eb2- Eb3- .- Eb2- Eb3- .- Eb2- Eb3- | F2- F3- .- F2- F3- .- F2- F3- | Eb2- Eb3- .- Eb2- Eb3- .- Eb2- Eb3- |
+organ | .- [Db]- .- [Db]-- [Db]- .- [Db]-- | .- [Eb]- .- [Eb]-- [Eb]- .- [Eb]-- | .- [Fm]- .- [Fm]-- [Fm]- .- [Fm]-- | .- [Eb]- .- [Eb]-- [Eb7]- .- [Eb7]-- |
+snare | .... x... .... x... | % | % | ..x. x.x. xxxx XXXX |
+
+play intro
+loop A A2 B B2 A A2 A+2 A2+2
+
+# Boss section: the helicopter. The hook drops to the relative minor over Fm / Db / Bbm / C, the bass hops
+# sixteenths, orchestra hits land in base; in Y the hook climbs an octave. The sting is Eb7 to A-flat, home.
+pattern X
+lead  | C5- F5- .- F5- E5- F5- G5- Ab5- | Ab5--- F5- Db5- .- Db5- Eb5- F5- | F5- .- F5- Eb5- Db5- Bb4- Db5- Eb5- | E5------- .- G5- E5- C5- |
+glock | C5- F5- .- F5- E5- F5- G5- Ab5- | Ab5--- F5- Db5- .- Db5- Eb5- F5- | F5- .- F5- Eb5- Db5- Bb4- Db5- Eb5- | E5------- .- G5- E5- C5- |
+saw   | C5- F5- .- F5- E5- F5- G5- Ab5- | Ab5--- F5- Db5- .- Db5- Eb5- F5- | F5- .- F5- Eb5- Db5- Bb4- Db5- Eb5- | E5------- .- G5- E5- C5- |
+bass  | F2- F3 F2 .- F2 F3 F2- F3 F2 .- F3- | Db2- Db3 Db2 .- Db2 Db3 Db2- Db3 Db2 .- Db3- | Bb2- Bb3 Bb2 .- Bb2 Bb3 Bb2- Bb3 Bb2 .- Bb3- | C2- C3 C2 .- C2 C3 C2- C3 C2 .- C3- |
+organ | .- [Fm]- .- [Fm]-- [Fm]- .- [Fm]-- | .- [Db]- .- [Db]-- [Db]- .- [Db]-- | .- [Bbm]- .- [Bbm]-- [Bbm]- .- [Bbm]-- | .- [C]- .- [C]-- [C]- .- [C7]-- |
+stab  | [Fm]!--- .------- [Fm]!--- | [Db]!--- .----------- | [Bbm]!--- .------- [Bbm]!--- | [C]!--- [C]!--- [C7]!------- |
+kick  | x... x... x... x... | % | % | x... x... x.x. xxxx |
+clap  | .... x... .... x... | % | % | % |
+snare | .... x... .... x..x | % | % | .... x... ..x. xxxx |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+hat   | xxxx xxxx xxxx xxxx | % | % | % |
+
+pattern Y from X
+lead  | F5--- Ab5--- C6--- Ab5--- | Db6------- C6--- Bb5--- | Bb5--- C6--- Db6--- F5--- | E5------- G5- Bb5- C6- E6- |
+glock | F5--- Ab5--- C6--- Ab5--- | Db6------- C6--- Bb5--- | Bb5--- C6--- Db6--- F5--- | E5------- G5- Bb5- C6- E6- |
+saw   | F5--- Ab5--- C6--- Ab5--- | Db6------- C6--- Bb5--- | Bb5--- C6--- Db6--- F5--- | E5------- G5- Bb5- C6- E6- |
+rise  | _ | _ | _ | C5--------------- |
+crash | _ | _ | _ | _ |
+
+pattern S
+lead  | Eb5--- G5--- Bb5--- Db6--- | C6------- .------- |
+glock | Eb5--- G5--- Bb5--- Db6--- | C6------- .------- |
+saw   | Eb5--- G5--- Bb5--- Db6--- | C6------- .------- |
+stab  | [Eb7]!--- .--- [Eb7]!--- [Eb7]!--- | [Ab]!------- .--- [Ab]!--- |
+organ | [Eb7]--- .--- [Eb7]--- [Eb7]--- | [Ab]------- .------- |
+bass  | Eb2--- Eb2--- Eb2--- Eb2--- | Ab2- Ab3- Ab2- Ab3- Ab2- Ab3- Ab2- Ab3- |
+kick  | x... x... x... x... | x... x... x... x.xx |
+clap  | .... .... xxxx XXXX | .... x... .... xxxx |
+ohat  | ..x. ..x. ..x. ..x. | % |
+crash | X... .... .... .... | X... .... .... .... |
+
+boss  X Y
+sting S

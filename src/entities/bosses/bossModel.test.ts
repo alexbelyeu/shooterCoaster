@@ -3,7 +3,7 @@ import {
   applyHit, bossMaxScore, createBossState, currentPhase, destroyScore, exposedWeakPoints, hpFraction,
   isDefeated, isExposed, maxHp, setRetracted, weakPointHp, type BossSpec, type BossState,
 } from './bossModel'
-import { BOSS_SPECS, GOLDEN_BLIMP } from './bossSpecs'
+import { BLIMP_LAYOUT, BOSS_SPECS, GOLDEN_BLIMP, blimpHullRadius } from './bossSpecs'
 
 const spec: BossSpec = {
   name: 'Test',
@@ -122,5 +122,24 @@ describe('bossSpecs', () => {
     expect(ids(t)).toEqual(['gondola'])
     expect(weakPointHp(t, 'gondola')).toBe(3)
     expect(isDefeated(hitAll(t, 'gondola', 3))).toBe(true)
+  })
+})
+
+describe('blimpHullRadius', () => {
+  const { hullX, hullRx, hullR, gondolaY } = BLIMP_LAYOUT
+
+  it('closes at both ends, is never wider than hullR and clears the gondola', () => {
+    expect(blimpHullRadius(hullX - hullRx)).toBe(0)
+    expect(blimpHullRadius(hullX + hullRx)).toBe(0)
+    expect(blimpHullRadius(hullX)).toBe(hullR)
+    let widest = 0
+    for (let x = hullX - hullRx; x <= hullX + hullRx; x += 1) widest = Math.max(widest, blimpHullRadius(x))
+    expect(widest).toBeLessThanOrEqual(hullR)
+    // The gondola's roof trim (19 + 2.5 above its centre) stays under the envelope.
+    expect(gondolaY + 21.5).toBeLessThan(-hullR)
+  })
+
+  it('tapers the tail more than the nose', () => {
+    expect(blimpHullRadius(hullX - hullRx * 0.8)).toBeLessThan(blimpHullRadius(hullX + hullRx * 0.8))
   })
 })

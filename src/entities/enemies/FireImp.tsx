@@ -9,6 +9,7 @@ import {
   FIRE_IMP_RUMP, FIRE_IMP_SHOULDER, FIRE_IMP_TAIL_GEO,
 } from './SharedEnemyAssets'
 import { FIRE_IMP_LIFT, FIRE_IMP_SCALE, HOP_HEIGHT, HOP_RATE, fireImpHop, hopScaleXZ, hopScaleY, type HopPose } from './fireImpHop.hot'
+import { leashedHeading } from './wanderLeash.hot'
 
 /** The arms' swing about the shoulders (radians, - = forward and up): at the top of a hop, and thrown up when hit. */
 const ARMS_HOP = -1.2
@@ -33,7 +34,7 @@ export default function FireImp(props: EnemyProps) {
   const heightFn = useContext(TerrainContext)
 
   const updatePosition = useCallback(
-    (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
+    (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
 
       // Sudden direction changes
@@ -41,6 +42,7 @@ export default function FireImp(props: EnemyProps) {
         dirRef.current += (rng() - 0.5) * Math.PI
         lastDirChange.current = time
       }
+      dirRef.current = leashedHeading(mesh.position, spawnPos, dirRef.current)
 
       mesh.position.x += Math.cos(dirRef.current) * moveSpeed * dt
       mesh.position.z += Math.sin(dirRef.current) * moveSpeed * dt

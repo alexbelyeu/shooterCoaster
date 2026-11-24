@@ -7,7 +7,7 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
 import { buildArcTable } from '@/track/arcLength'
-import { withTunnels } from '@/track/setPieces'
+import { withDarkSections, withTunnels } from '@/track/setPieces'
 import CoasterCamera from '@/track/CoasterCamera'
 import PhotoCamera from '@/track/PhotoCamera'
 import { rideModel } from '@/track/ridePhysics'
@@ -26,9 +26,9 @@ import ParticleExplosionPool from '@/effects/ParticleExplosion'
 import EnemySpawner from '@/entities/spawning/EnemySpawner'
 import { hardRouteFor, hardRouteOf, withBackwards } from '@/track/mechanics'
 import { sampleTrackXZ, setTrackOutline } from '@/track/trackOutline'
-import { goldenBalloonCount } from '@/levels/scoring'
 import { eventBus } from '@/core/EventBus'
 import { BYSTANDER_HIT_EVENT, bystanderWarning, type BystanderHitEvent } from '@/combat/bystanders'
+import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import ShootingController from './ShootingController'
 import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
@@ -41,15 +41,15 @@ function KillProjector() {
   const vec = useMemo(() => new THREE.Vector3(), [])
 
   useEffect(() => {
-    const emitAt = (position: { x: number; y: number; z: number }, popup: { multiplier: number; score: number; label?: string }) => {
+    const emitAt = (position: { x: number; y: number; z: number }, popup: { multiplier: number; score: number; label?: string; big?: true }) => {
       vec.set(position.x, position.y, position.z).project(camera)
       const screenX = ((vec.x + 1) / 2) * size.width
       const screenY = ((-vec.y + 1) / 2) * size.height
       eventBus.emit('score-popup:screen', { screenX, screenY, ...popup })
     }
     const onKilled = (data: unknown) => {
-      const d = data as { position: THREE.Vector3; multiplier: number; score: number }
-      emitAt(d.position, { multiplier: d.multiplier, score: d.score })
+      const d = data as EnemyKilledEvent
+      emitAt(d.position, { multiplier: d.multiplier, score: d.score, big: d.big })
     }
     const onBystander = (data: unknown) => {
       const d = data as BystanderHitEvent
@@ -90,15 +90,16 @@ export default function LevelScene({ levelId }: { levelId: string }) {
 }
 
 function LevelWorld({ levelId, config, world }: { levelId: string; config: LevelConfig; world: World }) {
-  const { track, environment, biome, enemies, combat, boss, pickups, walls } = config
+  const { track, environment, biome, enemies, combat, boss, pickups, walls, goldenBalloons } = config
   const def = world.biome
 
   const curve = useMemo(() => createTrackCurve(track), [track])
 
   const trackDims = useMemo(() => getTrackDimensions(track), [track])
   const trackTable = useMemo(
-    () => withBackwards(withTunnels(buildArcTable(curve), track.tunnels, trackDims.trackScale), track.mechanics),
-    [curve, track.tunnels, track.mechanics, trackDims],
+    () =>
+      withBackwards(withDarkSections(withTunnels(buildArcTable(curve), track.tunnels, trackDims.trackScale), track.darkSections), track.mechanics),
+    [curve, track.tunnels, track.darkSections, track.mechanics, trackDims],
   )
   const pointAt = useMemo(() => (t: number) => curve.getPointAt(t), [curve])
   const trackSamples = useMemo(() => sampleTrackPath((t) => curve.getPointAt(t)), [curve])
@@ -109,6 +110,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
   )
 
   const keepOff = useMemo(() => def.keepOff?.(groundFn, trackTable), [def, groundFn, trackTable])
+  const clearAir = useMemo(() => def.clearAir?.(groundFn, trackTable), [def, groundFn, trackTable])
   const speeds = useMemo(() => rideModel(track, trackTable), [track, trackTable])
   const hardRoute = useMemo(() => hardRouteFor(curve, track.mechanics), [curve, track.mechanics])
   useEffect(() => {
@@ -167,7 +169,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
         <LevelAudio />
         <EnemySpawner
           waves={enemies}
-          goldenBalloonCount={goldenBalloonCount(biome)}
+          goldenBalloonCount={goldenBalloons}
           trackTable={trackTable}
           groundFn={groundFn}
           boss={boss}
@@ -176,6 +178,7 @@ function LevelWorld({ levelId, config, world }: { levelId: string; config: Level
           walls={walls}
           bounds={def.bounds}
           keepOff={keepOff}
+          clearAir={clearAir}
           hardRoute={hardRoute}
         />
         <ShootingController />

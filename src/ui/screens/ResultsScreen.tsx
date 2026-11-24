@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
+import { m } from 'framer-motion'
 import { runBest, useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
-import { computeStars, runNextStar, runStars } from '@/levels/scoring'
+import { runNextStar } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
 import { usePrefersReducedMotion } from '@/ui/reducedMotion'
 import { SHARED_EVENT } from '@/app/analyticsEvents'
@@ -11,14 +11,14 @@ import ShareMenu from '@/ui/ShareMenu'
 import type { ShareMethod } from '@/ui/share'
 import { scoreCardRun } from '@/ui/scoreCard'
 import type { LeaderboardEntry } from '@/types/game'
-import { onlineEndpoint, onlineLeaderboard, runAccuracy, type OnlineEntry } from '@/store/onlineLeaderboard'
+import { onlineEndpoint, onlineLeaderboard, onlinePlan, runAccuracy, worldRows, type OnlineEntry } from '@/app/onlineLeaderboard'
 import { isNewRecord, nextStarLine, runLines } from './resultsStats'
 import { bystanderCount, bystanderNoun, bystanderType } from '@/combat/bystanders'
 import { initialsKey, type InitialsState } from './initialsEntry'
 import ResultsLeaderboard from './ResultsLeaderboard'
 import ResultsMarquee from './ResultsMarquee'
 import { FairBoard, FairStars } from '@/ui/Fair'
-import { isNewBuildLive, reloadForNewBuild } from '@/app/staleReload'
+import { isReloadDue, reloadIfDue } from '@/app/staleReload'
 import { saveGhost } from '@/combat/ghost'
 import { recording } from '@/combat/ghostTrack.hot'
 
@@ -49,10 +49,6 @@ function snapshotRun() {
   }
 }
 
-function worldRows(top: readonly OnlineEntry[], maxScore: number, thresholds: readonly [number, number, number]): LeaderboardEntry[] {
-  return top.map((e) => ({ initials: e.initials, score: e.score, stars: computeStars(e.score, maxScore, thresholds), date: Date.parse(e.at) || 0 }))
-}
-
 /** Null on every build but scoaster.com's own. */
 function worldBoard() {
   const endpoint = onlineEndpoint(__BUILT_ON_VERCEL__, window.location.search)
@@ -81,7 +77,7 @@ export default function ResultsScreen() {
   const worldRank = world?.rank ?? null
   const card = useMemo(() => (config ? scoreCardRun({ ...run, levelId: config.id, worldRank }) : null), [config, run, worldRank])
 
-  const stars = config ? runStars(run.score, config) : 0
+  const stars = card?.stars ?? 0
   const record = isNewRecord(run.score, run.previousBest)
   const counting = stage >= STAGE.count
   const done = stage >= STAGE.done
@@ -97,10 +93,10 @@ export default function ResultsScreen() {
   function leave(to: 'levels' | 'replay' | 'next') {
     if (left.current) return
     left.current = true
-    // A deploy replaced this build mid-session (#823): the next screen loads fresh, its sign-off sent first.
-    if (isNewBuildLive()) {
+    // A chunk failed mid-session (#823, #888): the next screen loads fresh, its sign-off sent first.
+    if (isReloadDue()) {
       submitOnline.current?.(lettersRef.current)
-      if (reloadForNewBuild()) return
+      if (reloadIfDue()) return
     }
     const store = useGameStore.getState()
     if (to === 'replay') store.restartRun('results')
@@ -139,29 +135,25 @@ export default function ResultsScreen() {
         })
         .then((result) => result && show(result.top, result.rank))
 
-    // A daily stays off the campaign board and has no entry: a new best of the day goes up at once under the last
-    // initials, any other run just shows the day's World board (#854). Without either, the local record stands alone.
-    if (run.mode.mode === 'daily') {
-      const day = run.mode.dateKey
-      if (isNewRecord(run.score, run.previousBest)) void submit(store.lastInitials, day)
-      else void online?.top({ daily: day }).then((top) => top && show(top, null))
-      return
+    // A daily stays off the campaign board and has no entry; only a new campaign best leaves a ghost.
+    const daily = run.mode.mode === 'daily' ? run.mode.dateKey : null
+    let placed: number | null = null
+    if (daily === null) {
+      if (record) saveGhost(config.id, recording)
+      placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
+      setRank(placed)
+      if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
     }
-    // Only a new campaign best leaves a ghost (a daily returned above).
-    if (record) saveGhost(config.id, recording)
-    const placed = store.addLeaderboardEntry(config.id, { score: run.score, stars, date: run.date })
-    setRank(placed)
-    if (placed !== null) setInitials({ letters: store.lastInitials, slot: 0 })
-
     if (!online) return
-    if (placed === null) {
-      void online.top({ level: config.id }).then((top) => top && show(top, null))
-      return
-    }
-    lettersRef.current = store.lastInitials
-    submitOnline.current = (letters) => {
-      submitOnline.current = null
-      void submit(letters)
+    const plan = onlinePlan(config.id, daily, record, placed !== null)
+    if (plan.kind === 'show') void online.top(plan.board).then((top) => top && show(top, null))
+    else if (plan.kind === 'submitNow') void submit(store.lastInitials, plan.daily)
+    else {
+      lettersRef.current = store.lastInitials
+      submitOnline.current = (letters) => {
+        submitOnline.current = null
+        void submit(letters)
+      }
     }
   }, [config, run, stars, online, record])
 
@@ -199,7 +191,7 @@ export default function ResultsScreen() {
   }
 
   function onShared(method: ShareMethod) {
-    if (config) eventBus.emit(SHARED_EVENT, config.id, method)
+    if (config) eventBus.emit(SHARED_EVENT, config.id, method, daily)
   }
 
   // Read through a ref so the listener sees the live entry state without re-subscribing every render.
@@ -316,7 +308,8 @@ export default function ResultsScreen() {
                     {p.label}
                   </button>
                 ))}
-              {card && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} />}
+              {/* Not in a portal build (#254): its link would send the portal's players off to scoaster.com. */}
+              {card && !__PORTAL_BUILD__ && <ShareMenu card={card} onShared={onShared} avoid={[nextRef]} prerender={done} />}
             </div>
             <p className="results-keys" data-shown={done}>
               {entryOpen && 'Type your initials or pick them with the arrows. Enter signs it.'}
@@ -328,7 +321,7 @@ export default function ResultsScreen() {
         </FairBoard>
 
         {(!daily || world) && (
-          <motion.div
+          <m.div
             className="results-board-slot"
             initial={false}
             variants={{ hidden: { opacity: 0, x: 24 }, shown: { opacity: 1, x: 0 } }}
@@ -343,7 +336,7 @@ export default function ResultsScreen() {
               onKey={initialsInput}
               onSlot={(slot) => initials && setInitials({ ...initials, slot })}
             />
-          </motion.div>
+          </m.div>
         )}
       </div>
     </div>

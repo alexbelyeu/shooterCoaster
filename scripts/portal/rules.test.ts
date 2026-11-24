@@ -30,6 +30,11 @@ describe('portalProblems', () => {
     expect(portalProblems([ok, css])).toHaveLength(2)
   })
 
+  it('rejects the share link anywhere: the portal build has no Share button', () => {
+    const js = { path: 'assets/a.js', bytes: 1, text: 'const u = "https://scoaster.com/go/share?utm_source=share"' }
+    expect(portalProblems([ok, js])).toEqual(['assets/a.js: carries the share link `go/share` (the portal build has no Share)'])
+  })
+
   it('caps the file count', () => {
     const many = Array.from({ length: MAX_FILES }, (_, i) => ({ path: `f${i}`, bytes: 1 }))
     expect(portalProblems([ok, ...many])).toEqual([`${MAX_FILES + 1} files (limit ${MAX_FILES})`])

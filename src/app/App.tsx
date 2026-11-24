@@ -1,23 +1,13 @@
 import { lazy, Suspense, useState, useEffect, useRef, useSyncExternalStore } from 'react'
-import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
+import { AnimatePresence, LazyMotion, MotionConfig, m } from 'framer-motion'
 import GameCanvas from '@/canvas/GameCanvas'
 import { useGameStore } from '@/store/useGameStore'
 import { isLevelActive } from '@/store/startPhase'
 import TitleScreen from '@/ui/screens/TitleScreen'
-import LevelSelectScreen from '@/ui/screens/LevelSelectScreen'
-import SettingsScreen from '@/ui/screens/SettingsScreen'
-import HUD from '@/ui/hud/HUD'
-import Countdown from '@/ui/hud/Countdown'
-import Intro from '@/ui/hud/Intro'
 import { introStartedAt, subscribeIntroClock } from '@/core/introShot'
 import LoadingScreen from '@/ui/screens/LoadingScreen'
-import PauseScreen from '@/ui/screens/PauseScreen'
-import ResultsScreen from '@/ui/screens/ResultsScreen'
 import MuteButton from '@/ui/MuteButton'
 import Crosshair from '@/combat/Crosshair'
-import GhostCrosshair from '@/ui/hud/GhostCrosshair'
-import ScorePopups from '@/effects/ScorePopups'
-import WaveAnnouncement from '@/ui/hud/WaveAnnouncement'
 import { startTitleMusic, stopTitleMusic } from '@/audio/titleMusic'
 import { sfx } from '@/audio/sfx'
 import { whenAudioReady } from '@/audio/AudioEngine'
@@ -26,9 +16,43 @@ import { usePauseOnHidden } from './usePauseOnHidden'
 import { useGamepad } from '@/input/gamepadInput'
 import Screen from './Screen'
 import { perfRequested } from '@/perf/perfFlag'
+import { loadLevelScene } from '@/canvas/loadLevelScene'
+import { lazyChunk } from '@/core/staleBuild'
+import {
+  Countdown,
+  GhostCrosshair,
+  HUD,
+  Intro,
+  LevelSelectScreen,
+  PauseScreen,
+  preloadScreens,
+  ResultsScreen,
+  ScorePopups,
+  SettingsScreen,
+  WaveAnnouncement,
+} from './lazyScreens'
 
 const PerfPanel = lazy(() => import('@/perf/PerfPanel'))
 const PhotoMode = lazy(() => import('@/ui/screens/PhotoMode'))
+const importMotionFeatures = lazyChunk(() => import('./motionFeatures').then((mod) => mod.default))
+/** Between two asks for the motion features: `LazyMotion` asks once, so its loader never gives up. */
+const MOTION_FEATURES_RETRY_MS = 10_000
+/**
+ * framer-motion's animation features, fetched as App mounts (#861): the `m` elements start animating once they land.
+ * Until then they sit at their `initial` (the title's invisible). A failed fetch reaches `app/staleReload.ts` through
+ * `lazyChunk`, which reloads the page while it still serves the game (once per session, #888); until then it asks again.
+ */
+function loadMotionFeatures(): ReturnType<typeof importMotionFeatures> {
+  return importMotionFeatures().catch(() =>
+    new Promise((resolve) => setTimeout(resolve, MOTION_FEATURES_RETRY_MS)).then(loadMotionFeatures),
+  )
+}
+
+/** Runs `fn` once the main thread is idle (a timer where `requestIdleCallback` is missing: Safari). */
+function whenIdle(fn: () => void): void {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, { timeout: 3000 })
+  else setTimeout(fn, 500)
+}
 
 /** PLAY / WORLDS fade the title to black (with a whoosh) over this long, then start the run / open level select. */
 const TITLE_FADE_S = 0.4
@@ -59,6 +83,10 @@ export default function App() {
     stopTitleMusic(true) // the level's music opens once its scene mounts; fade under it, not before (#168)
   }, [phase])
   useEffect(() => () => stopTitleMusic(), [])
+  // The menus and the run's screens: once the level chunk is in (fetched under the poster), when the title is idle.
+  useEffect(() => {
+    void loadLevelScene().catch(() => {}).finally(() => whenIdle(preloadScreens))
+  }, [])
 
   // The CSS mirrors its prefers-reduced-motion rules under html.reduce-motion for the in-game toggle.
   useEffect(() => {
@@ -110,90 +138,92 @@ export default function App() {
 
   return (
     // Framer transitions (countdown, wave banner, screen fades) follow the toggle too, not only the OS setting.
-    <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'}>
-      <GameCanvas />
+    <LazyMotion features={loadMotionFeatures} strict>
+      <MotionConfig reducedMotion={reducedMotion ? 'always' : 'never'}>
+        <GameCanvas />
 
-      <AnimatePresence mode="wait">
-        {phase === 'title' && !showSettings && (
-          <Screen
-            key="title"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
-            transition={{ duration: 0.3, ease: 'easeInOut' }}
-          >
-            <TitleScreen onPlay={playFromTitle} onWorlds={worldsFromTitle} onSettings={() => setShowSettings(true)} />
-          </Screen>
+        <AnimatePresence mode="wait">
+          {phase === 'title' && !showSettings && (
+            <Screen
+              key="title"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+            >
+              <TitleScreen onPlay={playFromTitle} onWorlds={worldsFromTitle} onSettings={() => setShowSettings(true)} />
+            </Screen>
+          )}
+
+          {phase === 'levelSelect' && !showSettings && (
+            <Screen key="levelSelect" {...fadeVariants} transition={{ duration: 0.3 }}>
+              <LevelSelectScreen />
+            </Screen>
+          )}
+
+          {phase === 'loading' && (
+            <Screen key="loading" {...fadeVariants} transition={{ duration: 0.3 }}>
+              <LoadingScreen />
+            </Screen>
+          )}
+
+          {(phase === 'playing' || resuming) && (
+            <Screen key="hud" {...fadeVariants} transition={{ duration: 0.2 }}>
+              <HUD />
+            </Screen>
+          )}
+
+          {phase === 'paused' && !resuming && !showSettings && !photo && (
+            <Screen key="paused" {...fadeVariants} transition={{ duration: 0.2 }}>
+              <PauseScreen onSettings={() => setShowSettings(true)} />
+            </Screen>
+          )}
+
+          {phase === 'results' && (
+            <Screen key={`results-${runId}`} {...fadeVariants} transition={{ duration: 0.4 }}>
+              <ResultsScreen />
+            </Screen>
+          )}
+        </AnimatePresence>
+
+        {phase === 'intro' && <Intro />}
+        {(phase === 'countdown' || phase === 'playing' || resuming) && <Countdown />}
+
+        {/* Black over everything from PLAY / WORLDS until the loading screen or level select has mounted under it. */}
+        <AnimatePresence>
+          {veiled && (
+            <m.div
+              key="veil"
+              className="screen-veil"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, transition: { duration: TITLE_FADE_S, ease: 'easeIn' } }}
+              exit={{ opacity: 0, transition: { duration: 0.4, delay: 0.3, ease: 'easeOut' } }}
+            />
+          )}
+        </AnimatePresence>
+
+        {showSettings && <SettingsScreen onClose={() => setShowSettings(false)} />}
+
+        {photo && (
+          <Suspense fallback={null}>
+            <PhotoMode />
+          </Suspense>
         )}
 
-        {phase === 'levelSelect' && !showSettings && (
-          <Screen key="levelSelect" {...fadeVariants} transition={{ duration: 0.3 }}>
-            <LevelSelectScreen />
-          </Screen>
+        {!photo && <MuteButton />}
+
+        {phase === 'playing' && <GhostCrosshair />}
+        {showCrosshair && <Crosshair />}
+
+        {phase === 'playing' && <ScorePopups />}
+        {phase === 'playing' && <WaveAnnouncement />}
+
+        {perfRequested() && (
+          <Suspense fallback={null}>
+            <PerfPanel />
+          </Suspense>
         )}
-
-        {phase === 'loading' && (
-          <Screen key="loading" {...fadeVariants} transition={{ duration: 0.3 }}>
-            <LoadingScreen />
-          </Screen>
-        )}
-
-        {(phase === 'playing' || resuming) && (
-          <Screen key="hud" {...fadeVariants} transition={{ duration: 0.2 }}>
-            <HUD />
-          </Screen>
-        )}
-
-        {phase === 'paused' && !resuming && !showSettings && !photo && (
-          <Screen key="paused" {...fadeVariants} transition={{ duration: 0.2 }}>
-            <PauseScreen onSettings={() => setShowSettings(true)} />
-          </Screen>
-        )}
-
-        {phase === 'results' && (
-          <Screen key={`results-${runId}`} {...fadeVariants} transition={{ duration: 0.4 }}>
-            <ResultsScreen />
-          </Screen>
-        )}
-      </AnimatePresence>
-
-      {phase === 'intro' && <Intro />}
-      {(phase === 'countdown' || phase === 'playing' || resuming) && <Countdown />}
-
-      {/* Black over everything from PLAY / WORLDS until the loading screen or level select has mounted under it. */}
-      <AnimatePresence>
-        {veiled && (
-          <motion.div
-            key="veil"
-            className="screen-veil"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1, transition: { duration: TITLE_FADE_S, ease: 'easeIn' } }}
-            exit={{ opacity: 0, transition: { duration: 0.4, delay: 0.3, ease: 'easeOut' } }}
-          />
-        )}
-      </AnimatePresence>
-
-      {showSettings && <SettingsScreen onClose={() => setShowSettings(false)} />}
-
-      {photo && (
-        <Suspense fallback={null}>
-          <PhotoMode />
-        </Suspense>
-      )}
-
-      {!photo && <MuteButton />}
-
-      {phase === 'playing' && <GhostCrosshair />}
-      {showCrosshair && <Crosshair />}
-
-      {phase === 'playing' && <ScorePopups />}
-      {phase === 'playing' && <WaveAnnouncement />}
-
-      {perfRequested() && (
-        <Suspense fallback={null}>
-          <PerfPanel />
-        </Suspense>
-      )}
-    </MotionConfig>
+      </MotionConfig>
+    </LazyMotion>
   )
 }

@@ -87,9 +87,13 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level4: { tonic: 62, minor: true }, // D minor
   level5: { tonic: 60, minor: true }, // C minor
   level6: { tonic: 64, minor: true }, // E minor
+  level7: { tonic: 60, minor: true }, // level5's score, aliased until Neon Metropolis's theme round
   'results-win': { tonic: 60, minor: false }, // C major
   'results-lose': { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
+  'level7.overpass': { tonic: 71, minor: true }, // B minor
+  'level7.gridlock': { tonic: 66, minor: true }, // F-sharp minor
+  'level7.pixel': { tonic: 68, minor: false }, // A-flat major
 }
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]
@@ -293,6 +297,7 @@ export const BIOME_REVERB: Record<BiomeType, BiomeReverb> = {
   volcanic: { seconds: 2, decayPow: 3.4, toneHz: 2600, level: 0.85, preDelayMs: 75, early: 0.15, slap: null },
   // A big hard-walled hall: dense early reflections.
   gym: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9, preDelayMs: 30, early: 0.4, slap: null },
+  city: { seconds: 1.6, decayPow: 3.2, toneHz: 7000, level: 0.8, preDelayMs: 16, early: 0.08, slap: null },
 }
 
 /** Where the early reflections land, as a share of the pre-delay gap, and their relative amplitudes. */

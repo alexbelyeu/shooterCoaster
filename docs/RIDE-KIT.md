@@ -121,10 +121,14 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   a slow corkscrew through a sea arch (`environment.seaArch`), the second lift cresting as the Kraken rises, and a
   quarter helix home under the first lift. No U-turns after the corkscrew: a hairpin or a half helix puts trackside
   waves behind the rider on their approach (`spawnPlacement.test.ts`).
-- **Antarctica (4):** an ice-cave dark section (blue glow), a bobsled helix down a glacier, an
-  airtime hill off a ridge with the aurora.
-- **Inferno (5):** a launch out of a lava tube, a drop-tower free fall inside the volcano, a
-  backwards section as the Titan rises behind you.
+- **Antarctica (4):** built (#866, `arctic/arcticTrack.ts`, its storyboard and seconds at the top): a station launch,
+  a lift up the valley, a 71° first drop into the ice cave (a dark section with the `ice` look, `IceCave.tsx`, its mouth
+  low over the rails), a second lift up the ridge, an airtime crest heading into the aurora (27 s), a 1.25-turn helix
+  down past the Ice Fortress ending as the Yeti arrives (40 s), and the valley run home.
+- **Inferno (5):** built (#867, `volcanic/infernoTrack.ts`, its storyboard and seconds at the top): a station
+  launch through a glowing lava tube, a lift up the volcano's flank into a hole, a drop track falling inside the cone
+  (18 s), out through a second hole a few metres round the rider (the near miss), two camelbacks (30 s), a turntable
+  (38 s) and the Titan's whole fight ridden backwards facing him (40–57 s).
 
 ## Rules for building rides
 
@@ -137,6 +141,45 @@ As built (#761: slowed and spread out for comfort at the rider's scale; `gymTrac
   `budgets.json` `pacing` ceilings (longest gap with no target, share of the run with none), and CI runs it on every PR
   that touches a level's ride or spawns. Spawns follow the ride: when the route changes, its targets move with it; on a
   climb the targets are on the wall beside and above the rider, during an inversion they stay in frame.
+
+### What the rider must see (#925, from Alex's playtest of the gym, 23 Nov)
+
+The gym's ride passed every gate and was, in Alex's words, a complete disaster: nine seconds of nothing at the jump and
+the drop, the Medusa on screen for two seconds, a sixteen-second crawl round the Tree with nothing to shoot. The gates
+counted any live enemy whose centre projected into the viewport, so enemies behind walls, under the floor or specks
+across the hall all counted. These rules come from that playtest; each says how it is checked.
+
+1. **A target counts only if the rider can shoot it** (checked). `__SC_TEST__.sight()` (`src/testing/lineOfSight.ts`)
+   counts a live enemy or exposed weak point only when it is inside the view, at least `MIN_ENEMY_PX` and has a clear
+   line from the camera (no opaque mesh in front of it). The `pacing` gate and the review run on that count, played as a
+   player who lands 3 hits a second on what they can see (`PLAYER_HITS_PER_SECOND`): a stretch only leftovers would fill
+   is empty.
+2. **Every element is a shooting moment** (checked by `pacing`): a spin, a roll, a jump, a drop and a lift hill each
+   get targets placed where the rider looks during it, not where the track was a second earlier. A roll over a set
+   piece puts the targets round the set piece, in frame through the roll.
+3. **Set pieces happen where the action is** (seen in the review): a jump, a drop or an inversion faces a landmark and
+   has a wave on it. A thrill against a blank corner of the hall is wasted seconds.
+4. **The boss fight is framed** (checked: `pacing.bossFramedShare`, `bossFraming` in `e2e/pacingMetric.mjs`): from
+   the boss's arrival, one of its weak points is shootable for at least that share of the fight (60% unless the level's
+   budget says more). The ride turns round the boss, not away from it, and the run ends on the fight: the finale is the
+   climax, never a slow crawl past empty scenery.
+5. **Waves last** (seen in the review): a wave's enemies spread along the stretch they belong to and stay there (on
+   walls, perches, slow orbits), so it is a stretch of shooting, not one cluster killed in a one-second burst at its tell.
+6. **Storyboard beats are contracts** (checked in each ride's track test): every beat of a level's storyboard lands
+   inside the run. A beat is not dropped, or moved after the run, to make something else fit; cut or move it only with
+   Alex's OK on the level's `steering` issue (the gym's Arch went "after the run" in #761 without one).
+7. **Effects look right from the seat** (seen in the review): look at every effect from where the rider passes it, above
+   and inside included. No camera-facing sprite seen edge-on or from above, no flames under what is burning, no hard or
+   pixelated sprite edges, and an effect fades before the camera goes into it.
+8. **No flicker** (seen in the review's `flicker` list): a region of the screen that jumps in brightness for one step and
+   comes straight back is a light popping, z-fighting or a blinking sprite. Find each spike's cause; explained ones (a
+   muzzle flash, a kill) go in the PR.
+
+**Every PR that changes a ride, its waves, a boss or a level's effects runs the ride review and posts it**:
+`npm run build && npm run review -- --level <id>` (`scripts/rideReview.mjs`, about 3 minutes in a cloud session) writes
+`e2e-results/review/<id>/sheet.jpg` (a frame every 2 s, each labelled with its time, track and what is shootable, red when
+nothing is) and `review.json` (the timeline, gaps, the boss's framing, flicker). Look at the whole sheet before shipping,
+put its summary lines in the PR body, and QA looks at it again.
 
 - Clearance from **everything solid**, railings, stairs and props included, never only the
   blockout's pieces (level 6 rode through the pit's railing on 19 Nov because they weren't checked).

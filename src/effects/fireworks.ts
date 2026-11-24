@@ -1,4 +1,5 @@
 /** Combo-streak fireworks (#182): numbers, launch rules and burst patterns for `Fireworks.tsx`. Pure, for Node tests. */
+import type { Vec3 } from '@/utils/vec3'
 
 /** A launch past this many live rockets steals the oldest slot. */
 export const MAX_ROCKETS = 3
@@ -74,12 +75,6 @@ export function rocketsForStreak(combo: number): number {
 /** Seconds from launch until the burst has faded. */
 export function slotLifetime(pattern: BurstPattern): number {
   return FLIGHT_S + PATTERNS[pattern].lifeS
-}
-
-export interface Vec3 {
-  x: number
-  y: number
-  z: number
 }
 
 /** Offset of a spark `t` seconds after the burst (drag, then gravity); mirrored in the `Fireworks.tsx` vertex shader. */
