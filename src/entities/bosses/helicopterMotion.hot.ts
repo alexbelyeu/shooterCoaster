@@ -10,9 +10,12 @@ export const HELI = {
   /** Its anchor ahead of the rider on the rider's heading, above the camera, and never lower than this over the street. */
   ahead: 560,
   above: 90,
-  minClearance: 240,
-  /** It weaves across the street ahead, `side` either way, one sweep every `2π / weaveRate` s. */
-  side: 150,
+  minClearance: 160,
+  /**
+   * It weaves across the street ahead, `side` either way, one sweep every `2π / weaveRate` s: within the street canyon,
+   * since any further over the blocks puts the towers between it and the rider (#871).
+   */
+  side: 24,
   weaveRate: 0.35,
   followTau: 1,
   /** It drops in from `dropIn` above its anchor over `dropSeconds` (the tell's beam comes from up there). */

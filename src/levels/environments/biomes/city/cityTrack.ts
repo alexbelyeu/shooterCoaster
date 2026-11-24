@@ -10,8 +10,9 @@
  * - **20.5 s, the head-chopper**: north under the elevated highway's deck (`highwayLayout.ts`), the near miss.
  * - **26 s, the airtime crest** west along the north side, the hero tower ahead.
  * - **31–40 s, the helix**: a climbing turn and a quarter round the hero tower; it comes out as the helicopter arrives (40 s).
- * - **40–60 s, the face-off**: a slow run back south through the west side's streets for the fight.
- * - **After the run, home**: the brake run into the station.
+ * - **40–60 s, the face-off**: a slow run south down the west avenue, one long straight, so the helicopter hovering
+ *   over the street ahead stays in the canyon's view for the fight (a corner puts it behind the towers).
+ * - **After the run, home**: round the corner into the station.
  *
  * `cityTrack.test.ts` holds it to the beats and to its clearances (the towers, the hero tower, the highway, itself).
  */
@@ -41,7 +42,7 @@ const LEFT = Math.PI / 2
 const RIGHT = -Math.PI / 2
 
 /** Speeds, world units a second. */
-const SPEED = { launch: 230, lift: 95, crest: 75, street: 170, helix: 200, run: 115, brake: 60 } as const
+const SPEED = { launch: 230, lift: 95, crest: 75, street: 170, helix: 200, run: 55, brake: 50 } as const
 
 /** A street corner's radius: a quarter turn from one street's centre line onto the cross street's. */
 const CORNER = 120
@@ -67,8 +68,8 @@ const RAIL = headChopper(
 const CREST = { fromX: 240, rise: 40, crestRadius: 160, angle: 28 * DEG } as const
 /** The helix: a climbing turn and a quarter round the hero tower, entered on its north side heading west. */
 const HELIX = { radius: 240, turns: 1.25, climb: 110, bank: 30 * DEG } as const
-/** The face-off: south down the west side, a dogleg east and back west (the streets at these lines), then home. */
-const RUN = { south: -120, east: -360, back: 120, home: -1080, y: 24 } as const
+/** The face-off: south down the west avenue from the helix to the station's street, coming down to this height. */
+const RUN = { y: 24 } as const
 
 /** The storyboard's beats: the second the car reaches the `nth` element of a kind, its start or (`middle`) its middle. */
 const BEATS: { kind: MarkerKind; second: number; nth?: number; at?: 'middle' | 'end' }[] = [
@@ -123,20 +124,8 @@ export function buildCityRide(): CityRide {
     b.mark('straight', () => straightTo(b, 'x', LANDMARK_SITE.x))
     helix(b, { radius: HELIX.radius, turns: HELIX.turns, drop: -HELIX.climb, bank: HELIX.bank, hand: 1 })
   })
-  zone('brake', SPEED.run, () => {
-    b.mark('straight', () => straightTo(b, 'z', RUN.south - CORNER, { rise: RUN.y - y(), ease: 10 * EYE }))
-    corner(LEFT)
-    b.mark('straight', () => straightTo(b, 'x', RUN.east - CORNER))
-    corner(RIGHT)
-    b.mark('straight', () => straightTo(b, 'z', RUN.back - CORNER))
-    corner(RIGHT)
-    b.mark('straight', () => straightTo(b, 'x', RUN.home + CORNER))
-  })
-  zone('brake', SPEED.brake, () => {
-    corner(LEFT)
-    b.mark('straight', () => straightTo(b, 'z', STATION.z - CORNER))
-    corner(LEFT)
-  })
+  zone('brake', SPEED.run, () => b.mark('straight', () => straightTo(b, 'z', STATION.z - CORNER, { rise: RUN.y - y(), ease: 10 * EYE })))
+  zone('brake', SPEED.brake, () => corner(LEFT))
   b.mark('straight', () => straightTo(b, 'x', STATION.x - SPACING, { rise: STATION.y - y(), ease: 2 * EYE }))
   return { points: b.points, markers: b.markers, mechanics, zones }
 }
