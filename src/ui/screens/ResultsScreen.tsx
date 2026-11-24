@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { m } from 'framer-motion'
-import { runBest, useGameStore } from '@/store/useGameStore'
+import { medalRun, runBest, useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { runNextStar } from '@/levels/scoring'
 import { sfx } from '@/audio/sfx'
@@ -17,7 +17,8 @@ import { bystanderCount, bystanderNoun, bystanderType } from '@/combat/bystander
 import { initialsKey, type InitialsState } from './initialsEntry'
 import ResultsLeaderboard from './ResultsLeaderboard'
 import ResultsMarquee from './ResultsMarquee'
-import { FairBoard, FairStars } from '@/ui/Fair'
+import { FairBoard, FairMedal, FairStars } from '@/ui/Fair'
+import { levelMedals, medalsWon } from '@/levels/medals'
 import { isReloadDue, reloadIfDue } from '@/app/staleReload'
 import { saveGhost } from '@/combat/ghost'
 import { recording } from '@/combat/ghostTrack.hot'
@@ -33,6 +34,7 @@ const NO_BOARD: LeaderboardEntry[] = []
 function snapshotRun() {
   const s = useGameStore.getState()
   return {
+    medals: s.currentLevel ? medalsWon(s.currentLevel, medalRun(s)) : [],
     levelId: s.currentLevel,
     runId: s.runId,
     mode: s.runMode,
@@ -124,6 +126,7 @@ export default function ResultsScreen() {
       bestCombo: run.bestCombo,
     }
     store.saveRunResult(entry)
+    if (run.medals.length > 0) store.saveMedals(config.id, run.medals)
     const show = (top: OnlineEntry[], rank: number | null) => {
       if (!left.current) setWorld({ board: worldRows(top, config.maxScore, config.starThresholds), rank })
     }
@@ -252,6 +255,7 @@ export default function ResultsScreen() {
     { to: 'levels', label: 'Levels', shown: true },
   ] as const
   const go = plates.find((p) => p.to === enterTo)
+  const medals = levelMedals(config.id).filter((m) => run.medals.includes(m.id))
 
   return (
     <div
@@ -285,6 +289,16 @@ export default function ResultsScreen() {
             <p className="results-next" data-shown={stage >= STAGE.stats}>
               {nextStarLine(next, (n) => fmt.format(n))}
             </p>
+            {medals.length > 0 && (
+              <ul className="results-medals" data-shown={stage >= STAGE.stats} aria-label="Medals won this run">
+                {medals.map((medal) => (
+                  <li key={medal.id} className="results-medal fair-showcard" data-medal={medal.id} title={medal.line}>
+                    <FairMedal earned />
+                    {medal.name}
+                  </li>
+                ))}
+              </ul>
+            )}
             {!record && run.previousBest > 0 && (
               <p className="results-best">
                 {daily ? "Today's best is" : 'Your best is'} {fmt.format(Math.round(run.previousBest))}

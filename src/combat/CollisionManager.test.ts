@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
+import { useGameStore } from '@/store/useGameStore'
 import {
   getCollisionTargets,
   processFlaggedHits,
@@ -48,5 +49,31 @@ describe('collision targets', () => {
     expect(hits.sort()).toEqual(['b', 'c', 'd'])
     expect(getCollisionTargets().every((t) => !t.hitThisFrame)).toBe(true)
     for (const t of [...getCollisionTargets()]) unregisterCollisionTarget(t.id)
+  })
+
+  it("counts a hit toward FRENZY by when its bullet was fired, not when it lands (#904)", () => {
+    const store = useGameStore.getState
+    store().startRun('level1')
+    registerCollisionTarget(target('t'))
+    const t = getCollisionTargets()[0]
+    const land = (firedInFrenzy: boolean) => {
+      t.hitThisFrame = true
+      t.firstHitThisFrame = true
+      t.hitInFrenzy = firedInFrenzy
+      processFlaggedHits()
+    }
+    // A flawless FRENZY: the last shot is still in the air when FRENZY ends, and lands after.
+    store().setSlowMo(0.35, 'on')
+    store().registerShot()
+    land(true)
+    store().registerShot()
+    store().setSlowMo(1, 'off')
+    land(true)
+    // A shot fired just before the next FRENZY lands inside it: no unpaired FRENZY hit.
+    store().registerShot()
+    store().setSlowMo(0.35, 'on')
+    land(false)
+    expect(store()).toMatchObject({ shotsFired: 3, hits: 3, frenzyShots: 2, frenzyHits: 2 })
+    unregisterCollisionTarget('t')
   })
 })

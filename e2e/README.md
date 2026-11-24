@@ -35,7 +35,7 @@ screen / covers the centre / overlaps the HUD / points > 25° off the tracer of 
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
-reveal (`data-sequence="done"`), lacks a stat line (its `data-stat` hits, accuracy, combo, time; hits must start with the kills) or the
+reveal (`data-sequence="done"`), shows no medal or not exactly the medals the run won, unsaved (#879: the run's last kill lands on a chain primed to the longest medal chain), lacks a stat line (its `data-stat` hits, accuracy, combo, time; hits must start with the kills) or the
 Levels / Replay / Share buttons (inside the viewport, none overlapping, 44 px), offers Next Level while the next level is locked (or hides it while open), shows NaN, or disagrees with `stats()` on score or kills, has no local leaderboard fully inside 1280×720, or (first level) Enter with the mute button focused doesn't play on;
 on the first level the leaderboard is seeded so the run places 4th: the row must open for initials at the last ones used (AAA),
 all with the Share button focused (#357): ArrowUp must cycle a letter, typing r e s must give RES without leaving or toggling mute (R and S are letters there), and Enter must confirm (not open the share menu), store
@@ -78,8 +78,10 @@ no such row), turns that toggle on, picks Low and a music volume, cycles Med / H
 and fails if the renderer's GPU textures grew over the last two cycles (each change rebuilds the post composer, #249),
 closes with Esc, and requires both to survive a reload and the title's "Internal device, not tracked" marker to show after it. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
-track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
-A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
+track point, each held at the level's start from its first frame (level timer, game clock and ride at 0, so no enemy flies in
+however long the level takes to load) and counted once its draw count has held for 5 frames (`waitDrawsSettled`, #972: the same counts on
+any runner): low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
+A `levelSelect` step seeds saved progress (3★ + 1★), two of the first level's medals and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
 and requires one card per level plus the Daily card, each top's initials on its card after the reload, the right locked count and `★ x / 15` total, every card
 inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);

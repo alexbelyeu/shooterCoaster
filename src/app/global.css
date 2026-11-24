@@ -1176,6 +1176,16 @@ canvas {
   font-variant-numeric: tabular-nums;
 }
 
+.level-medals {
+  display: flex;
+  gap: 2px;
+}
+
+.level-medals .fair-medal {
+  width: 24px;
+  height: 24px;
+}
+
 .level-card-initials {
   margin-left: 0.35rem;
   font-weight: 800;
@@ -1625,7 +1635,35 @@ canvas {
   color: var(--fair-sky);
 }
 
+.results-medals {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 0.7rem;
+  margin-top: 0.7rem;
+  list-style: none;
+}
+
+.results-medal {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--fair-tar);
+  background: var(--fair-cream);
+  rotate: -2deg;
+}
+
+.results-medal:nth-child(even) {
+  rotate: 2deg;
+}
+
+.results-medal .fair-medal {
+  width: 24px;
+  height: 24px;
+}
+
 .results-next[data-shown='false'],
+.results-medals[data-shown='false'],
 .results-stats[data-shown='false'],
 .results-actions[data-shown='false'],
 .results-keys[data-shown='false'] {
@@ -3008,6 +3046,39 @@ span:is(.fair-board-shadow, .fair-board) {
 
 .fair-stars .earned path {
   fill: var(--fair-gilt);
+  stroke: var(--fair-tar);
+}
+
+/* Prize medals (#879): gilt on a gilt-block ribbon with a tar edge when won, sunk into the board like a star when not. */
+.fair-medal {
+  width: 28px;
+  height: 28px;
+  flex: none;
+}
+
+.fair-medal path,
+.fair-medal circle {
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  fill: var(--fair-oxblood-deep);
+  stroke: var(--fair-oxblood-deep);
+}
+
+.fair-medal .fair-medal-ring {
+  fill: none;
+}
+
+.fair-medal.earned circle {
+  fill: var(--fair-gilt);
+  stroke: var(--fair-tar);
+}
+
+.fair-medal.earned .fair-medal-ring {
+  fill: none;
+}
+
+.fair-medal.earned .fair-medal-ribbon {
+  fill: var(--fair-gilt-block);
   stroke: var(--fair-tar);
 }
 

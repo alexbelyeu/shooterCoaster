@@ -4,6 +4,7 @@ import type { LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { currentStreak, dailyKey, dailyLevel, type DailyStreak } from '@/levels/daily'
 import { previousLevel } from '@/levels/LevelRegistry'
 import { hasNightRide } from '@/levels/environments/nightPreset'
+import type { Medal } from '@/levels/medals'
 
 export interface LevelSelectSource {
   id: string
@@ -28,15 +29,28 @@ export interface LevelCard {
   unlockedBy: string | null
   /** Offers the Night Ride toggle (#829): the level has all its stars and its biome a night preset. */
   nightRide: boolean
+  /** The level's three medals (#879) and which it has won; none while it is locked. */
+  medals: { id: string; name: string; line: string; earned: boolean }[]
 }
 
 export const STARS_PER_LEVEL = 3
+
+/** What a card's medals say aloud: "1 of 3 medals, Gold Rush". */
+/** The card's medals for its aria-label: every one named, a won one as won and an unwon one with its feat (#904). */
+export function medalsLine(medals: readonly Pick<LevelCard['medals'][number], 'name' | 'line' | 'earned'>[]): string {
+  const won = medals.filter((m) => m.earned).length
+  const each = medals.map((m) => (m.earned ? `${m.name}, won` : `${m.name}: ${m.line}`))
+  return `${won} of ${medals.length} medals${each.length > 0 ? `. ${each.join('. ')}` : ''}`
+}
 
 export function buildLevelCards(
   levels: readonly LevelSelectSource[],
   savedScores: Record<string, ScoreEntry | undefined>,
   isUnlocked: (id: string) => boolean,
   leaderboards: Record<string, readonly LeaderboardEntry[] | undefined>,
+  savedMedals: Record<string, readonly string[] | undefined> = {},
+  /** A level's medals (`levels/medals.ts` `levelMedals`), passed in so the store's startup path doesn't carry the table. */
+  medalsOf: (levelId: string) => readonly Medal[] = () => [],
 ): LevelCard[] {
   return levels.map((level) => {
     const unlocked = isUnlocked(level.id)
@@ -55,6 +69,9 @@ export function buildLevelCards(
       bestInitials: unlocked ? (top?.initials ?? null) : null,
       unlockedBy: levels.find((l) => l.id === previousId)?.name ?? null,
       nightRide: stars === STARS_PER_LEVEL && hasNightRide(level.biome),
+      medals: unlocked
+        ? medalsOf(level.id).map(({ id, name, line }) => ({ id, name, line, earned: savedMedals[level.id]?.includes(id) ?? false }))
+        : [],
     }
   })
 }

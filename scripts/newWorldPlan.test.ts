@@ -5,6 +5,7 @@ import {
   EDITED_FILES,
   NewWorldError,
   PLACEHOLDER,
+  STARTER_MEDALS,
   STARTER_ROSTER,
   TEMPLATE_ROOT,
   parseNewWorldArgs,
@@ -13,6 +14,8 @@ import {
 } from './newWorldPlan.mjs'
 import { SCORE_VALUES } from '@/levels/scoring'
 import { getAllLevels } from '@/levels/LevelRegistry'
+import { COMBO_TIERS, TOP_TIER } from '@/combat/comboTiers'
+import type { Feat } from '@/levels/medals'
 
 const root = path.resolve(__dirname, '..')
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
@@ -91,6 +94,17 @@ describe('npm run new-world (#460)', () => {
     expect(budgets.pacing[id]).toEqual(PLACEHOLDER)
     expect(edit(EDITED_FILES.shards)).toContain(`\n  ${id}: { levels: ['${id}'], steps: ['ride'] },`)
     expect(edit(EDITED_FILES.ci)).toMatch(new RegExp(`shard: \\[[^\\]]*\\b${last.id}, ${id}, `))
+  })
+
+  it('gives the level three starter medals its starter roster can win, and asks for them renamed', () => {
+    const medals = edit(EDITED_FILES.medals)
+    expect(medals).toMatch(new RegExp(`\\n {2}${id}: \\[\\n(    medal\\('\\w+', '[^']+', '[^']+', \\{[^}]+\\}\\),\\n){3} {2}\\],\\n\\}`))
+    for (const m of STARTER_MEDALS) expect(medals).toContain(`medal('${m.id}', '${m.name}', '${m.line}', `)
+    const enemies = [...STARTER_ROSTER.waves, STARTER_ROSTER.finale].reduce((n, w) => n + w.count, 0)
+    const needs = (f: Feat) =>
+      f.kind === 'combo' ? f.count : f.kind === 'accuracy' ? Math.ceil((f.minShots * f.percent) / 100) : f.kind === 'frenzyClean' ? COMBO_TIERS[TOP_TIER].minCount + 1 : Infinity
+    for (const m of STARTER_MEDALS) expect(needs(m.feat as Feat)).toBeLessThanOrEqual(enemies)
+    expect(plan.checklist.some((c: string) => c.startsWith(`Medals: rename LEVEL_MEDALS.${id}`))).toBe(true)
   })
 
   it('names the world in #about and counts it', () => {
