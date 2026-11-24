@@ -3784,12 +3784,15 @@ async function countdownCheck(page, levelId) {
 
   // 5. Leave a fresh level mid-warm-up (#141). Level select first unmounts the level: its scene swap is a transition
   // (#597) that a software renderer's slow frames starve, and a start before it commits keeps the mounted level, so
-  // nothing remounts (#646: a 2-core runner took over the 30 s this wait used to give up after, silently). Both waits
+  // nothing remounts (#646: at a 2-core runner's ~1.5 s frames that outlasted the 30 s this wait used to give up after,
+  // silently, and the check below found no warm-up; 11 s at ~1 s frames). Both waits
   // are on their event, under the first warm-up's bound: a fast machine passes as soon as they happen.
   await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
-  const unmounted = await page
+  const leftAt = Date.now()
+  const unmountMs = await page
     .waitForFunction(() => !window.__SC_TEST__.levelReady(), null, { timeout: 180000, polling: 100 })
-    .then(() => true, () => false)
+    .then(() => Date.now() - leftAt, () => null)
+  const unmounted = unmountMs !== null
   await waitFrames(page, 2, { maxMs: 30000 })
   // The remount's first write of `shaderWarmup` (its mount effect, before the warm-up's first step) leaves: `true`
   // when that write is a warm-up under way, `false` when the level reported itself warm without one, `null` for none.
@@ -3881,6 +3884,7 @@ async function countdownCheck(page, levelId) {
       replayPhase,
       skipTapIn: tappedIn,
       swoop,
+      unmountMs,
       leftDuringWarmup,
       warmup,
       firstShot,
@@ -4530,10 +4534,8 @@ async function run() {
     await ctx.addInitScript(installSettledStepper)
     const page = await ctx.newPage()
     if (LEVEL_CHUNK_DELAY_MS > 0) await delayLevelChunk(page)
-    { const orig = page.screenshot.bind(page); page.screenshot = async (o) => { const t = Date.now(); try { return await orig(o) } finally { console.log('SHOTMS', path.basename(o?.path ?? '-'), Date.now() - t) } } }
     const errors = []
     collectErrors(page, errors)
-    if (process.env.SC_GPU_SYNC && !query.includes('gpuSync')) query += '&gpuSync=1'
     await page.goto(`${base}/?${query}`, { waitUntil: whileLoading ? 'commit' : 'load' })
     const loading = whileLoading ? await whileLoading(page) : null
     await page.waitForLoadState('load')
