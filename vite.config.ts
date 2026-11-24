@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 import fs from 'fs'
 import { minifyGlsl } from './scripts/glslMinify.mjs'
+import { stripScrim } from './scripts/scrimStrip.mjs'
 
 /**
  * Portal pages carry their own share card, canonical URL and structured data, and the zip may
@@ -44,6 +45,19 @@ function minifyGlslPlugin(): Plugin {
   }
 }
 
+// Ships the music scores (`*.scrim?raw`) without their comments and `about` prose in builds (scripts/scrimStrip.mjs).
+function stripScrimNotesPlugin(): Plugin {
+  return {
+    name: 'strip-scrim-notes',
+    apply: 'build',
+    enforce: 'pre',
+    load(id) {
+      if (!id.endsWith('.scrim?raw')) return null
+      return `export default ${JSON.stringify(stripScrim(fs.readFileSync(id.slice(0, -'?raw'.length), 'utf8')))}`
+    },
+  }
+}
+
 // `vite build --mode portal` (`npm run build:portal`): relative asset URLs, so the zip plays from any sub-path.
 // `vite build --mode turntable` (`npm run turntable`): only the dev pages (the enemy turntable, the ride elements), into dist-turntable/.
 export default defineConfig(({ mode }) => {
@@ -53,7 +67,7 @@ export default defineConfig(({ mode }) => {
   const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
   return {
     base: portal ? './' : '/',
-    plugins: portal ? [react(), stripBlockoutNotes(), minifyGlslPlugin(), portalHtml()] : [react(), stripBlockoutNotes(), minifyGlslPlugin()],
+    plugins: portal ? [react(), stripBlockoutNotes(), minifyGlslPlugin(), stripScrimNotesPlugin(), portalHtml()] : [react(), stripBlockoutNotes(), minifyGlslPlugin(), stripScrimNotesPlugin()],
     define: {
       // Vercel sets VERCEL=1 during its builds; gates Web Analytics (src/app/analyticsGate.ts). Portal builds never send it.
       __BUILT_ON_VERCEL__: JSON.stringify(process.env.VERCEL === '1' && !portal),
