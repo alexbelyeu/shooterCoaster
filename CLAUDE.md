@@ -82,9 +82,10 @@ smoke step checks, or when a failure needs more than its summary line.
 React 19 + @react-three/fiber 9 + drei + @react-three/postprocessing, three 0.172,
 Web Audio (procedural music and SFX, no audio library), zustand (state),
 framer-motion (UI), Vite 6, TypeScript strict. Fonts (Ultra, Big Shoulders; Lobster for the logo) are self-hosted from `public/fonts/` (OFL, Ultra Apache 2.0); the game makes no
-third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel: every push to
-`main` goes to production at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it). Preview deployments
-are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. `vercel.json` rewrites only
+third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it).
+A merge to `main` is **not** live at once: `deploy.yml` ships main's head daily at 05:00 UTC, when Alex starts it (Deploy now in the
+control center), and after every green CI on `main` while an `agent:prod-broken` issue is open (`scripts/deploy.cjs`). Vercel builds no
+push itself (`git.deploymentEnabled` in `vercel.json`: Standard build minutes are billed) — verification happens in CI. `vercel.json` rewrites only
 the `/go/<campaign>` landing paths to the game; any other unknown path gets `public/404.html` with a real 404,
 and it sets the security headers, a year's `immutable` cache on Vite's hashed `/assets/*` (so nothing unhashed goes in
 `public/assets/`) and `no-cache` on `/sw.js`; `scripts/vercelRoutes.mjs` models the routing and headers, which `scripts/site.test.ts` checks (with the share card, manifest and icons) and `e2e/prod-check.mjs` holds the live site to. `index.html` carries
