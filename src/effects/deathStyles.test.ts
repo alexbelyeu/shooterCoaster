@@ -5,6 +5,7 @@ import {
   BOSS_DEFEAT_DEATH_STYLE,
   BOSS_PART_DEATH_STYLE,
   DEATH_SLOTS,
+  drawnSlots,
   GOLDEN_BALLOON_DEATH_STYLE,
   CHUNKS_PER_SLOT,
   DEATH_STYLES,
@@ -171,5 +172,18 @@ describe('pickDeathSlot', () => {
   it('steals the oldest active slot when full, and clears it', () => {
     const slots = [3, 1, 2].map((serial) => ({ active: true, needsZero: false, serial }))
     expect(pickDeathSlot(slots)).toEqual({ index: 1, clear: true })
+  })
+})
+
+describe('drawnSlots', () => {
+  const slot = (active: boolean) => ({ active, needsZero: !active, serial: 0 })
+
+  it('draws one slot when the pool is idle', () => {
+    expect(drawnSlots(Array.from({ length: DEATH_SLOTS }, () => slot(false)))).toBe(1)
+  })
+
+  it('draws up to the highest live slot, gaps included', () => {
+    expect(drawnSlots([slot(true), slot(false), slot(true), slot(false)])).toBe(3)
+    expect(drawnSlots(Array.from({ length: DEATH_SLOTS }, () => slot(true)))).toBe(DEATH_SLOTS)
   })
 })

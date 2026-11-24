@@ -114,6 +114,15 @@ export function pickDeathSlot(slots: readonly SlotState[]): { index: number; cle
   return { index, clear: slot.active || slot.needsZero }
 }
 
+/**
+ * Slots the pool draws: up to the highest live one (at least one, so the programs stay in use). `pickDeathSlot` fills
+ * the lowest free slot first, so an idle pool draws one slot's instances instead of all `DEATH_SLOTS` at zero scale.
+ */
+export function drawnSlots(slots: readonly SlotState[]): number {
+  for (let i = slots.length - 1; i > 0; i--) if (slots[i].active) return i + 1
+  return 1
+}
+
 const layer = (l: Partial<DeathLayer> & Pick<DeathLayer, 'shape' | 'count' | 'colors' | 'speed'>): DeathLayer => ({
   glow: 1, up: 0, drag: 2.5, gravity: 0, size: 2, spin: 0, hold: 0, ...l,
 })
