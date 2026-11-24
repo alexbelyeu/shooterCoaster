@@ -15,7 +15,7 @@ import {
 } from './weaponModel'
 import {
   SHOT_AIM_HOLD_MS, TRACER_MS, TRACER_RANGE, WEAPON_RECOIL_BACK, WEAPON_RECOIL_MS, WEAPON_RECOIL_SCALE,
-  WEAPON_MIN_AIM_DIST, WEAPON_RECOIL_PITCH, clampWeaponAim, recoilEnvelope, weaponDepth, weaponLayout,
+  WEAPON_MIN_AIM_DIST, WEAPON_RECOIL_PITCH, clampWeaponAim, recoilEnvelope, recoilKickAxis, weaponDepth, weaponLayout,
   type WeaponDepth, type WeaponLayout,
 } from './weaponLayout'
 import { WEAPONS } from './weapons/weaponTypes'
@@ -40,7 +40,7 @@ const _v = new THREE.Vector3()
 const _dir = new THREE.Vector3()
 const _side = new THREE.Vector3()
 const _normal = new THREE.Vector3()
-const _xAxis = new THREE.Vector3(1, 0, 0)
+const _kickAxis = new THREE.Vector3()
 const _zAxis = new THREE.Vector3(0, 0, 1)
 const _corner = new THREE.Vector3()
 const _layout: WeaponLayout = { x: 0, y: 0, unitPx: 0 }
@@ -168,13 +168,14 @@ export default function WeaponViewModel() {
     if (env > 0) {
       _v.set(0, 0, WEAPON_RECOIL_BACK * scale * env).applyQuaternion(gun.quaternion)
       gun.position.add(_v)
-      _qRecoil.setFromAxisAngle(_xAxis, WEAPON_RECOIL_PITCH * env)
-      _q.copy(gun.quaternion).multiply(_qRecoil)
-      gun.quaternion.copy(_q)
+      _dir.set(0, 0, -1).applyQuaternion(gun.quaternion)
+      if (recoilKickAxis(_dir, _pivot, _kickAxis)) _qRecoil.setFromAxisAngle(_kickAxis, WEAPON_RECOIL_PITCH * env)
+      else _qRecoil.identity()
+      gun.quaternion.premultiply(_qRecoil)
     }
     gun.updateMatrix()
     // Undo the recoil rotation on the stored aim so the slerp target stays clean.
-    if (env > 0) gun.quaternion.multiply(_qRecoil.invert())
+    if (env > 0) gun.quaternion.premultiply(_qRecoil.invert())
 
     anchor.tip.copy(TIP).applyMatrix4(gun.matrix)
     anchor.size = FLASH_SIZE * scale
