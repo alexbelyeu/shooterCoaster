@@ -52,6 +52,9 @@ export const TITAN_DEFEAT = {
   sinkDepth: 900,
 } as const
 
+/** Where its break bursts on defeat, in its local frame: chest, shoulders, head. One explosion slot each. */
+export const TITAN_BREAK_POINTS: readonly (readonly [number, number, number])[] = [[0, 820, 60], [300, 1050, 0], [-300, 1050, 0], [0, 1200, 30]]
+
 export const TITAN_PERCH: PerchConfig = {
   slots: [
     [1650, 450],

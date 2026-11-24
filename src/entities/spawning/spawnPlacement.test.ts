@@ -21,8 +21,9 @@ import {
   AIR_CLEARANCE, ENTRY_SECONDS_MAX, FORMATIONS, RIDE_PACE_SLACK, facingBack, NEAR_FIELD, clampToBounds, clearOfKeepOff, entryPoint, formationFrame, formationSlots, groupStep,
   indexAhead, insideBounds, marchHeading, marchMoving, outsideNearField, placeFormationWave, placeTracksideWave, slotOffset, trackPoint,
   inRiderFrame, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge, riderFrame, trackTangent, trackView, tracksideAhead, tracksideBand, tracksideSlots,
-  type ChoreographedFormation, type RideAhead, type Vec3,
+  type ChoreographedFormation, type RideAhead,
 } from './spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 import {
   ENEMY_PLACEMENT, SWARM_SPACING, WALL_START_SPREAD, WATER_DEPTH, WATER_Y, bystanderSlots, placedBesideTrack, readableScatterSpawn, swarmSlots, wallPoint,
   type ScatterBand,

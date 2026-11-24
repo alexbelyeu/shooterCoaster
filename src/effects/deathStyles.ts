@@ -43,8 +43,11 @@ export interface DeathStyle {
   sound: KillSound
 }
 
-/** Concurrent explosions; unlit particles and chunks per explosion. */
-export const DEATH_SLOTS = 8
+/**
+ * Concurrent explosions; unlit particles and chunks per explosion. The Magma Titan's defeat, the busiest moment,
+ * takes 9 (its crown, 4 confetti, 4 break bursts): 10 leaves one for a kill alongside (`deathStyles.test.ts`).
+ */
+export const DEATH_SLOTS = 10
 export const GLOW_PER_SLOT = 48
 export const CHUNKS_PER_SLOT = 12
 
@@ -111,6 +114,15 @@ export function pickDeathSlot(slots: readonly SlotState[]): { index: number; cle
   return { index, clear: slot.active || slot.needsZero }
 }
 
+/**
+ * Slots the pool draws: up to the highest live one (at least one, so the programs stay in use). `pickDeathSlot` fills
+ * the lowest free slot first, so an idle pool draws one slot's instances instead of all `DEATH_SLOTS` at zero scale.
+ */
+export function drawnSlots(slots: readonly SlotState[]): number {
+  for (let i = slots.length - 1; i > 0; i--) if (slots[i].active) return i + 1
+  return 1
+}
+
 const layer = (l: Partial<DeathLayer> & Pick<DeathLayer, 'shape' | 'count' | 'colors' | 'speed'>): DeathLayer => ({
   glow: 1, up: 0, drag: 2.5, gravity: 0, size: 2, spin: 0, hold: 0, ...l,
 })
@@ -171,7 +183,7 @@ export const GOLDEN_BALLOON_DEATH_STYLE: DeathStyle = {
 
 /**
  * A boss's defeat: a fairground confetti shower. One slot holds 48 pieces, so `BossBase` fires it at each of
- * `BOSS_DEFEAT_BURST_OFFSETS` (4 of the pool's 8 slots) to spread ~190 pieces across the boss. No flash, no sound
+ * `BOSS_DEFEAT_BURST_OFFSETS` (4 of the pool's `DEATH_SLOTS`) to spread ~190 pieces across the boss. No flash, no sound
  * of its own: the defeat's sting plays it.
  */
 export const BOSS_DEFEAT_DEATH_STYLE: DeathStyle = {
