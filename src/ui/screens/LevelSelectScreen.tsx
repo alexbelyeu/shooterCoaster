@@ -3,7 +3,8 @@ import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { dailyKey, dailyLevel, msUntilNextUtcDay } from '@/levels/daily'
 import { biomeTheme } from '@/ui/theme'
-import { FairBoard, FairStar, FairStars } from '@/ui/Fair'
+import { FairBoard, FairMedal, FairStar, FairStars } from '@/ui/Fair'
+import { levelMedals } from '@/levels/medals'
 import { prefersReducedMotion } from '@/ui/reducedMotion'
 import { prepareSfx, sfx } from '@/audio/sfx'
 import LevelPostcard from './LevelPostcard'
@@ -11,6 +12,7 @@ import {
   STARS_PER_LEVEL,
   buildDailyCard,
   buildLevelCards,
+  medalsLine,
   nextLevelIndex,
   isNavKey,
   navigateCards,
@@ -56,13 +58,14 @@ export default function LevelSelectScreen() {
   const setPhase = useGameStore((s) => s.setPhase)
   const savedScores = useGameStore((s) => s.savedScores)
   const leaderboards = useGameStore((s) => s.leaderboards)
+  const savedMedals = useGameStore((s) => s.savedMedals)
   const isLevelUnlocked = useGameStore((s) => s.isLevelUnlocked)
   const savedDaily = useGameStore((s) => s.savedDaily)
   const dailyStreak = useGameStore((s) => s.dailyStreak)
 
   const cards = useMemo(
-    () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked, leaderboards),
-    [savedScores, isLevelUnlocked, leaderboards],
+    () => buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked, leaderboards, savedMedals, levelMedals),
+    [savedScores, isLevelUnlocked, leaderboards, savedMedals],
   )
   const today = useUtcDayKey()
   const daily = useMemo(
@@ -186,7 +189,7 @@ export default function LevelSelectScreen() {
               aria-disabled={!card.unlocked}
               aria-label={
                 card.unlocked
-                  ? `${card.name}${night ? ', Night Ride' : ''}: ${card.stars} of ${STARS_PER_LEVEL} stars${card.bestScore > 0 ? `, best ${card.bestScore}${card.bestInitials ? ` by ${card.bestInitials}` : ''}` : ''}`
+                  ? `${card.name}${night ? ', Night Ride' : ''}: ${card.stars} of ${STARS_PER_LEVEL} stars${card.bestScore > 0 ? `, best ${card.bestScore}${card.bestInitials ? ` by ${card.bestInitials}` : ''}` : ''}, ${medalsLine(card.medals)}`
                   : `${card.name}: locked${card.unlockedBy ? `, earn a star on ${card.unlockedBy}` : ''}`
               }
               onFocus={() => setFocusIndex(i)}
@@ -205,6 +208,13 @@ export default function LevelSelectScreen() {
                         {card.bestScore > 0 && card.bestInitials && (
                           <span className="level-card-initials">{card.bestInitials}</span>
                         )}
+                      </span>
+                      <span className="level-medals" aria-hidden="true">
+                        {card.medals.map((m) => (
+                          <span key={m.id} className="level-medal" data-medal={m.id} data-earned={m.earned} title={`${m.name}. ${m.line}`}>
+                            <FairMedal earned={m.earned} />
+                          </span>
+                        ))}
                       </span>
                     </span>
                   ) : (
