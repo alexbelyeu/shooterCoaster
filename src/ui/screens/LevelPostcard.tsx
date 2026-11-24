@@ -142,13 +142,17 @@ const SCENES: Record<BiomeType, Scene> = {
       <path d="M0 92 H200 V100 H0Z" fill="#08060f" />
     </>
   ),
-  // Jungle Ruins (scaffolded): a stand-in until the world's landmark is drawn here
+  // Jungle Ruins: the stepped temple and its shrine over the canopy, the waterfall beside it, the track dropping past
   jungle: (t) => (
     <>
-      <circle cx="160" cy="26" r="8" fill={t.accent2} />
-      <path d="M118 90 L128 30 L138 90Z" fill="#6f6660" />
-      <path d="M0 80 Q50 70 100 78 T200 74 V100 H0Z" fill="#33402c" />
-      <path d="M8 74 Q50 30 92 62 T192 50" stroke={t.accent} strokeWidth="3" fill="none" />
+      <path d="M150 100 V30 H176 V100Z" fill="#4e5a48" />
+      <path d="M156 30 V96 M164 30 V96 M171 30 V96" stroke="#e8f4f0" strokeWidth="2.5" opacity="0.75" />
+      <path d="M52 100 V82 H58 V70 H64 V58 H70 V46 H76 V36 H104 V46 H110 V58 H116 V70 H122 V82 H128 V100Z" fill="#6f6a52" />
+      <path d="M82 36 V24 H98 V36Z" fill="#5a5644" />
+      <path d="M87 36 V29 H93 V36Z" fill="#1c2416" />
+      <path d="M0 100 V78 Q12 66 24 76 Q36 62 50 74 Q60 84 70 78 Q84 70 96 80 Q112 70 128 78 Q140 66 152 76 Q168 64 184 74 Q194 68 200 72 V100Z" fill="#2d5a26" />
+      <path d="M0 100 V88 Q30 80 60 88 T120 86 T200 88 V100Z" fill="#1d3a18" />
+      <path d="M6 58 Q40 30 76 70 T190 52" stroke={t.accent} strokeWidth="3" fill="none" />
     </>
   ),
 }

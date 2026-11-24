@@ -79,10 +79,10 @@ export const BIOME_UI: Record<BiomeType, BiomeUITheme> = {
     sky: [['#05061a', 0], ['#1a1434', 0.55], ['#3a2a48', 1]], // atmosphere.ts city.sky, zenith to the hazy horizon
   }),
   jungle: theme({
-    accent: '#eb4794', // scaffolded: pick the world's accent
-    glow: 'rgba(235, 71, 148, 0.55)',
-    accent2: '#42f048',
-    sky: [['#4d1a31', 0], ['#a63f6f', 0.6], ['#f0c2d7', 1]],
+    accent: '#ff8a1c', // the toucan's bill (`TOUCAN_BILL`)
+    glow: 'rgba(255, 138, 28, 0.55)',
+    accent2: '#f7d43a', // its bib
+    sky: [['#1f4a5e', 0], ['#3f7f9c', 0.55], ['#c9d8bf', 1]], // atmosphere.ts jungle.sky, zenith to the misty horizon
   }),
 }
 
