@@ -163,7 +163,7 @@ When level1 is in the run, a `pickup` step checks its 2–4 weapon pickups (`pic
 (spread) with time frozen and shoots it with a real bullet: `weaponState()` must report the spread gun, the next pull must
 count 3 shots and draw 3 bullets, and `level1-pickup.png` holds the tinted tracer with the `.hud-weapon` badge clear of the HUD;
 the pickup must hold through a pause, expire on game time, and a restart must bring back the blaster and every pickup.
-For each level with a Night Ride in the run (`STEP_LEVELS.night`: level1, level2, level3; #829, #880), a `night` step (nightly)
+For each level with a Night Ride in the run (`STEP_LEVELS.night`: level1 to level6; #829, #880, #994), a `night` step (nightly)
 rides it (`startLevel(id, seed, 'night')`, `variant()`) to the ride step's moment: the run must be `night`, the sky band (top 30%)
 dark (`NIGHT_CHECK.maxSkyLuma`), the enemies as readable as the ride's probe asks (`<id>-night-enemy.png`) and the scene inside
 the level's `scene` budget (`<id>-night.png`); its line ends with `programs after warm-up: +N` (failed under `--gate-programs`).
