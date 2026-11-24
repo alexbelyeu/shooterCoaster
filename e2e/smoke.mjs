@@ -3333,6 +3333,8 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
       quality: [...document.querySelectorAll('[aria-labelledby="settings-quality-label"] [role="radio"]')].map((el) => el.textContent),
       sliders: document.querySelectorAll('.settings-card input[type="range"]').length,
       switches: document.querySelectorAll('.settings-card input[role="switch"]').length,
+      // The Vibration toggle (#995) shows only on a touch-first device that can vibrate (the phone run).
+      vibration: typeof navigator.vibrate === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches,
       smallTargets: targets.filter((el) => el.getBoundingClientRect().height < 44).length,
     }
   })
@@ -3343,8 +3345,9 @@ async function settingsLayout(page, label, { fromTitle = false } = {}) {
   if (r.hScroll) problems.push('settings scroll sideways')
   if (r.quality.length !== 4) problems.push(`${r.quality.length} quality options (${r.quality.join('/')}), expected Auto / Low / Med / High`)
   if (r.sliders !== 2) problems.push(`${r.sliders} volume sliders, expected music + effects`)
-  const switches = fromTitle ? 4 : 3
-  if (r.switches !== switches) problems.push(`${r.switches} switches, expected show FPS + ghost + reduced motion${fromTitle ? ' + internal device' : ''}`)
+  const switches = 3 + (r.vibration ? 1 : 0) + (fromTitle ? 1 : 0)
+  if (r.switches !== switches)
+    problems.push(`${r.switches} switches, expected show FPS + ghost + reduced motion${r.vibration ? ' + vibration' : ''}${fromTitle ? ' + internal device' : ''}`)
   if (r.smallTargets) problems.push(`${r.smallTargets} settings control(s) under the 44 px touch target`)
   return { ...r, problems: problems.map((p) => `${label}: ${p}`) }
 }

@@ -7,6 +7,8 @@ import { usePrefersReducedMotion, useSystemPrefersReducedMotion } from '@/ui/red
 import { browserStorage, isInternalBrowser, setInternalBrowser } from '@/app/analyticsGate'
 import { isInRun } from '@/store/startPhase'
 import { FairBoard } from '@/ui/Fair'
+import { touchFirst } from '@/ui/touchFirst'
+import { canVibrate } from '@/input/useHaptics'
 
 const SHAKE_LABELS: Record<ScreenShakeLevel, string> = { off: 'Off', reduced: 'Reduced', full: 'Full' }
 
@@ -141,6 +143,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const fromTitle = useGameStore((g) => !isInRun(g.phase))
   const reducedMotion = usePrefersReducedMotion()
   const systemReducedMotion = useSystemPrefersReducedMotion()
+  const showVibration = canVibrate() && touchFirst()
   const screen = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
@@ -211,6 +214,15 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
               disabled={systemReducedMotion}
               onChange={s.setReducedMotion}
             />
+            {showVibration && (
+              <ToggleRow
+                label="Vibration"
+                note={reducedMotion ? 'Off (reduced motion)' : 'A buzz on kills and boss hits'}
+                checked={s.vibration && !reducedMotion}
+                disabled={reducedMotion}
+                onChange={s.setVibration}
+              />
+            )}
           </section>
 
           <section className="settings-group">
