@@ -4,6 +4,7 @@
  * (what each covers: e2e/README.md "Production") and rewrites `prod-check.json` after each, for scripts/prod-alert.cjs.
  *   npm run build && node e2e/prod-check.mjs --url https://scoaster.com
  *   npm run build && node e2e/prod-check.mjs     # serves dist/ on localhost the way vercel.json says
+ *   npm run build && node e2e/prod-check.mjs --checks assets,routes,offline   # a subset (CI's `offline` job, #1004)
  */
 import { devices } from 'playwright'
 import fs from 'node:fs'
@@ -26,6 +27,13 @@ const OUT = path.resolve(args.out ?? 'e2e-results')
 const LEVEL = args.level ?? 'level1'
 const SEED = Number(args.seed ?? 1337)
 const SHOT_TIMEOUT = 120000
+const ALL_CHECKS = ['assets', 'routes', 'title', 'level', 'phone', 'offline']
+const CHECKS = args.checks ? args.checks.split(',') : ALL_CHECKS
+const unknown = CHECKS.filter((c) => !ALL_CHECKS.includes(c))
+if (unknown.length) {
+  console.error(`Unknown --checks ${unknown.join(', ')}; known: ${ALL_CHECKS.join(', ')}`)
+  process.exit(2)
+}
 const vercel = JSON.parse(fs.readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'))
 fs.mkdirSync(OUT, { recursive: true })
 
@@ -34,6 +42,7 @@ const save = () => fs.writeFileSync(path.join(OUT, 'prod-check.json'), JSON.stri
 
 /** A throw is a failed check, not a crash. */
 async function check(id, fn) {
+  if (!CHECKS.includes(id)) return
   report.running = id
   save()
   const started = Date.now()
@@ -288,12 +297,14 @@ async function run() {
   console.log(`Deploy health check of ${base} (local build: ${path.relative(process.cwd(), DIST) || '.'})`)
   await check('assets', () => assetsCheck(base))
   await check('routes', () => routesCheck(base))
-  const browser = await launchBrowser(['--autoplay-policy=no-user-gesture-required'])
-  await check('title', () => titleCheck(browser, base))
-  await check('level', () => levelCheck(browser, base))
-  await check('phone', () => phoneCheck(browser, base))
-  await check('offline', () => offlineCheck(browser, base))
-  await browser.close()
+  if (CHECKS.some((c) => !['assets', 'routes'].includes(c))) {
+    const browser = await launchBrowser(['--autoplay-policy=no-user-gesture-required'])
+    await check('title', () => titleCheck(browser, base))
+    await check('level', () => levelCheck(browser, base))
+    await check('phone', () => phoneCheck(browser, base))
+    await check('offline', () => offlineCheck(browser, base))
+    await browser.close()
+  }
   local?.server.close()
   report.finished = true
   save()
