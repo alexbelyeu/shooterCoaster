@@ -53,7 +53,7 @@ export const YETI_RISE = {
   sinkDepth: 260,
 } as const
 
-/** Holds a ridge until the rider is about to pass it (or `holdS`), then lopes to the next. */
+/** Holds a ridge until the rider is about to pass it, loses sight of it (`unseenS`) or `holdS` is up, then lopes to the next. */
 export const YETI_ROAM = {
   holdS: 10,
   lopeS: 1.6,
@@ -61,6 +61,11 @@ export const YETI_ROAM = {
   hopHeight: 70,
   minAhead: 520,
   maxOffAngle: 1.05,
+  /** Out of the rider's look (`viewAngle` either side) or hidden by the snow this long, it lopes to a ridge in sight (#937). */
+  unseenS: 1,
+  viewAngle: 0.7,
+  /** Its chest at most this far above the rider's eye per unit away (~31°): up a valley wall it stands over the top of the frame. */
+  maxRise: 0.6,
 } as const
 
 export const YETI_PERCH: PerchConfig = {
@@ -73,6 +78,10 @@ export const YETI_PERCH: PerchConfig = {
     [1250, 760],
     [1600, 480],
     [1100, 860],
+    // Down the valley floor ahead, for when the walls hide every ridge (level 4 from 40 s, #937).
+    [1400, 300],
+    [1600, 320],
+    [1850, 340],
   ],
   footprint: 230,
   clearance: 45,
