@@ -182,7 +182,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
-      branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 17 },
+      branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 19 },
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},
