@@ -51,15 +51,16 @@ const LEVELS: LevelConfig[] = [
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
     ...paceLevel({
       // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all
-      // thirty in view (#864: draws); a first V over the lift hill's crest, where the climb pitches the view at the sky (5 s);
-      // the second pack on the sand before the door, under the drop (11 s); the sandstorm's V meets the car out of the Pyramid (16 s), the
-      // last V comes in over the climb to the airtime crest (28 s).
+      // thirty in view (#864: draws); two Vs up the lift hill (2 s, 6 s), one group each, so the sky holds crows until the
+      // crest (#937); the second pack on the sand before the door, under the drop (11 s); the sandstorm's V meets the car
+      // out of the Pyramid (16 s); the last V's groups spread from the climb to the airtime crest (25 s) on to the boss.
       waves: [
-        { type: 'scorpion', count: 12, waveLabel: 'Incoming!', weight: 5 },
-        { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 6 },
+        { type: 'scorpion', count: 12, waveLabel: 'Incoming!', weight: 2 },
+        { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 4 },
+        { type: 'crow', count: 9, formation: 'v', weight: 5 },
         { type: 'scorpion', count: 18, waveLabel: 'Out of the Sand!', weight: 5 },
-        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 12 },
-        { type: 'crow', count: 39, waveLabel: 'More Crows!', formation: 'v', weight: 17 },
+        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 9 },
+        { type: 'crow', count: 30, waveLabel: 'More Crows!', formation: 'v', weight: 20 },
       ],
       boss: 'giantScorpion',
     }),
@@ -193,28 +194,73 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 55 * 15 + 25 * 20 + 60 + 60 + 400, // 55 drones and 25 bots, 1325, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1845
+    maxScore: 57 * 15 + 25 * 20 + 60 + 60 + 400, // 57 drones and 25 bots, 1355, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1875
     message: 'You cleared Neon Metropolis!',
-    nextLevel: null,
+    nextLevel: 'level8',
     // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
     // The street and the air take turns (#963): billboard bots line the launch's avenue, where the rider is at street
-    // level, hover drones patrol the canyons in Vs, rings and a spiral from the lift on (the towers hide the pavements
-    // from up there), then the Helicopter (#325) arrives at 40 s over the helix. Every drone wave is a formation ahead
-    // of the rider, each drone moved onto the street its approach sees best (`clearOfTowers`): scattered over the whole
-    // city, or in the cross streets beside the ride's avenue, the towers hid them (the pacing gate, #950).
+    // level, hover drones patrol the canyons in a V and rings from the lift on (the towers hide the pavements from up
+    // there), then the Helicopter (#325) arrives at 40 s over the helix. Every drone wave is a formation ahead of the
+    // rider, each drone moved onto the street its approach sees best (`clearOfTowers`): scattered over the whole city, or
+    // in the cross streets beside the ride's avenue, the towers hid them (the pacing gate, #950). Rings, not a spiral:
+    // a ring's anchor is on the rails ahead, where the rider looks, and a spiral's 260 off to the side, behind the
+    // towers; the weights bring each wave in about a second sooner, before the last one is all shot or out of sight.
     ...paceLevel({
       waves: [
         { type: 'billboardBot', count: 12, waveLabel: 'Billboard Bots!', weight: 0.75 },
-        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v' },
-        { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring' },
+        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.8 },
+        { type: 'hoverDrone', count: 10, waveLabel: 'Surveillance Ring!', formation: 'ring' },
         { type: 'billboardBot', count: 13, waveLabel: 'Street March!' },
-        { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'spiral' },
-        { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.5 },
+        { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'ring' },
+        { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.9 },
       ],
       boss: 'helicopter',
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},
+  },
+  {
+    id: 'level8',
+    name: 'Jungle Ruins',
+    description: 'Toucans over the temple ruins',
+    order: 8,
+    biome: 'jungle',
+    maxScore: 83 * 15 + 5 * 65 + 400, // 1245 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 1970
+    message: 'You cleared Jungle Ruins!',
+    nextLevel: null,
+    // A first cut on the legacy curve1 until the ride kit's storyboard (#1009, `jungleTrack.ts`); `jungleLayout.test.ts`
+    // keeps the temple in front of the drop meanwhile.
+    ride: {
+      track: {
+        varA: 3,
+        varB: 17,
+        varC: 4,
+        scalar: 20,
+        curve: 'curve1',
+        ride: 'v2',
+        mechanics: [{ kind: 'station', from: 0, to: 0.01, speed: 120 }],
+        rideV2: { gravity: 480, crawl: 90, drag: 0.0012, zones: [{ kind: 'lift', from: 0.085, to: 0.122, speed: 60 }] },
+        color1: 0xd8c9a0,
+        color2: 0x3f8a4a,
+      },
+    },
+    // Toucans over the canopy in Vs, rings and spirals ahead of the rider, one wave every few seconds from the
+    // station to the temple, then the boss slot, held by the Golden Blimp until the guardian (#869). Each V is one
+    // group of 9: on this curve a second group would sit within reading range of the rider from the wave's start.
+    ...paceLevel({
+      waves: [
+        { type: 'toucan', count: 9, waveLabel: 'Toucans!', formation: 'v', weight: 0.75 },
+        { type: 'toucan', count: 10, waveLabel: 'Over the Canopy!', formation: 'ring' },
+        { type: 'toucan', count: 9, waveLabel: 'The Flock!', formation: 'v' },
+        { type: 'toucan', count: 16, waveLabel: 'Temple Run!', formation: 'spiral' },
+        { type: 'toucan', count: 9, waveLabel: 'Bills Out!', formation: 'v' },
+        { type: 'toucan', count: 9, waveLabel: 'Down the Falls!', formation: 'v' },
+        { type: 'toucan', count: 21, waveLabel: 'The Whole Jungle!', formation: 'ring', weight: 2.5 },
+      ],
+      boss: 'goldenBlimp',
+    }),
+    starThresholds: [0.25, 0.55, 0.85],
+    environment: { hasTrees: true, treeCount: 500 },
   },
 ]
 

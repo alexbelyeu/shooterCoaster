@@ -1011,7 +1011,9 @@ canvas {
 .level-card {
   --tilt: -0.8deg;
   display: flex;
-  width: clamp(200px, 21vw, 258px);
+  /* Five to a row at desktop widths (5 x 206 + 4 gaps fits the 1120px grid), so eight ride boards and the
+     Daily Run ticket fit a 1280x720 screen as two rows (#959). */
+  width: clamp(176px, 15.6vw, 206px);
   min-height: 44px;
   padding: 0;
   border: 0;
@@ -1366,7 +1368,7 @@ canvas {
   }
 
   .level-card {
-    width: clamp(150px, 21vw, 200px);
+    width: clamp(150px, 15.6vw, 180px);
   }
 
   .level-board .level-card-desc {

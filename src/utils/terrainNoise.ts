@@ -114,6 +114,32 @@ export interface NoiseTerrainConfig {
   transitionWidth: number
   /** Side length of the rendered terrain mesh (`getTerrainMeshSize`). */
   meshSize: number
+  /** Level ground cut into the hills for a landmark to stand on (the jungle's temple, #870). */
+  terraces?: readonly Terrace[]
+}
+
+/** Flat ground at height `y` within `radius` of (x, z), easing back into the noise over the next `falloff`. */
+export interface Terrace {
+  x: number
+  z: number
+  y: number
+  radius: number
+  falloff: number
+}
+
+/** `height` levelled towards each terrace it stands on or near. */
+export function onTerraces(terraces: readonly Terrace[], x: number, z: number, height: number): number {
+  for (const t of terraces) {
+    const d = Math.hypot(x - t.x, z - t.z)
+    if (d >= t.radius + t.falloff) continue
+    const k = d <= t.radius ? 1 : 1 - smoothstep01((d - t.radius) / t.falloff)
+    height += (t.y - height) * k
+  }
+  return height
+}
+
+function smoothstep01(t: number): number {
+  return t * t * (3 - 2 * t)
 }
 
 /** An interior: its ground is the biome's own `BiomeDefinition.floor` (`groundOf`, `worlds.ts`), never noise; only the floor mesh's size. Exactly the biomes with a `floor` (terrainNoise.test.ts). */
@@ -212,6 +238,26 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     flatRadius: 2600,
     transitionWidth: 1200,
     meshSize: 6000,
+  },
+  // Jungle Ruins (#870): steep wooded hills close round the ride, the track's corridor carving the valleys it runs in.
+  jungle: {
+    frequency: 0.0011,
+    amplitude: 380,
+    octaves: 5,
+    persistence: 0.45,
+    lacunarity: 2.2,
+    exponent: 1.2,
+    ridgeMode: false,
+    baseY: 0,
+    flatRadius: 350,
+    transitionWidth: 900,
+    meshSize: 6000,
+    // The temple's terrace (biomes/jungle/config.ts TEMPLE), ahead of the first drop in the hills beyond the ride, and the waterfall's.
+    terraces: [
+      { x: 700, z: -1900, y: 80, radius: 470, falloff: 320 },
+      // The waterfall's pool (FALLS), right of the temple seen from the ride
+      { x: 1350, z: -1350, y: 70, radius: 200, falloff: 260 },
+    ],
   },
 }
 
@@ -337,6 +383,8 @@ export function createHeightFunction(
     if (envelope === 0) {
       height = config.baseY
     }
+
+    if (config.terraces) height = onTerraces(config.terraces, x, z, height)
 
     // --- Track corridor suppression ---
     // Find the lowest track Y among all nearby samples, then suppress terrain below it.

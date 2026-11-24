@@ -10,6 +10,7 @@ import { bossMaxScore, type BossSpec } from '@/entities/bosses/bossModel'
 export const SCORE_VALUES: Record<EnemyType, number> = {
   balloon: 13,
   crow: 15,
+  toucan: 15,
   scorpion: 20,
   shark: 25,
   jellyfish: 18,
