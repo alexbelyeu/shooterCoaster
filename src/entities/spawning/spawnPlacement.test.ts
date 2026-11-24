@@ -31,6 +31,8 @@ import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
+import { ORBITS, orbitPoint, placeOrbit } from './swimOrbit'
+import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 
 /** Share of trackside enemies in front of the rider on their approach, on every level (level 6's tight spline too, #543). */
 const IN_FRONT_SHARE = 0.85
@@ -321,13 +323,19 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
       const placed = placeTracksideWave({ table, riderIndex, camera, type: wave.type, groundFn, slots, ride, bounds, keepOff })
       expect(placed).toHaveLength(wave.count)
       placed.forEach((p, i) => {
+        // Where along the track the slot ended up: the sea search moves a water slot along the band (#356).
+        let ahead = tracksideAhead(table, surface, slots[i], ride)
         if (surface === 'water') {
           let lateral = Infinity
           for (let a = band.aheadMin; a <= band.aheadMax; a += 10) {
             const j = indexAhead(table, riderIndex, a)
-            lateral = Math.min(lateral, Math.hypot(p.x - table.x[j], p.z - table.z[j]))
+            const d = Math.hypot(p.x - table.x[j], p.z - table.z[j])
+            if (d < lateral) [lateral, ahead] = [d, a]
           }
           expect(lateral).toBeLessThan(band.sideMax + 1)
+          // A shark laps a circle through its spot: `sideMin` off every rail of the lap (#922); a jellyfish only off its
+          // own stretch's, and may drift nearer another stretch or be pushed out of the near field.
+          if (ORBITS[wave.type]) expect(railGap(table, p)).toBeGreaterThan(band.sideMin - 1)
           expect(groundFn(p.x, p.z)).toBeLessThan(WATER_DEPTH)
           expect(p.y).toBe(WATER_Y)
         } else {
@@ -348,7 +356,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
           expect(p.y).toBeGreaterThan(groundFn(p.x, p.z))
         }
         expect(dist(p, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
-        const near = indexAhead(table, riderIndex, tracksideAhead(table, surface, slots[i], ride) - APPROACH)
+        const near = indexAhead(table, riderIndex, ahead - APPROACH)
         const nearPoint = trackPoint(table, near)
         const forward = trackTangent(table, near)
         total++
@@ -480,6 +488,45 @@ describe('level3 opening jellyfish', () => {
 
   it('keeps the smoke gate (2) through the opening for any seed', () => {
     for (let seed = 1; seed <= 20; seed++) expect(Math.min(...readableThroughOpening(seed)), `seed ${seed}`).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('level3 shark orbits (#356, #922)', () => {
+  const { level, table, groundFn, rideFor, keepOff } = tracksideWorlds.find((w) => w.level.id === 'level3')!
+  const wave = level.enemies.find((w) => w.type === 'shark')!
+  const band = ORBITS.shark!
+  const index = buildTrackIndex(table)
+
+  it('the ocean keeps its sea stacks and rocks off', () => {
+    expect(keepOff.length).toBeGreaterThan(10)
+  })
+
+  it('every circle stays clear of the rails, out of the stacks and rocks, and over open water', () => {
+    const bad: string[] = []
+    for (const seed of [1337, 1, 2, 3, 4, 5]) {
+      const slots = tracksideSlots(wave.count, 'water', createRng(seed))
+      for (const fraction of RIDER_FRACTIONS) {
+        const riderIndex = Math.round(fraction * (table.count - 1))
+        const placed = placeTracksideWave({ table, riderIndex, camera: trackPoint(table, riderIndex), type: wave.type, groundFn, slots, ride: rideFor(wave), keepOff })
+        placed.forEach((p, i) => {
+          const orbit = placeOrbit(p, band, { index, keepOff, groundFn }, createRng(seed * 977 + i))
+          expect(orbit.radius).toBeGreaterThanOrEqual(band.tight)
+          expect(orbit.radius).toBeLessThanOrEqual(band.radiusMax)
+          // Finer than the placement samples it.
+          for (let k = 0; k < 96; k++) {
+            const q = orbitPoint(p, orbit, (k / 96) * Math.PI * 2)
+            const why = index.near(q.x, q.z, band.clearance - 2) ? 'rails'
+              : !clearOfKeepOff({ x: q.x, y: 0, z: q.z }, keepOff, -2) ? 'stack'
+                : groundFn(q.x, q.z) >= WATER_DEPTH + 1 ? 'shore' : null
+            if (why) {
+              bad.push(`seed ${seed} rider ${fraction} shark ${i}: ${why}`)
+              break
+            }
+          }
+        })
+      }
+    }
+    expect(bad).toEqual([])
   })
 })
 
