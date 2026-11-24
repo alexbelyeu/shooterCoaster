@@ -61,8 +61,8 @@ export const YETI_ROAM = {
   hopHeight: 70,
   minAhead: 520,
   maxOffAngle: 1.05,
-  /** Out of the rider's look (`viewAngle` either side) or hidden by the snow this long, it lopes to a ridge in sight (#937). */
-  unseenS: 1,
+  /** Out of the rider's look (`viewAngle` either side) or hidden by the snow this long, it lopes to a ridge in sight (#937). 2 s is the one value the pacing gate passed on level 4 (1 / 1.5 / 2.5 / 3 s: 51–58% with nothing to shoot). */
+  unseenS: 2,
   viewAngle: 0.7,
   /** Its chest at most this far above the rider's eye per unit away (~31°): up a valley wall it stands over the top of the frame. */
   maxRise: 0.6,
