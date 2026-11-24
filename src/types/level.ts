@@ -247,7 +247,7 @@ export interface LevelConfig {
   /**
    * The ride, when the registry carries it: level 1's (the run most players start first) and small hand-written tracks.
    * Every other ride comes with its world's chunk (`World.rides`, #960), so its data is never startup JS: read a level's
-   * ride with `levelRide`, which has it once that chunk is in.
+   * ride with `worlds.ts` `levelRide`, which has it once that chunk is in.
    */
   ride?: LevelRide
   enemies: EnemyWave[]

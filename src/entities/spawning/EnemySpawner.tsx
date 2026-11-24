@@ -128,7 +128,7 @@ function generateEnemies(
     if (wave.bystanders) {
       const { type, count } = wave.bystanders
       if (ENEMY_PLACEMENT[type].scatter !== 'wall') throw new Error(`bystander ${type} must climb a wall`)
-      if (walls.length === 0) throw new Error("bystanders climb the level's walls (LevelConfig.walls)")
+      if (walls.length === 0) throw new Error("bystanders climb the ride's walls (LevelRide.walls)")
       // Their wall is picked when the wave activates, like a swarm's.
       for (const swarm of bystanderSlots(count, rng)) {
         enemies.push({
@@ -146,7 +146,7 @@ function generateEnemies(
     }
     if (scatter === 'swarm') {
       if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} swarms on a wall: no formation`)
-      if (walls.length === 0) throw new Error("wall enemies need the level's walls (LevelConfig.walls)")
+      if (walls.length === 0) throw new Error("wall enemies need the ride's walls (LevelRide.walls)")
       for (const swarm of swarmSlots(wave.count, rng)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside: null, swarm, ...base })
       }

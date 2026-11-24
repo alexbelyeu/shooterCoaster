@@ -34,7 +34,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { medalRun, useGameStore } from '@/store/useGameStore'
 import type { RideVariant, RunMode } from '@/types/game'
-import { getAllLevels, getLevelConfig, levelRide } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
@@ -710,6 +710,9 @@ export const e2eFireworks = {
 /** Written by `shared/ParticleField.tsx` when the e2e flag is on; read through `particles()`. */
 export const e2eParticles = { mounted: false, points: 0, boostPoints: 0, boost: 0 }
 
+/** Written by `canvas/LevelScene.tsx` when the e2e flag is on: the running level's v2 ride beats (its ride is in its world's chunk, #960); read through `rideBeats()`. */
+export const e2eRide: { beats: readonly RideBeat[] } = { beats: [] }
+
 /** Written by `combat/pickups/Pickups.tsx` when the e2e flag is on; read through `pickups()`. */
 export const e2ePickups: { list: readonly LivePickup[] } = { list: [] }
 
@@ -1284,10 +1287,7 @@ export function installE2EApi() {
     rideSpeed: null,
     rideProgress: 0,
     rideFastest: null,
-    rideBeats: () => {
-      const id = useGameStore.getState().currentLevel
-      return (id ? levelRide(id)?.track.rideV2?.beats : undefined) ?? []
-    },
+    rideBeats: () => e2eRide.beats,
     sight: readSight,
     graphics: () => {
       const { quality, reducedMotion } = useSettingsStore.getState()

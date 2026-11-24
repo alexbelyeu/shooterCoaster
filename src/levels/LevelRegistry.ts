@@ -1,4 +1,4 @@
-import type { LevelConfig, LevelRide } from '@/types/level'
+import type { LevelConfig } from '@/types/level'
 import { paceLevel } from './pacing'
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS (#863). Every other generated
 // ride is its world chunk's (`World.rides`), out of the startup JS altogether (#960).
@@ -241,19 +241,6 @@ export function getLevelConfig(id: string): LevelConfig | undefined {
 
 export function getAllLevels(): LevelConfig[] {
   return [...LEVELS].sort((a, b) => a.order - b.order)
-}
-
-/** The rides that came with their worlds' chunks (`addRides`, from `loadWorld`), by level. */
-const arrivedRides = new Map<string, LevelRide>()
-
-/** A world chunk's rides, once it has arrived (`loadWorld`). */
-export function addRides(rides: Readonly<Record<string, LevelRide>>): void {
-  for (const [id, ride] of Object.entries(rides)) arrivedRides.set(id, ride)
-}
-
-/** A level's ride: the registry's (level 1's), else its world's once that chunk is in (#960); undefined before. */
-export function levelRide(id: string): LevelRide | undefined {
-  return getLevelConfig(id)?.ride ?? arrivedRides.get(id)
 }
 
 /** The level whose `nextLevel` is `id` (its star unlocks `id`); null for the first level or an unknown id. */

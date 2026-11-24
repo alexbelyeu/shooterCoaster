@@ -87,7 +87,7 @@ biome or score that already exists is refused, so a second run changes nothing. 
    `LevelRegistry.test.ts`'s finales table and its pinned lap in `track/ridePhysics.test.ts` `LAPS`;
    `node scripts/gen-level-limits.mjs` (the server's limits). **(by hand)** The track (inside the
    extent formula, or an authored spline from a blockout like the gym's; its `LAPS` pin follows; a generated ride,
-   `scripts/gen-ride-levels.mjs`, goes in the world's `world.ts` `rides` and `shippedLevels.ts`, never the registry,
+   `scripts/gen-ride-levels.mjs`, goes in the world's `rides.ts` (`world.ts` hands it on as `rides`; `shippedLevels.ts` finds it there), never the registry,
    which is startup JS, #960), the
    world's own roster and boss; then `maxScore`, the finales row and `gen-level-limits` again.
 4. Enemies **(by hand)**: anything new in `SharedEnemyAssets.ts` (warm-up finds it), the world's `world.ts` (each enemy and the boss its

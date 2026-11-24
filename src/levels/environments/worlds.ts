@@ -1,6 +1,6 @@
 import { createContext, useContext, type ComponentType } from 'react'
 import type { BiomeType, BossType, EnemyType, LevelRide } from '@/types/level'
-import { addRides } from '@/levels/LevelRegistry'
+import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { EnemyProps } from '@/entities/enemies/EnemyBase'
 import type { BossProps } from '@/entities/bosses/BossBase'
 import { lazyChunk } from '@/core/staleBuild'
@@ -56,7 +56,6 @@ export function loadWorld(biome: BiomeType): Promise<World> {
   if (!load) {
     load = lazyChunk(() =>
       WORLD_CHUNKS[biome]().then(({ world }) => {
-        if (world.rides) addRides(world.rides)
         loadedWorlds.set(biome, world)
         return world
       }),
@@ -80,6 +79,12 @@ export function forgetWorldFailures(): void {
 
 /** The biome's world once its chunk has arrived: a level of it mounts without suspending. */
 export const loadedWorld = (biome: BiomeType): World | undefined => loadedWorlds.get(biome)
+
+/** A level's ride: the registry's (level 1's), else its world's once that chunk has arrived (#960); undefined before. */
+export function levelRide(id: string): LevelRide | undefined {
+  const config = getLevelConfig(id)
+  return config && (config.ride ?? loadedWorld(config.biome)?.rides?.[id])
+}
 
 /** A biome's ground, for every caller: an interior's authored `floor` as given, else the noise terrain kept off the track. */
 export function groundOf(biome: BiomeType, def: BiomeDefinition, trackSamples?: TrackSample[]): HeightFunction {

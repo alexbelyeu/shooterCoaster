@@ -1,11 +1,12 @@
 import { use, useEffect, useMemo } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { getLevelConfig, levelRide } from '@/levels/LevelRegistry'
+import { getLevelConfig } from '@/levels/LevelRegistry'
 import type { LevelConfig, LevelRide } from '@/types/level'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import TrackMesh from '@/track/TrackMesh'
 import { getTrackDimensions } from '@/track/trackDimensions'
+import { e2eRide, isE2E } from '@/testing/e2eHook'
 import { buildArcTable } from '@/track/arcLength'
 import { withDarkSections, withTunnels } from '@/track/setPieces'
 import CoasterCamera from '@/track/CoasterCamera'
@@ -13,7 +14,7 @@ import PhotoCamera from '@/track/PhotoCamera'
 import { rideModel } from '@/track/ridePhysics'
 import BiomeEnvironment from '@/levels/environments/BiomeEnvironment'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
-import { forgetWorldFailures, groundOf, loadedWorld, loadWorld, WorldContext, type World } from '@/levels/environments/worlds'
+import { forgetWorldFailures, groundOf, levelRide, loadedWorld, loadWorld, WorldContext, type World } from '@/levels/environments/worlds'
 import ContactShadows from '@/levels/environments/shared/ContactShadows'
 import {
   createTerrainSurface,
@@ -95,6 +96,13 @@ function LevelWorld({ levelId, config, ride, world }: { levelId: string; config:
   const { environment, biome, enemies, combat, boss, pickups, goldenBalloons } = config
   const { track, walls, seaArch } = ride
   const def = world.biome
+  useEffect(() => {
+    if (!isE2E) return
+    e2eRide.beats = track.rideV2?.beats ?? []
+    return () => {
+      e2eRide.beats = []
+    }
+  }, [track])
 
   const curve = useMemo(() => createTrackCurve(track), [track])
 

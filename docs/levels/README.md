@@ -32,8 +32,8 @@ After changing the blockout, the ride or the walls, re-run it: `src/levels/rideL
 The ride-kit levels do the same (#863): level 1's ride comes from `parkLevel.ts` (levels 2, 3, 4 and 5: `desertLevel.ts`, `oceanLevel.ts` with its sea arch, `arcticLevel.ts`, `infernoLevel.ts`; the desert's points ship in its ride's own frame, `yaw`),
 written by `node scripts/gen-ride-levels.mjs level1` after any change to `parkTrack.ts` (no argument regenerates every ride). A new
 generated ride is one row in that script's `RIDES` and one in `rideLevels.test.ts`, and its `<NAME>_LEVEL_RIDE` in its world's
-`rides` and `shippedLevels.ts` `WORLD_RIDES` (#960): only level 1's ride is in the registry, the startup JS; every other ride
-arrives with its world's chunk, which the loading screen fetches, and `levelRide(id)` has it from then on. Every generated file is the same format, packed and
+`rides.ts` (#960; its `world.ts` `rides`, and `shippedLevels.ts` finds it there): only level 1's ride is in the registry, the startup JS; every other ride
+arrives with its world's chunk, which the loading screen fetches, and `worlds.ts` `levelRide(id)` has it from then on. Every generated file is the same format, packed and
 unpacked by `src/levels/rideData.ts` (#890): positions rounded (whole units for the kit rides, 0.01 for level 6's small hall) and stored
 as whole-number steps from the last point, everything else to 6 significant digits, to fit the startup JS budget (since #960, level 1's alone is in it); so the ride tests
 (`parkTrack.test.ts`, `desertTrack.test.ts`) check the shipped track as well as the authored one.
