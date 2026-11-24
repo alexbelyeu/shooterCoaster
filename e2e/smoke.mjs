@@ -2049,11 +2049,13 @@ async function chunkRetryCheck(page, base, levelId) {
 }
 
 /**
- * #938: a run starting in the render where framer's `motionFeatures` chunk lands must still swap the title for the HUD
- * (the title stayed up over the run, its PLAY under the crosshair, #933). The chunk waits on a gate the page opens just
- * before `startLevel`, so the features arrive ahead of React's render for them.
+ * #938: a run starting as framer's `motionFeatures` chunk lands must still swap the title for the HUD (the title stayed
+ * up over the run, its PLAY under the crosshair, #933). The chunk waits on a gate. With `ticks` a number, the page opens
+ * it and starts the run that many scheduler tasks later (0: ahead of React's render for the features; 1–2: as the
+ * title's enter fade has just started, a leave framer never completed). With `ticks` null the run starts with the gate
+ * still closed and it opens two frames later, the features reaching a title already leaving.
  */
-async function lateMotionCheck(page, base, levelId) {
+async function lateMotionCheck(page, base, levelId, ticks) {
   await page.route(/\/motionFeatures-[^/]*\.js$/, async (route) => {
     const res = await route.fetch()
     const body = `await new Promise((r) => { window.__SC_MOTION_GATE__ = r });\n${await res.text()}`
@@ -2061,15 +2063,29 @@ async function lateMotionCheck(page, base, levelId) {
   })
   await page.goto(`${base}/?e2e=1`)
   await page.waitForFunction(() => !!window.__SC_TEST__ && !!window.__SC_MOTION_GATE__, null, { timeout: 30000 })
-  await page.evaluate(async (id) => {
+  await page.evaluate(async ([id, n]) => {
+    const frame = () => new Promise((r) => requestAnimationFrame(() => r()))
+    const task = () => new Promise((r) => {
+      const c = new MessageChannel()
+      c.port1.onmessage = () => r()
+      c.port2.postMessage(0)
+    })
+    if (n === null) {
+      window.__SC_TEST__.startLevel(id)
+      await frame()
+      await frame()
+      window.__SC_MOTION_GATE__()
+      return
+    }
     window.__SC_MOTION_GATE__()
     for (let i = 0; i < 50; i++) await null
+    for (let i = 0; i < n; i++) await task()
     window.__SC_TEST__.startLevel(id)
-  }, levelId)
+  }, [levelId, ticks])
   const hud = await waitVisible(page, '.hud-score', 10000)
   const title = await page.evaluate(() => !!document.querySelector('.title-logo'))
   if (hud && !title) return []
-  return [`with the animation features landing as the run started, ${title ? 'the title stayed up' : 'the title left'} and the HUD ${hud ? 'mounted' : 'never mounted'} (${await runReport(page, levelId, { width: 1280, height: 720 })})`]
+  return [`with the animation features landing ${ticks === null ? 'two frames after the run started' : `${ticks} task(s) before the run started`}, ${title ? 'the title stayed up' : 'the title left'} and the HUD ${hud ? 'mounted' : 'never mounted'} (${await runReport(page, levelId, { width: 1280, height: 720 })})`]
 }
 
 /** Sense of speed (#27) at the default Screen-shake setting: streaks and bank at top speed, within the caps (speed.png). */
@@ -4797,12 +4813,14 @@ async function run() {
       // The aborted request is the one expected error.
       r.errors = [...errors.filter((e) => !/Failed to load resource: net::ERR_FAILED/.test(e)), ...(await page.evaluate(() => window.__SC_TEST__.errors))]
       await ctx.close()
-      const lateCtx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
-      const late = await lateCtx.newPage()
-      collectErrors(late, r.errors)
-      r.problems.push(...(await lateMotionCheck(late, base, first)))
-      r.errors.push(...(await late.evaluate(() => window.__SC_TEST__.errors)))
-      await lateCtx.close()
+      for (const ticks of [0, 1, 2, null]) {
+        const lateCtx = await browser.newContext({ viewport: { width: 1280, height: 720 } })
+        const late = await lateCtx.newPage()
+        collectErrors(late, r.errors)
+        r.problems.push(...(await lateMotionCheck(late, base, first, ticks)))
+        r.errors.push(...(await late.evaluate(() => window.__SC_TEST__.errors)))
+        await lateCtx.close()
+      }
       if (r.errors.length) r.problems.push(`${r.errors.length} error(s)`)
       r.ok = r.problems.length === 0
       return r
@@ -4933,7 +4951,7 @@ async function run() {
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +
           ` ducked=${r.engine.ducked} layers ${r.engine.layers ? `up ${r.engine.layers.rise.join('->')} paused ${r.engine.layers.paused} resumed ${r.engine.layers.resumed} down ${r.engine.layers.fall.join('->')}` : 'none'} paused at ${r.engine.pausedHeld?.at.toFixed(1)}s (${r.engine.pausedHeld?.after2s.toFixed(1)} 2 s later, resumed ${r.engine.pausedHeld?.resumedAt?.toFixed(1)}) results=${r.engine.results}`
       : r.id === 'chunkRetry'
-        ? ` ${r.level}: the level chunk's first request aborted, ${r.requests} request(s) over ${r.loads} page load(s); a run started as the animation features landed`
+        ? ` ${r.level}: the level chunk's first request aborted, ${r.requests} request(s) over ${r.loads} page load(s); runs started as the animation features landed and before them`
       : r.speed
         ? ` ${r.speed.level} at track ${r.speed.fraction.toFixed(3)}: speed ${r.speed.speed.toFixed(2)} streaks ${r.speed.streaks.toFixed(2)} ${weightSummary(r.speed)}`
       : r.mobile
