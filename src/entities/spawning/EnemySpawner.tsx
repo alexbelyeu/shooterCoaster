@@ -23,8 +23,9 @@ import { FIRE_IMP_HIT_RADIUS } from '../enemies/fireImpHop.hot'
 import {
   clampToBounds, formationSlots, outsideNearField, placeFormationWave, placeTracksideWave, placeWallClimbers, placeWallSwarm, rideAheadOfWaves, rideToMerge,
   trackPoint, tracksideSlots,
-  type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot, type Vec3,
+  type FormationMotion, type FormationSlot, type KeepOff, type PlacementBounds, type RideAhead, type TracksideSlot,
 } from './spawnPlacement'
+import type { Vec3 } from '@/utils/vec3'
 import {
   ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
