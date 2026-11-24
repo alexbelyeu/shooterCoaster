@@ -229,18 +229,20 @@ const LEVELS: LevelConfig[] = [
     message: 'You cleared Jungle Ruins!',
     nextLevel: null,
     // The ride kit's storyboard through the valleys (#1009, `jungleTrack.ts`), shipped in the jungle world's chunk.
-    // Toucans over the canopy in Vs, rings and spirals ahead of the rider, one wave every few seconds from the
-    // station to the temple, then the boss slot, held by the Golden Blimp until the guardian (#869). Each V is one
+    // Toucans over the canopy in Vs, rings and spirals ahead of the rider, one wave per stretch (0 s the station, 3 s
+    // the turn onto the lift, 8 s the lift, 13 s the crest and drop, 19 s the valley run, 24 s the airtime crest, 29 s
+    // the helix), each arriving as the last is shot down, then the boss slot, held by the Golden Blimp until the
+    // guardian (#869). Each V is one
     // group of 9: on this curve a second group would sit within reading range of the rider from the wave's start.
     ...paceLevel({
       waves: [
-        { type: 'toucan', count: 9, waveLabel: 'Toucans!', formation: 'v', weight: 0.75 },
+        { type: 'toucan', count: 9, waveLabel: 'Toucans!', formation: 'v', weight: 0.6 },
         { type: 'toucan', count: 10, waveLabel: 'Over the Canopy!', formation: 'ring' },
         { type: 'toucan', count: 9, waveLabel: 'The Flock!', formation: 'v' },
-        { type: 'toucan', count: 16, waveLabel: 'Temple Run!', formation: 'spiral' },
+        { type: 'toucan', count: 16, waveLabel: 'Temple Run!', formation: 'spiral', weight: 1.2 },
         { type: 'toucan', count: 9, waveLabel: 'Bills Out!', formation: 'v' },
         { type: 'toucan', count: 9, waveLabel: 'Down the Falls!', formation: 'v' },
-        { type: 'toucan', count: 21, waveLabel: 'The Whole Jungle!', formation: 'ring', weight: 2.5 },
+        { type: 'toucan', count: 21, waveLabel: 'The Whole Jungle!', formation: 'ring', weight: 3.2 },
       ],
       boss: 'goldenBlimp',
     }),

@@ -8,8 +8,9 @@
  * - **5 s, the lift hill**: round onto the temple and up a chain on the clearing's west side, straight at it, over the
  *   treetops.
  * - **~15 s, the first drop**: over a level crest and down (65°) with the temple dead ahead and the waterfall right of
- *   it, into the valley the ride has carved in the hills.
- * - **~17–24 s, the valley run**: low towards the temple's foot through the mist, then round east under it.
+ *   it, to the valley's run along the hillsides.
+ * - **~17–24 s, the valley run**: towards the temple's foot through the mist, then round east under it, high enough on
+ *   the hillsides that the toucans beside it show over the hills (`DROP.floor`).
  * - **26 s, the airtime crest** in front of the waterfall, on the valley floor south of it.
  * - **~29–40 s, the helix**: round south down the east valley, then a climbing turn and a quarter out of it as the boss
  *   arrives (40 s).
@@ -52,11 +53,15 @@ const STATION = { x: -100, y: 12, z: 650 } as const
  */
 const AIM = { x: TEMPLE.x + 0.3 * (FALLS.x - TEMPLE.x), z: TEMPLE.z + 0.3 * (FALLS.z - TEMPLE.z) } as const
 /** The lift: straight at `AIM` up the clearing's west side, to the crest. */
-const LIFT = { run: 800, topY: 320 } as const
+const LIFT = { run: 800, topY: 420 } as const
 /** The level crest the car tips over the drop from, slowly. */
 const CREST_RUN = 2 * SPACING
-/** The first drop: pitched over the edge slowly (`top`), out at the bottom on a wider radius, to the valley floor. */
-const DROP = { grade: 65 * DEG, top: 40, bottom: 120, floor: 40 } as const
+/**
+ * The first drop: pitched over the edge slowly (`top`), out at the bottom on a wider radius, to the valley run's height.
+ * `floor` keeps the valley stretches up on the hillsides: lower, the corridor the track cuts in the hills (`createHeightFunction`)
+ * is a trench whose walls hide the waves flying beside it (#1009: 60% of the run with nothing to shoot at 40).
+ */
+const DROP = { grade: 65 * DEG, top: 40, bottom: 120, floor: 150 } as const
 /** The valley run: on towards the temple until this far short of it (its terrace is 470 across, the slope 320 more). */
 const VALLEY = { shortOfTemple: 1200 } as const
 /** East along the valley under the temple and the waterfall, to the east valley's line. */
