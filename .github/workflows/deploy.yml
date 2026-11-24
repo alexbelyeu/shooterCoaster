@@ -1,0 +1,44 @@
+name: Deploy
+
+# Production deploys to https://scoaster.com. Vercel doesn't build every merge (vercel.json `git.deploymentEnabled`):
+# main ships once a day before the nightly smoke, on demand (the control center's Deploy now, or the Actions tab), and
+# after every green CI on main while an `agent:prod-broken` issue is open (CI, not `push`: auto-merges push with
+# GITHUB_TOKEN, which triggers no `push` run, and automerge.cjs dispatches CI on main instead). Nothing new on main,
+# nothing deployed. The logic is scripts/deploy.cjs (deploy.test.ts). Vercel's deployment_status still starts prod-smoke.yml's deploy check.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: '0 5 * * *' # an hour before the nightly smoke (prod-smoke.yml)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if production already serves main's head
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: read
+  deployments: read
+
+jobs:
+  deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/deploy.cjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/github-script@v7
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        with:
+          script: |
+            const run = require(`${process.env.GITHUB_WORKSPACE}/scripts/deploy.cjs`)
+            await run({ github, context, core })

@@ -3,10 +3,7 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "git": {
-    "deploymentEnabled": {
-      "**": false,
-      "main": true
-    }
+    "deploymentEnabled": false
   },
   "functions": {
     "api/leaderboard.ts": { "maxDuration": 10 },
