@@ -2,15 +2,22 @@ import { useState } from 'react'
 import { m, useIsPresent, type HTMLMotionProps } from 'framer-motion'
 
 /**
- * One screen in App's `AnimatePresence mode="wait"` (#367). When an exit finishing and a phase change land in
- * the same React batch (a slow frame), framer's stale list of waiting screens mounts the screen that was
- * waiting to enter already leaving: the HUD as a run ends, so the results screen waited behind it forever.
- * A motion element mounted mid-exit never runs its exit, so the wait never ends. Mounted leaving, a screen
- * drops its `exit`: with nothing to wait for, its presence completes at once and the next screen mounts.
+ * One screen in App's `AnimatePresence mode="wait"`. A motion element whose animation features arrive while it is
+ * already leaving registers for its exit but never runs it, so the next screen waits forever: the HUD mounted leaving
+ * as a run ended (#367), the title when `LazyMotion`'s chunk landed in the render that started a run (#938, #933).
+ * So a screen keeps its `exit` only once it has started an animation while present (its enter fade).
  */
-export default function Screen({ exit, ...props }: HTMLMotionProps<'div'>) {
+export default function Screen({ exit, onAnimationStart, ...props }: HTMLMotionProps<'div'>) {
   const isPresent = useIsPresent()
-  const [entered, setEntered] = useState(isPresent)
-  if (isPresent && !entered) setEntered(true)
-  return <m.div {...props} exit={entered ? exit : undefined} />
+  const [animated, setAnimated] = useState(false)
+  return (
+    <m.div
+      {...props}
+      exit={animated ? exit : undefined}
+      onAnimationStart={(definition) => {
+        if (isPresent) setAnimated(true)
+        onAnimationStart?.(definition)
+      }}
+    />
+  )
 }

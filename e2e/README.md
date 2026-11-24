@@ -126,7 +126,7 @@ follow the combo with its intensity layers (time frozen, `primeCombo(8)` → 2, 
 When level1 is in the run, a `boss` step summons the Golden Blimp (`summonBoss()`): the tell and `boss:spawn` must fire, the
 hull must be ≥ 15% of the frame wide and ≥ 1 balloon on screen (every boss is summoned into a ride frozen where it stands, and
 moved alone until its first phase is on screen, at most 20 s: the blimp places itself off the camera's heading, which riding on
-through its arrival had turned away from on some runners, #905), with the boss bar clear of the HUD (`level1-boss.png`), only the balloons exposed; a real
+through its arrival had turned away from on some runners, #905), with the boss bar clear of the HUD (`level1-boss.png`; a bar that never shows prints the phase, the screens mounted and the `runLog`, #938), only the balloons exposed; a real
 bullet must hit one, `bossHit` clears them and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
 `boss:defeated`, one kill per weak point and the big score popup over the confetti (`level1-boss-down.png`). The phone run
 resumes after its Pause tap with the boss summoned: the bar must sit inside the viewport and clear of the HUD in portrait and
@@ -249,7 +249,7 @@ Every check above belongs to a named step: `title`, `landing`, `levelSelect`, `d
 run's touch play: taps, aim assist, aspect, HUD, audio, up to the Pause tap) and `mobileMenus` (the rest of the phone run on
 the same page: pause card, settings, boss bar, initials entry, results, share, music switches) (no level); `frenzy` (the
 first level's FRENZY kill, leaderboard entry and frenzy-end rerun, inside its ride), `seed`, `quality`, `pause`
-(hidden-pause + pause menu), `countdown`, `speed`, `chunkRetry` (the level core's chunk aborted once at startup: the page must reload, #888, and the reloaded page load the level) (on the run's first level); `ride` (every level: its intro tour pinned at four marks, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; at each mark the camera must be on the tour and over the ground, at the landmark looking at it; the ride, the perf
+(hidden-pause + pause menu), `countdown`, `speed`, `chunkRetry` (the level core's chunk aborted once at startup: the page must reload, #888, and the reloaded page load the level; then a run started in the same task the held `motionFeatures` chunk lands: the title must leave and the HUD mount, #938) (on the run's first level); `ride` (every level: its intro tour pinned at four marks, #675, on the level held at its start (`timerStep` / `rideRate` 0), which the ride then goes on from: one mount; at each mark the camera must be on the tour and over the ground, at the landmark looking at it; the ride, the perf
 gate, the enemy probe, combat, the level's end), on the ride's own page `tour` (before the ride: each tour mark also shot, `<id>-tour-{reveal,landmark,track,landing}.png`, and not blank; nightly only, a capture costs ~15 s on a software renderer), `shot` (the frozen fresh shot and aim jump),
 `results` (the results screen's reveal, stats, buttons, board) and `share` (its Share line, menu and score cards); and
 `pacing` (every level, a whole run on its own page) and `wave`, `weather`, `boss`, `pickup`, `audio`, `night` (only on the levels in `e2e/shards.mjs` `STEP_LEVELS`, where each
