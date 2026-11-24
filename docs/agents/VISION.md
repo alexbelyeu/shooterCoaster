@@ -210,17 +210,16 @@ throttled nightly, the whale, weather waves, boss cues placed, shark and drake a
 photo mode, Night Ride for level 1, the radar, aerial fog, the loading screen, colour-blind
 palettes, ghost replay, the WebGPU event, the Daily Run board).
 
-1. **Night Ride for levels 4–6** — after #880 (Desert, Ocean) sets the pattern; one issue.
-2. **Medals for new worlds** — each world adds its three to `medals.ts` once #879 lands.
-3. **Remappable input** — keyboard and gamepad bindings in Settings, saved locally.
-4. **PWA install + offline play** — a service worker that caches the hashed assets (never the
+1. **Medals for new worlds** — each world adds its three to `medals.ts` once #879 lands.
+2. **Remappable input** — keyboard and gamepad bindings in Settings, saved locally.
+3. **PWA install + offline play** — a service worker that caches the hashed assets (never the
    `api/` calls), the manifest's install prompt from the title.
-5. **Boss rush** — every boss back to back, unlocked when every level has 3★; a local best.
-6. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only if a world can't
+4. **Boss rush** — every boss back to back, unlocked when every level has 3★; a local best.
+5. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only if a world can't
    hold 250 draws by batching alone.
-7. **The Blender spike** (#381 step 4) — one enemy from a Blender script, with a recorded adopt /
+6. **The Blender spike** (#381 step 4) — one enemy from a Blender script, with a recorded adopt /
    don't-adopt decision.
-8. **Daily Run ghost** — today's World best as a ghost crosshair (needs a column; Alex runs the
+7. **Daily Run ghost** — today's World best as a ghost crosshair (needs a column; Alex runs the
    migration).
 
 Not doing (from the slop-newyork review, #126): unpinned three.js from a CDN,

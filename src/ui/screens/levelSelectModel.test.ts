@@ -16,7 +16,7 @@ import {
 
 const levels: LevelSelectSource[] = [
   { id: 'a', name: 'Alpha', description: '', biome: 'themePark', nextLevel: 'b' },
-  { id: 'b', name: 'Bravo', description: '', biome: 'arctic', nextLevel: 'c' },
+  { id: 'b', name: 'Bravo', description: '', biome: 'city', nextLevel: 'c' },
   { id: 'c', name: 'Charlie', description: '', biome: 'ocean', nextLevel: null },
 ]
 

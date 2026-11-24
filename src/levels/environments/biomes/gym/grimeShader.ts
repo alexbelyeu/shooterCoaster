@@ -34,6 +34,9 @@ const fireSin = Math.sin((fire.rot * Math.PI) / 180)
 /** The fire light's level, 0.5..1 (`fireFlicker`): one uniform shared by every patched material, set by `FlameFire` each frame. */
 export const FIRE_FLICKER = { value: 1 }
 
+/** The strip lights' level, 1 = the house lights on; after hours (a Night Ride, `GymFeatures`) only the work lights' share is left. */
+export const HOUSE_LIGHTS = { value: 1 }
+
 const vertexHead = /* glsl */ `
 varying vec3 vGrimePos;
 `
@@ -56,6 +59,7 @@ const fragmentHead = /* glsl */ `
 varying vec3 vGrimePos;
 uniform float uFireFlicker;
 uniform float uDarkness;
+uniform float uHouseLights;
 ${valueNoiseGlsl}
 // A hall point in the Flame's own frame: along its length, up, across it
 vec3 fireLocal(vec3 p) {
@@ -151,7 +155,7 @@ const poolFragment = /* glsl */ `
   float facing = max(dot(normal, normalize((viewMatrix * vec4(dir, 0.0)).xyz)), 0.0);
   float cone = smoothstep(0.35, 0.85, dir.y) + ${f(STRIP_LIGHTS.uplight)} * smoothstep(0.2, 0.8, -dir.y);
   float pool = ${f(STRIP_LIGHTS.pool)} * facing * cone / (1.0 + dist * dist / ${f(STRIP_LIGHTS.reach * STRIP_LIGHTS.reach)});
-  pool *= mix(1.0, ${f(BLACKLIGHT.pools)}, uDarkness);
+  pool *= mix(1.0, ${f(BLACKLIGHT.pools)}, uDarkness) * uHouseLights;
   reflectedLight.directDiffuse += diffuseColor.rgb * (${glslColor(STRIP_LIGHTS.color)} * pool + ${glslColor(BLACKLIGHT.fill)} * ${f(BLACKLIGHT.fillStrength)} * uDarkness);
 }
 `
@@ -193,6 +197,7 @@ function patch(material: THREE.Material, key: string, surface: string, pool: boo
     if (pool) shader.fragmentShader = inject(shader.fragmentShader, '#include <lights_fragment_end>', `${poolFragment}\n${fireFragment}`)
     shader.uniforms.uFireFlicker = FIRE_FLICKER
     shader.uniforms.uDarkness = DARKNESS
+    shader.uniforms.uHouseLights = HOUSE_LIGHTS
   }
   material.customProgramCacheKey = () => key
 }
