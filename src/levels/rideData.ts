@@ -10,11 +10,29 @@ export interface RidePrecision {
 }
 
 /** A ride's control points packed: `xyz` is the first point then each one's step from the last, in units of 10^-position
- * (whole numbers, so the steps along a straight repeat and gzip well); `ups` is index, x, y, z of each rolled point's up. */
+ * (whole numbers, so the steps along a straight repeat and gzip well); `ups` is index, x, y, z of each rolled point's up.
+ * A ride laid out in a frame turned `yaw` about y (level 2's faces the Pyramid, #864) packs in that frame, where its straights
+ * run along the axes and their steps repeat. */
 export interface PackedPoints {
   position: number
   xyz: number[]
   ups: number[]
+  yaw?: number
+}
+
+type Xyz = { x: number; y: number; z: number }
+
+/** A world point into the frame turned `yaw` about y, and back (`out`). */
+function turn<T extends Xyz>(p: T, yaw: number, out: boolean): T {
+  const [c, s] = [Math.cos(yaw), out ? Math.sin(yaw) : -Math.sin(yaw)]
+  return { ...p, x: p.x * c + p.z * s, z: -p.x * s + p.z * c }
+}
+
+function turnPoint(p: RailPoint, yaw: number, out = false): RailPoint {
+  if (!yaw) return p
+  const q = turn(p, yaw, out)
+  if (p.up) q.up = turn(p.up, yaw, out)
+  return q
 }
 
 /** `v` to `digits` decimals (never -0). */
@@ -33,16 +51,18 @@ export function roundNumbers<T>(value: T): T {
   ) as T
 }
 
-/** The control points as the shipped ride has them. */
-export function roundPoints(points: readonly RailPoint[], precision: RidePrecision): RailPoint[] {
-  return points.map((p) => {
+/** The control points as the shipped ride has them (rounded in the frame turned `yaw`, as `packPoints` packs them). */
+export function roundPoints(points: readonly RailPoint[], precision: RidePrecision, yaw = 0): RailPoint[] {
+  return points.map((world) => {
+    const p = turnPoint(world, yaw)
     const q: RailPoint = { x: roundTo(p.x, precision.position), y: roundTo(p.y, precision.position), z: roundTo(p.z, precision.position) }
     if (p.up) q.up = { x: roundTo(p.up.x, precision.up), y: roundTo(p.up.y, precision.up), z: roundTo(p.up.z, precision.up) }
-    return q
+    return turnPoint(q, yaw, true)
   })
 }
 
-export function packPoints(points: readonly RailPoint[], precision: RidePrecision): PackedPoints {
+export function packPoints(world: readonly RailPoint[], precision: RidePrecision, yaw = 0): PackedPoints {
+  const points = world.map((p) => turnPoint(p, yaw))
   const scale = 10 ** precision.position
   const xyz: number[] = []
   let last = [0, 0, 0]
@@ -54,10 +74,10 @@ export function packPoints(points: readonly RailPoint[], precision: RidePrecisio
   const ups = points.flatMap((p, i) =>
     p.up ? [i, roundTo(p.up.x, precision.up), roundTo(p.up.y, precision.up), roundTo(p.up.z, precision.up)] : [],
   )
-  return { position: precision.position, xyz, ups }
+  return yaw ? { position: precision.position, xyz, ups, yaw } : { position: precision.position, xyz, ups }
 }
 
-export function unpackPoints({ position, xyz, ups }: PackedPoints): RailPoint[] {
+export function unpackPoints({ position, xyz, ups, yaw = 0 }: PackedPoints): RailPoint[] {
   const scale = 10 ** position
   const points: RailPoint[] = []
   let [x, y, z] = [0, 0, 0]
@@ -68,5 +88,5 @@ export function unpackPoints({ position, xyz, ups }: PackedPoints): RailPoint[] 
     points.push({ x: x / scale + 0, y: y / scale + 0, z: z / scale + 0 })
   }
   for (let i = 0; i < ups.length; i += 4) points[ups[i]].up = { x: ups[i + 1], y: ups[i + 2], z: ups[i + 3] }
-  return points
+  return yaw ? points.map((p) => turnPoint(p, yaw, true)) : points
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { buildArcTable, tAtLoopDistance } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
@@ -8,7 +8,7 @@ import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleT
 import { createLavaRiverGeometries, RIVER_COLUMNS } from './lavaRivers'
 import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow } from './lavaRiverPaths'
 
-const level = getLevelConfig('level5')!
+const level = shippedLevel('level5')
 const curve = createTrackCurve(level.track)
 const table = buildArcTable(curve)
 const heightFn = createHeightFunction('volcanic', sampleTrackPath((t) => curve.getPointAt(t)))

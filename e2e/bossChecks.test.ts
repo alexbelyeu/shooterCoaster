@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { buildArcTable } from '@/track/arcLength'
@@ -11,7 +11,7 @@ const FACE_OFF_SECONDS = 4
 
 /** The lap fraction (arc length, as `rideTo` takes it) the ride reaches at each 0.1 s from GO. */
 function lapFractions(levelId: string): number[] {
-  const track = getLevelConfig(levelId)!.track
+  const track = shippedLevel(levelId).track
   const table = buildArcTable(createTrackCurve(track))
   return rideProfile(table, rideModel(track, table), RUN_SECONDS + 5).map((s) => s / table.length)
 }
@@ -27,7 +27,7 @@ describe('the boss step rides to its boss (#769)', () => {
   })
 
   for (const check of riding) {
-    const at = getLevelConfig(check.level)!.boss!.at
+    const at = shippedLevel(check.level).boss!.at
 
     it(`${check.level}: rideTo is in the boss's first ${FACE_OFF_SECONDS} s`, () => {
       const t = secondsAt(lapFractions(check.level), check.rideTo!)

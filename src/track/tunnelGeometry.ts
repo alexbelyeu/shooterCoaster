@@ -109,8 +109,14 @@ function onRing(fr: Frame, angle: number, radius: number, normal?: THREE.Vector3
   return fr.c.clone().addScaledVector(dir, radius)
 }
 
-/** Every tunnel on `table` as one geometry (attributes position, normal, color, aEmissive). Caller disposes. */
-export function buildTunnelGeometry(curve: TrackCurve, table: ArcTable, dims: TunnelDims, colours: TunnelColours): THREE.BufferGeometry {
+/** Every tunnel on `table` (the glass ones, or the rest) as one geometry (attributes position, normal, color, aEmissive). Caller disposes. */
+export function buildTunnelGeometry(
+  curve: TrackCurve,
+  table: ArcTable,
+  dims: TunnelDims,
+  colours: TunnelColours,
+  glass = false,
+): THREE.BufferGeometry {
   const mesh = new MeshBuilder()
   const point = new THREE.Vector3()
   const prevRight = new THREE.Vector3(1, 0, 0)
@@ -127,6 +133,7 @@ export function buildTunnelGeometry(curve: TrackCurve, table: ArcTable, dims: Tu
   const angleOf = (j: number) => (j / SIDES) * Math.PI * 2 - Math.PI
 
   for (const span of table.tunnels ?? []) {
+    if (!!span.glass !== glass) continue
     const ribs = ribCentres(span, dims)
     const spillAt = (dist: number) => {
       let near = Infinity

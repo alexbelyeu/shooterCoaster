@@ -82,3 +82,50 @@ export function followHeading(heading: FlatDir, fx: number, fz: number, dt: numb
   heading.x = x
   heading.z = z
 }
+
+/** A heading that leads the rider's turn (`leadHeading`): the turn rate it has measured and the forward it measured it from. */
+export interface LeadHeading extends FlatDir {
+  /** Radians a second, positive turning from +x towards +z. */
+  rate: number
+  lastX: number
+  lastZ: number
+}
+
+/** `leadHeading`'s time constants, seconds: the turn rate's smoothing, the heading's, and how far ahead of the view it aims. */
+export interface LeadTiming {
+  rateTau: number
+  headingTau: number
+  lead: number
+}
+
+/** A camera cut or a snap is not a turn: the measured rate stops here (radians a second). */
+const MAX_LEAD_RATE = 2
+
+/**
+ * Eases `h` towards the flat unit forward (`fx`, `fz`) turned on by its measured turn rate × `lead`, so through a steady
+ * turn (the park's finale helix, a turn a second) it holds where the rider is looking instead of trailing round behind:
+ * a heading that only follows, over `HEADING_TAU`, lags a whole turn there. `snap` sets it to the forward, rate zero.
+ */
+export function leadHeading(h: LeadHeading, fx: number, fz: number, dt: number, snap: boolean, timing: LeadTiming): void {
+  if (snap) {
+    h.x = h.lastX = fx
+    h.z = h.lastZ = fz
+    h.rate = 0
+  }
+  if (snap || dt <= 0) return
+  const turned = Math.atan2(h.lastX * fz - h.lastZ * fx, h.lastX * fx + h.lastZ * fz)
+  const rate = Math.max(-MAX_LEAD_RATE, Math.min(MAX_LEAD_RATE, turned / dt))
+  h.rate += (rate - h.rate) * (1 - Math.exp(-dt / timing.rateTau))
+  h.lastX = fx
+  h.lastZ = fz
+  const a = h.rate * timing.lead
+  const tx = fx * Math.cos(a) - fz * Math.sin(a)
+  const tz = fx * Math.sin(a) + fz * Math.cos(a)
+  const k = 1 - Math.exp(-dt / timing.headingTau)
+  const x = h.x + (tx - h.x) * k
+  const z = h.z + (tz - h.z) * k
+  const len = Math.hypot(x, z)
+  if (len < 1e-3) return
+  h.x = x / len
+  h.z = z / len
+}

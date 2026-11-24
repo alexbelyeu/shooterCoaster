@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable } from './arcLength'
 import { getTrackDimensions } from './trackDimensions'
@@ -8,7 +8,7 @@ import { trackFrame } from './trackGeometry'
 import { getTunnelDims, withTunnels } from './setPieces'
 import { buildTunnelGeometry, tunnelColours, tunnelShadowCasters } from './tunnelGeometry'
 
-const level = getLevelConfig('level1')!
+const level = shippedLevel('level1')
 const curve = createTrackCurve(level.track)
 const plain = buildArcTable(curve)
 const dims = getTrackDimensions(level.track)

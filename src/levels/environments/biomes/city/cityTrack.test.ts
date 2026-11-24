@@ -5,7 +5,7 @@ import { rideModel } from '@/track/ridePhysics'
 import { BEAT_TOLERANCE_SECONDS } from '@/track/rideV2'
 import { eyeClearance, type Box } from '@/track/elements/headChopper'
 import { getTrackDimensions } from '@/track/trackDimensions'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import type { TrackParams } from '@/types/level'
 import { trackExtent } from '../../shared/trackScatter'
 import { buildCityRide, CITY_TRACK } from './cityTrack'
@@ -19,7 +19,7 @@ const deck: Box = { min: { x: L.from, y: L.under, z: L.z - L.width / 2 }, max: {
 
 // The authored ride and the one the game ships (`cityLevel.ts`, rounded to whole units by `gen-ride-levels.mjs`).
 describe.each([
-  ['as shipped', getLevelConfig('level7')!.track],
+  ['as shipped', shippedLevel('level7').track],
   ['as authored', CITY_TRACK],
 ] as [string, TrackParams][])("level 7's ride (#871), %s", (_name, track) => {
   const curve = createTrackCurve(track)

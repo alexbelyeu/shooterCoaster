@@ -82,15 +82,20 @@ biome or score that already exists is refused, so a second run changes nothing. 
    accent; an interior sizes `HALL` around its track (its `BIOME_TERRAIN_CONFIGS` `meshSize` sizes the floor mesh if the
    default 6000 doesn't fit it).
 3. Level. **(script)** `LevelRegistry.ts`: the level after the last one (its `nextLevel`, so the last
-   level's star unlocks it), level1's track params, a starter roster of balloons and crows through
+   level's star unlocks it), a starter `ride` on level1's curve family, a starter roster of balloons and crows through
    `paceLevel` ending on a finale wave, `maxScore` from `SCORE_VALUES`; its row in
    `LevelRegistry.test.ts`'s finales table and its pinned lap in `track/ridePhysics.test.ts` `LAPS`;
    `node scripts/gen-level-limits.mjs` (the server's limits). **(by hand)** The track (inside the
-   extent formula, or an authored spline from a blockout like the gym's; its `LAPS` pin follows), the
+   extent formula, or an authored spline from a blockout like the gym's; its `LAPS` pin follows; a generated ride,
+   `scripts/gen-ride-levels.mjs`, goes in the world's `world.ts` `rides` and `shippedLevels.ts`, never the registry,
+   which is startup JS, #960), the
    world's own roster and boss; then `maxScore`, the finales row and `gen-level-limits` again.
 4. Enemies **(by hand)**: anything new in `SharedEnemyAssets.ts` (warm-up finds it), the world's `world.ts` (each enemy and the boss its
    levels spawn: `worlds.test.ts` fails a missing one), `enemyComponents.ts` / `bossComponents.ts` (the turntable's),
    `ENEMY_PLACEMENT`, `SCORE_VALUES`, `deathStyles.ts`, `sfxDesign.ts`, the turntable's `subjects.ts`.
+   Its three medals in `src/levels/medals.ts` `LEVEL_MEDALS` (#879; `medals.test.ts` fails a level without them,
+   or one a 60 s run can't win): **(script)** writes three starter medals any starter roster wins (a 20 chain,
+   70% over 30 shots, a clean Frenzy); rename them for the world and swap one for a boss / golden / hard-route feat once it has one.
 5. Music. **(script)** `scores/<levelId>.scrim`, a copy of `--score-from`'s score (level1 by default), in
    `scores/index.ts`, with that score's key in `SCORE_KEYS`. **(by hand)** A theme round for Alex
    (`Listen:`); the winner replaces the copy and its `SCORE_KEYS` row.

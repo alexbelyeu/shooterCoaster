@@ -15,6 +15,8 @@ export interface CollisionTarget {
   hitThisFrame: boolean
   /** The hitting bullet's first target that counts (`countsForAccuracy`): only that hit counts for accuracy. */
   firstHitThisFrame: boolean
+  /** Whether the bullet that hit it this frame was fired in FRENZY (its shot was counted as one). */
+  hitInFrenzy: boolean
 }
 
 /**
@@ -40,9 +42,9 @@ function removeTarget(id: string): void {
   if (i >= 0) targetList.splice(i, 1)
 }
 
-export function registerCollisionTarget(target: Omit<CollisionTarget, 'hitThisFrame' | 'firstHitThisFrame'>): void {
+export function registerCollisionTarget(target: Omit<CollisionTarget, 'hitThisFrame' | 'firstHitThisFrame' | 'hitInFrenzy'>): void {
   removeTarget(target.id)
-  targetList.push({ ...target, hitThisFrame: false, firstHitThisFrame: false })
+  targetList.push({ ...target, hitThisFrame: false, firstHitThisFrame: false, hitInFrenzy: false })
 }
 
 export function unregisterCollisionTarget(id: string): void {
@@ -60,14 +62,19 @@ export function countsForAccuracy(target: CollisionTarget): boolean {
 
 /**
  * Resolve one hit on a target: count it for accuracy, emit `enemy:hit`, then run its own
- * hit handler. The bullet pool's collision pass and the e2e hook both take this path.
+ * hit handler. The bullet pool's collision pass and the e2e hook both take this path. `inFrenzy` is whether
+ * the shot was fired in FRENZY (a bullet's, from the pool); a hit with no bullet (the e2e hook) is fired now.
  */
-export function processHit(target: CollisionTarget, countHit = true): void {
+export function processHit(
+  target: CollisionTarget,
+  countHit = true,
+  inFrenzy = useGameStore.getState().frenzy !== 'off',
+): void {
   if (target.kind === 'bystander') {
     target.onHit()
     return
   }
-  if (countHit) useGameStore.getState().registerHit()
+  if (countHit) useGameStore.getState().registerHit(inFrenzy)
   if (target.kind === 'pickup' || target.kind === 'switch') {
     target.onHit()
     return
@@ -89,7 +96,7 @@ export function processFlaggedHits(): void {
     const target = targetList[t]
     if (target === undefined || !target.hitThisFrame) continue
     target.hitThisFrame = false
-    processHit(target, target.firstHitThisFrame)
+    processHit(target, target.firstHitThisFrame, target.hitInFrenzy)
   }
 }
 

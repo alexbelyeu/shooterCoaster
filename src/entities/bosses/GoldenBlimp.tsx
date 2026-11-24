@@ -11,7 +11,7 @@ import {
   BLIMP_GLINT_GEO, BLIMP_GLINT_MAT, BLIMP_HULL_GEO, BLIMP_HULL_MAT, BLIMP_PROP_AT, BLIMP_PROP_GEO,
 } from './bossAssets'
 import { flatForward } from './bossAim.hot'
-import { followHeading } from './bossCycle.hot'
+import { leadHeading, type LeadTiming } from './bossCycle.hot'
 
 /** Rides with the coaster: a fixed boss would be behind the rider within seconds. */
 const AHEAD = 760
@@ -19,7 +19,13 @@ const ABOVE = 170
 const MIN_CLEARANCE = 220
 const SIDE = 340
 const CROSS_SECONDS = 24
+/** Its height eases to the anchor's over this; across, it holds the anchor, which `HEADING` already smooths. */
 const FOLLOW_TAU = 1.2
+/**
+ * Its heading leads the rider's turn by the heading's own lag, so through the finale's helix (a turn every six seconds,
+ * #937) it stays in front instead of trailing round behind the rider.
+ */
+const HEADING: LeadTiming = { rateTau: 0.6, headingTau: 0.4, lead: 0.4 }
 const FALL_ACCEL = 90
 const FALL_PITCH = 0.5
 const EXIT_SECONDS = 3.5
@@ -48,14 +54,14 @@ const towLine = <mesh geometry={BLIMP_CABLE_GEO} material={BLIMP_CABLE_MAT} />
 /** Theme Park finale: pop the five towed balloons to expose the gondola, three hits on it bring the blimp down. */
 export default function GoldenBlimp(props: BossProps) {
   const heightFn = useContext(TerrainContext)
-  const motion = useRef({ placed: false, heading: new THREE.Vector3(), fallSpeed: 0 }).current
+  const motion = useRef({ placed: false, heading: { x: 0, z: 0, rate: 0, lastX: 0, lastZ: 0 }, fallSpeed: 0 }).current
   const prop = useRef<THREE.Mesh>(null)
   const glint = useRef<THREE.Mesh>(null)
 
   const move = useCallback(
     ({ root, parts, camera, state, dt, age, sinceDefeat }: BossFrame) => {
       flatForward(camera, _fwd)
-      followHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed)
+      leadHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed, HEADING)
       const h = motion.heading
       const rx = -h.z
       const rz = h.x
@@ -69,7 +75,9 @@ export default function GoldenBlimp(props: BossProps) {
         root.position.copy(_anchor)
         motion.placed = true
       } else if (sinceDefeat < 0) {
-        root.position.lerp(_anchor, k)
+        root.position.x = _anchor.x
+        root.position.z = _anchor.z
+        root.position.y += (_anchor.y - root.position.y) * k
       } else {
         root.position.x += (_anchor.x - root.position.x) * k
         root.position.z += (_anchor.z - root.position.z) * k

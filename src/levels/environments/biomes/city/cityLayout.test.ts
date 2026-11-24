@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { trackExtent } from '../../shared/trackScatter'
 import { footprintDistance, layoutCity, STREET_GRID, TRACK_CLEARANCE, type Tower } from './cityLayout'
 
-const table = buildArcTable(createTrackCurve(getLevelConfig('level7')!.track))
+const table = buildArcTable(createTrackCurve(shippedLevel('level7').track))
 const extent = trackExtent(table)
 const layout = layoutCity(table, extent)
 

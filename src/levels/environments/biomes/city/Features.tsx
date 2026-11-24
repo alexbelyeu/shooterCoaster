@@ -3,7 +3,7 @@ import * as THREE from 'three'
 import type { BiomeFeaturesProps } from '@/levels/environments/shared/types'
 import StaticInstances from '@/levels/environments/shared/StaticInstances'
 import { layoutElevatedLine, layoutHeroTower } from './cityLayout'
-import { createNeonMaterial, createTowerGeometry, neonGeometry, towerMatrix } from './cityNeon'
+import { createNeonMaterial, createTowerGeometry, neonGeometry, towerMatrix, useNeonClock } from './cityNeon'
 import { createTowerMaterial } from './cityShaders'
 import { ELEVATED_LINE, LANDMARK_SITE } from './config'
 
@@ -24,6 +24,7 @@ export default function CityFeatures({ groundFn }: BiomeFeaturesProps) {
   const matrices = useMemo(() => hero.tiers.map((t) => towerMatrix(t, ground)), [hero, ground])
   // The line's boxes stand at their own heights over the street (`towerMatrix`'s base, unsunk)
   const lineMatrices = useMemo(() => line.boxes.map((b) => towerMatrix(b, groundFn(b.x, b.z) + b.y, 0)), [line, groundFn])
+  useNeonClock()
 
   useEffect(
     () => () => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { INTRO_SECONDS } from '@/core/introShot'
 import { ORBIT_RATE, introProgress, orbitPose, tourPose, type HeroShot } from './introCamera.hot'
 import { TOUR_SPEED_CAP, buildIntroTour, tourDistance, tourTurnRates } from './introTour'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { createTrackCurve } from './curves/createTrackCurve'
 import { getTrackDimensions } from './trackDimensions'
 import { buildArcTable } from './arcLength'
@@ -23,7 +23,7 @@ const GROUND_SAMPLES: Record<string, number> = {}
 
 /** Each level's tour as `CoasterCamera` builds it (the real ground), with its seat (track start + eye height) and ride direction. */
 function levelTours() {
-  return getAllLevels().map((level) => {
+  return shippedLevels().map((level) => {
     const curve = createTrackCurve(level.track)
     const table = buildArcTable(curve)
     const dims = getTrackDimensions(level.track)

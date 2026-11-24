@@ -94,6 +94,27 @@ export const TRACER_RANGE = 160
 /** How long (game ms) the gun keeps pointing at the last shot before following the pointer again. */
 export const SHOT_AIM_HOLD_MS = 300
 
+type Vec3 = { x: number; y: number; z: number }
+
+/**
+ * The axis (camera space, unit) the recoil kick turns the barrel about: square to the barrel and to
+ * the view ray through the pivot, so the kicked muzzle stays on the barrel's screen line and the
+ * tracer still leaves along it (#893: a kick about the gun's own x axis swung a held shot's barrel
+ * up to 32° off its tracer). A positive turn lifts the muzzle off the view ray. False (and `out`
+ * untouched) when the barrel lies along the view ray.
+ */
+export function recoilKickAxis(barrel: Vec3, pivot: Vec3, out: Vec3): boolean {
+  const x = pivot.y * barrel.z - pivot.z * barrel.y
+  const y = pivot.z * barrel.x - pivot.x * barrel.z
+  const z = pivot.x * barrel.y - pivot.y * barrel.x
+  const len = Math.hypot(x, y, z)
+  if (len < 1e-9) return false
+  out.x = x / len
+  out.y = y / len
+  out.z = z / len
+  return true
+}
+
 /** Recoil envelope 1 → 0 from the remaining time (smoothstep). */
 export function recoilEnvelope(remainingMs: number): number {
   const t = Math.min(Math.max(remainingMs / WEAPON_RECOIL_MS, 0), 1)

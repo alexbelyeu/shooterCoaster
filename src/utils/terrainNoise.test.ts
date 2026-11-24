@@ -6,16 +6,17 @@ import {
   type NoiseTerrainConfig,
   getTerrainSlope,
   sampleTrackPath,
+  sightClear,
 } from './terrainNoise'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { GYM_SCALE } from '@/levels/environments/biomes/gym/blockout'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { BIOME_TYPES, type BiomeType, type LevelConfig } from '@/types/level'
+import { BIOME_TYPES, type BiomeType, type RiddenLevel } from '@/types/level'
 
 // The noise-terrain biomes (an interior's ground is its authored floor: `biomeHeightFunction`).
 const NOISE_BIOMES = BIOME_TYPES.filter((b) => !BIOMES[b].floor)
-const levels = getAllLevels()
+const levels = shippedLevels()
 
 function noiseConfig(biome: BiomeType): NoiseTerrainConfig {
   const c = BIOME_TERRAIN_CONFIGS[biome]
@@ -23,10 +24,25 @@ function noiseConfig(biome: BiomeType): NoiseTerrainConfig {
   return c
 }
 
-function trackSamplesFor(level: LevelConfig) {
+function trackSamplesFor(level: RiddenLevel) {
   const c = createTrackCurve(level.track)
   return { curve: c, samples: sampleTrackPath((t) => c.getPointAt(t)) }
 }
+
+describe('sightClear', () => {
+  // A ridge 100 high across x = 500..600, flat ground elsewhere.
+  const ridge = (x: number) => (x >= 500 && x <= 600 ? 100 : 0)
+
+  it('is blocked by ground over the line, not by ground under it', () => {
+    expect(sightClear(ridge, 0, 50, 0, 1000, 50, 0)).toBe(false)
+    expect(sightClear(ridge, 0, 150, 0, 1000, 150, 0)).toBe(true)
+  })
+
+  it('sees over a ridge from high enough on one end', () => {
+    expect(sightClear(ridge, 0, 50, 0, 1000, 400, 0)).toBe(true)
+    expect(sightClear(ridge, 0, 0, 0, 1000, 50, 0)).toBe(false)
+  })
+})
 
 describe('BIOME_TERRAIN_CONFIGS', () => {
   it('has a config for every biome', () => {
