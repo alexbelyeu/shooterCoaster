@@ -45,6 +45,7 @@ before Ready. Levels 2 and 3 still ride trig loops (`curve1`); levels 1 and 4–
 | 4 Antarctica | arctic | scouts, snowmen, brutes, **blizzard** wave, **Yeti** | Ice fortress, aurora | Heaviest for draws; ride flat (#866); Yeti below brief (#873) |
 | 5 Inferno | volcanic | wisps, imps, golems, drakes (characters), eruption, **Magma Titan** | Volcano, lava channels | Enemies are characters now; ride flat (#867, waits on #716) |
 | 6 Climbing Gym | gym (interior) | rats, dust bunnies, lanternfly swarms, bystander climbers, **Medusa** | Alex's gym at `GYM_SCALE` 48, the Starr, the Flame's fire, the Tree's gap, the Training Area cave, the Arch, a V2 / V8 switch | Every 14 / 18 Nov note done; **waits on Alex's replay** (#671). The ride-kit ride: launch, heartline roll over the Flame, the cave, the switch, the wall lift, a dyno jump, the auto-belay drop, the Medusa helix |
+| 7 Neon Metropolis | city | hover drones (Vs and rings), finale ring; no boss yet (#322) | Night city on a street grid (`cityLayout.ts`): window-lit towers in four height classes, a skyline ring, neon blades and bands near the ride, wet asphalt streets, the stepped hero tower, drizzle; first v2 ride on a trig curve (station launch, then a drop into the canyons) | Playable slice (#323). No elevated highway, traffic, billboard bots or boss yet; the score is a copy of level5's |
 
 Common flow: poster → title (the fair's front, the park to the horizon, attract mode; PLAY starts the
 next unlocked level, WORLDS opens level select) → loading → intro tour → Ready / Set / GO in the seat →

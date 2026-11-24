@@ -25,12 +25,16 @@ import {
 } from './spawnPlacement'
 import type { Vec3 } from '@/utils/vec3'
 import {
-  ENEMY_PLACEMENT, SWARM_SPACING, WALL_START_SPREAD, WATER_DEPTH, WATER_Y, bystanderSlots, placedBesideTrack, swarmSlots, wallPoint,
+  ENEMY_PLACEMENT, SWARM_SPACING, WALL_START_SPREAD, WATER_DEPTH, WATER_Y, bystanderSlots, placedBesideTrack, readableScatterSpawn, swarmSlots, wallPoint,
+  type ScatterBand,
 } from './enemyPlacement'
 import { CLIMB } from '../enemies/climbMotion'
 import { HOP } from '../enemies/hopGlideMotion'
 import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { REFERENCE_FOV_DEG, maxReadableDistance } from '../enemies/enemyReadability'
+import { DRONE_CLEARANCE } from '../enemies/hoverDroneMotion'
+import { trackExtent } from '@/levels/environments/shared/trackScatter'
+import { cityTowers } from '@/levels/environments/biomes/city/cityLayout'
 import { ORBITS, orbitPoint, placeOrbit } from './swimOrbit'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 
@@ -799,5 +803,54 @@ describe('a group on a long backwards straight', () => {
       expect(behind, formation).toBeGreaterThanOrEqual(FORMATIONS[formation].origin.ahead * 0.99)
       expect(behind, formation).toBeLessThan(table.length / 2)
     }
+  })
+})
+
+describe('level7 hover drones keep out of the towers (#323)', () => {
+  const { level, table, groundFn, rideFor } = world(getAllLevels().find((l) => l.id === 'level7')!)
+  const clearAir = BIOMES.city.clearAir!(groundFn, table)
+  const towers = cityTowers(table, trackExtent(table))
+  const c = DRONE_CLEARANCE
+  // The drone's whole drift, not just its centre, stays out of every tower
+  const inTower = (p: Vec3) => {
+    const up = p.y - groundFn(p.x, p.z) - c.y
+    return towers.some((t) => up < t.h && Math.abs(p.x - t.x) < t.w / 2 + c.x && Math.abs(p.z - t.z) < t.d / 2 + c.z)
+  }
+
+  it('scatter spawns, as their wave activates', () => {
+    const rng = createRng(1337)
+    const scatter = ENEMY_PLACEMENT.hoverDrone.scatter as ScatterBand
+    let raw = 0
+    let blocked = 0
+    for (let i = 0; i < 2000; i++) {
+      const camera = trackPoint(table, Math.floor(rng() * table.count))
+      const p = readableScatterSpawn('hoverDrone', scatter, 'air', table, groundFn, rng)
+      if (inTower(p)) raw++
+      if (inTower(clearAir(outsideNearField(p, camera)))) blocked++
+    }
+    expect(raw).toBeGreaterThan(0) // the check would catch an unplaced spawn
+    expect(blocked).toBe(0)
+  })
+
+  it('formation slots, moved onto a street out of the near field', () => {
+    let raw = 0
+    let near = 0
+    let blocked = 0
+    for (const wave of level.enemies.filter((w) => choreographed(w.formation))) {
+      const formation = wave.formation as ChoreographedFormation
+      const slots = formationSlots(formation, wave.count, createRng(1337))
+      for (const fraction of RIDER_FRACTIONS) {
+        const riderIndex = Math.round(fraction * (table.count - 1))
+        const camera = trackPoint(table, riderIndex)
+        const input = { table, riderIndex, camera, formation, type: wave.type, groundFn, slots, ride: rideFor(wave) }
+        raw += placeFormationWave(input).filter((p) => inTower(p.position)).length
+        const placed = placeFormationWave({ ...input, clearAir })
+        blocked += placed.filter((p) => inTower(p.position)).length
+        near += placed.filter((p) => dist(p.position, camera) < NEAR_FIELD).length
+      }
+    }
+    expect(raw).toBeGreaterThan(0)
+    expect(blocked).toBe(0)
+    expect(near).toBe(0) // the move onto a street keeps it out of the rider's face
   })
 })

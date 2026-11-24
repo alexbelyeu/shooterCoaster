@@ -49,3 +49,9 @@ export const WISP_WHITE = '#fff7e1'
 export const WISP_RIM = '#ff3a10'
 export const WISP_RIBBON_ROOT = '#ff8a2a'
 export const WISP_RIBBON_TIP = '#a01010'
+
+// cityEnemyAssets.ts
+export const DRONE_BODY = '#2a2e3a'
+export const DRONE_DOME = '#3c4354'
+export const DRONE_GLOW = '#2ee8ff'
+export const DRONE_TAIL = '#ff2fb0'

@@ -116,3 +116,24 @@ export function withRim<T extends LitMaterial>(material: T, options: RimOptions 
   material.customProgramCacheKey = () => RIM_CACHE_KEY
   return material
 }
+
+/** Chains a fragment patch after `material`'s rim, with its own uniforms and program key. */
+export function withEmissivePatch<T extends THREE.Material>(
+  material: T,
+  key: string,
+  uniforms: Record<string, THREE.IUniform>,
+  pars: string,
+  apply: string,
+): T {
+  const base = material.onBeforeCompile
+  const baseKey = material.customProgramCacheKey()
+  material.onBeforeCompile = (shader, renderer) => {
+    base.call(material, shader, renderer)
+    Object.assign(shader.uniforms, uniforms)
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${pars}`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${apply}`)
+  }
+  material.customProgramCacheKey = () => `${baseKey}-${key}`
+  return material
+}

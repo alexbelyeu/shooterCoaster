@@ -166,7 +166,7 @@ const LEVELS: LevelConfig[] = [
     biome: 'gym',
     maxScore: 20 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1512 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2412
     message: 'You sent the Climbing Gym!',
-    nextLevel: null,
+    nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
     track: GYM_LEVEL_TRACK,
     walls: [...GYM_LEVEL_WALLS],
@@ -187,6 +187,51 @@ const LEVELS: LevelConfig[] = [
       ],
       boss: 'medusa',
       branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 17 },
+    }),
+    starThresholds: [0.25, 0.55, 0.85],
+    environment: {},
+  },
+  {
+    id: 'level7',
+    name: 'Neon Metropolis',
+    description: 'Drones over the city that never sleeps',
+    order: 7,
+    biome: 'city',
+    maxScore: 112 * 15, // 1680: no boss, a finale wave ends the run
+    message: 'You cleared Neon Metropolis!',
+    nextLevel: null,
+    // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
+    // countdown, GO launches it over the fins and it drops straight into the street canyons; gravity rides the rest,
+    // the beat keeping a run to about half the lap. level1's curve family, extent varC × 13 × scalar = 1040.
+    track: {
+      varA: 3,
+      varB: 17,
+      varC: 4,
+      scalar: 20,
+      curve: 'curve1',
+      ride: 'v2',
+      mechanics: [{ kind: 'station', from: 0, to: 0.012, speed: 260 }],
+      rideV2: { crawl: 100, drag: 0.001 },
+      color1: 0xff3fb4,
+      color2: 0x2ee6ff,
+      glow: 0.6,
+    },
+    // Hover drones patrol the street canyons in Vs and rings; no boss yet (the helicopter is #322's), a finale wave ends the run.
+    // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the finale at 40 s. A wave of drones is
+    // shot down in a few seconds and the towers hide stragglers: four big waves 10 s apart, two scattered over the whole
+    // city, left the rider with nothing to shoot for most of the run (the pacing gate). The ring comes second, centred on
+    // the track, so the drop into the canyons has targets; the last wave and the finale come in three rings each, so
+    // they last until the next arrives and to the end of the run.
+    ...paceLevel({
+      waves: [
+        { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
+        { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring' },
+        { type: 'hoverDrone', count: 13, waveLabel: 'Patrol Wing!', formation: 'v' },
+        { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'spiral' },
+        { type: 'hoverDrone', count: 14, waveLabel: 'Swarm Protocol!', formation: 'v' },
+        { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.5 },
+      ],
+      finale: { type: 'hoverDrone', count: 30, waveLabel: 'Final Wave!', formation: 'ring' },
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},

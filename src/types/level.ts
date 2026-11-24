@@ -1,10 +1,10 @@
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
 /** Every biome id, the one list (#509): anything per biome is a `Record<BiomeType, …>`, so a missing one fails `tsc -b`. */
-export const BIOME_TYPES = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym'] as const
+export const BIOME_TYPES = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym', 'city'] as const
 export type BiomeType = (typeof BIOME_TYPES)[number]
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti' | 'magmaTitan' | 'medusa'
-export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly'
+export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly' | 'hoverDrone'
 
 /** A climbable wall (#453): from `origin`, its bottom-left corner, along unit `right` and `up`; it faces `right × up`. */
 export interface WallSurface {

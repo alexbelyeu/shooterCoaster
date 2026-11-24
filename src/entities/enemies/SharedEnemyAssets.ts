@@ -10,6 +10,7 @@ type Vec3 = [number, number, number]
 
 export * from './infernoEnemyAssets'
 export * from './oceanEnemyAssets'
+export * from './cityEnemyAssets'
 
 // Readability rules: every lit enemy material gets a fresnel rim via withRim() (#15), and every enemy's read
 // colours keep `MIN_DELTA_E` (deuteranopia, normal vision) / `MIN_DELTA_E_PROTAN` (protanopia) from what it is seen

@@ -465,14 +465,17 @@ export interface PlaceWaveInput {
   slots: readonly FormationSlot[]
   ride: RideAhead
   bounds?: PlacementBounds
+  /** Moves an air member's spot out of the world's buildings (`BiomeDefinition.clearAir`). */
+  clearAir?: (p: Vec3) => Vec3
 }
 
 /** World placements for a formation wave's slots, in slot order. */
 export function placeFormationWave(input: PlaceWaveInput): Placement[] {
-  const { table, riderIndex, camera, formation, type, groundFn, slots, ride, bounds } = input
+  const { table, riderIndex, camera, formation, type, groundFn, slots, ride, bounds, clearAir } = input
   // Inside an interior's walls, back on its surface (a clamped air slot keeps its clearance under the roof).
   const keepIn = (p: Vec3) => (bounds ? clampToBounds(settle(clampToBounds(p, bounds), surface, groundFn), bounds) : p)
   const surface = ENEMY_PLACEMENT[type].surface
+  const clear = surface === 'air' && clearAir ? clearAir : (p: Vec3) => p
   const reach = maxReadableDistance(type)
   const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
   const step = groupStep(table, formation, groups, ride)
@@ -509,7 +512,7 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
     }
     const { from, spin } = entryStart(formation, f, position, groundFn)
     return {
-      position: keepIn(outsideNearField(keepIn(position), camera)),
+      position: clear(keepIn(outsideNearField(keepIn(position), camera))),
       from: keepIn(outsideNearField(keepIn(from), camera)),
       spin,
       entrySeconds: ENTRY_SECONDS + (ENTRY_STAGGER * slot.index) / Math.max(1, slot.groupSize - 1),
