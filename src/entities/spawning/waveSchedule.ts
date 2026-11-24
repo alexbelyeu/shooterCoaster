@@ -68,6 +68,10 @@ export function waveWindows(delays: readonly number[], bossAt: number | undefine
  * never reads as a kill (#480). Bystanders are never in `spawned`.
  */
 export function enemyCounts(spawned: number, killed: number, escaped: number): { remaining: number; total: number } {
-  const total = Math.max(0, spawned - escaped)
-  return { remaining: Math.max(0, total - killed), total }
+  return { remaining: enemiesLeft(spawned, killed, escaped), total: Math.max(0, spawned - escaped) }
+}
+
+/** `enemyCounts`' remaining alone, for a per-frame check. */
+export function enemiesLeft(spawned: number, killed: number, escaped: number): number {
+  return Math.max(0, Math.max(0, spawned - escaped) - killed)
 }

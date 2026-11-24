@@ -6,6 +6,7 @@ import { indexAtT, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress.hot'
 import type { RideSpeeds } from '@/track/ridePhysics'
 import { RUN_SECONDS } from '@/levels/pacing'
+import { nothingLeft } from '@/levels/bossWin'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -29,7 +30,7 @@ import type { Vec3 } from '@/utils/vec3'
 import {
   ENEMY_PLACEMENT, GOLDEN_BALLOON_SCATTER, WALL_STANDOFF, bystanderSlots, readableScatterSpawn, swarmSlots, wallPoint, wallSlots, type SwarmSlot, type WallSlot,
 } from './enemyPlacement'
-import { enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWaves } from './waveSchedule'
+import { enemiesLeft, enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWaves } from './waveSchedule'
 import type { HardRoute } from '@/track/mechanics'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { ORBITS, placeOrbit, type SwimOrbit } from './swimOrbit'
@@ -331,6 +332,11 @@ export default function EnemySpawner({
   const lastWaveTick = useRef<number | null>(null)
   const goneEnemies = useRef(new Set<string>())
   const escapedEnemies = useRef(new Set<string>())
+  /** Golden balloons popped: outside the kill tally, but one still up is something left to shoot. */
+  const poppedGolden = useRef(new Set<string>())
+  const bossBeaten = useRef(false)
+  /** `run:cleared` went out this run (#961). */
+  const cleared = useRef(false)
   // A hard-route wave's members join the count when it arrives (`joinedEnemies`): an easy-route run never meets them.
   const totalEnemyCount = useMemo(() => enemies.filter((e) => !e.bystander && !waves[e.waveIndex].route).length, [enemies, waves])
   const joinedEnemies = useRef(0)
@@ -350,6 +356,9 @@ export default function EnemySpawner({
     lastWaveTick.current = null
     goneEnemies.current.clear()
     escapedEnemies.current.clear()
+    poppedGolden.current.clear()
+    bossBeaten.current = false
+    cleared.current = false
     joinedEnemies.current = 0
     useGameStore.getState().setEnemyCounts(totalEnemyCount, totalEnemyCount)
     setGeneration((g) => g + 1)
@@ -432,14 +441,28 @@ export default function EnemySpawner({
     const levelTime = RUN_SECONDS - s.timeRemaining
     tickWaves(waveDelays, levelTime, waveProgress.current, tellWave, activateWave)
     lastWaveTick.current = levelTime
+    // The boss beaten with nothing left to shoot or still to come: GameTimer ends the run after the defeat's hold (#961).
+    if (cleared.current) return
+    const left = enemiesLeft(totalEnemyCount + joinedEnemies.current, goneEnemies.current.size, escapedEnemies.current.size)
+    if (!nothingLeft(bossBeaten.current, left, goldenBalloons.length - poppedGolden.current.size, nextWaveDue(waveDelays, waveProgress.current))) return
+    cleared.current = true
+    eventBus.emit('run:cleared')
   })
+
+  useEffect(() => {
+    const onDefeated = () => { bossBeaten.current = true }
+    eventBus.on('boss:defeated', onDefeated)
+    return () => eventBus.off('boss:defeated', onDefeated)
+  }, [])
 
   useEffect(() => {
     const gone = goneEnemies.current
     const escaped = escapedEnemies.current
+    const popped = poppedGolden.current
     return () => {
       gone.clear()
       escaped.clear()
+      popped.clear()
     }
   }, [])
 
@@ -450,6 +473,8 @@ export default function EnemySpawner({
     },
     [publishCounts],
   )
+
+  const onGoldenPop = useCallback((id: string) => { poppedGolden.current.add(id) }, [])
 
   // Gone without a kill (a climber topped out): off the total, so never a kill (#480); no last-kill slow-mo. A bystander
   // is in no count.
@@ -500,7 +525,7 @@ export default function EnemySpawner({
           spawnPosition={gb.position}
           scoreValue={gb.scoreValue}
           radius={gb.radius}
-          onKill={onKill}
+          onKill={onGoldenPop}
         />
       ))}
       {boss && (

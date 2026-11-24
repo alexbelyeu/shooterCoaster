@@ -99,7 +99,7 @@ import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitDr
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
-import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
@@ -2494,7 +2494,7 @@ async function pacingCheck(page, id) {
   pacing.boss = bossFraming(samples, end)
   const shaders = await programsAfterWarmup(page)
   gatePrograms(problems, shaders)
-  if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
+  if (samplingCutShort(samples, end, PACING_STEP)) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
   // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
   const placeholder = isPlaceholder(budget) ? pacing : null
