@@ -309,10 +309,10 @@ export interface SCTestApi {
    *  camera's distance from the pivot (the seat's eye at the pause) and its height over the terrain. */
   photo: { on: boolean; yaw: number; pitch: number; radius: number; offset: number; clearance: number }
   /** The on-ride photo (#701), set by `RidePhoto`: its marker as a track fraction (`at`), whether this run's is taken, the
-   *  ride's track fraction then, the snapshot call's ms, the whole capture frame's ms (the next frame's delta) and the
-   *  frame's before it, its size and its JPEG's bytes (once encoded). */
+   *  ride's track fraction then, the snapshot call's ms, the whole capture frame's ms (the next frame's delta), the
+   *  readback's frame's (the one after) and the frame's before the capture, its size and its JPEG's bytes (once encoded). */
   ridePhoto: {
-    at: number | null; taken: boolean; progress: number | null; captureMs: number | null; frameMs: number | null; beforeMs: number | null
+    at: number | null; taken: boolean; progress: number | null; captureMs: number | null; frameMs: number | null; readMs: number | null; beforeMs: number | null
     width: number; height: number; bytes: number | null
     /** The HUD's flash started its animation. */
     flashed: boolean
@@ -1270,7 +1270,7 @@ export function installE2EApi() {
     introAt: null,
     intro: { mode: 'ride', length: INTRO_SECONDS, handoff: INTRO_HANDOFF_SECONDS, progress: 0, height: 0, seatOffset: 0, seatAngle: 0, anchorAngle: 0, clearance: 0, marks: null, goOffset: null, orbitSeconds: 0, seconds: null, skipped: false },
     photo: { on: false, yaw: 0, pitch: 0, radius: 0, offset: 0, clearance: 0 },
-    ridePhoto: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, width: 0, height: 0, bytes: null, flashed: false, trace: null },
+    ridePhoto: { at: null, taken: false, progress: null, captureMs: null, frameMs: null, readMs: null, beforeMs: null, width: 0, height: 0, bytes: null, flashed: false, trace: null },
     rideTo: null,
     rideSpeed: null,
     rideProgress: 0,

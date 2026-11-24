@@ -665,12 +665,18 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   }
 }
 
-/** Track fraction short of the photo marker the ride is put at: it must then ride past it (#701). */
-const PHOTO_APPROACH = 0.003
 /**
- * The capture's frame against the frame before it or the run's average, the longer (#701): the snapshot waits for the
- * frame's GPU work, which a software renderer does on the CPU, so a fixed ms cap would only measure the runner. The
- * scaling and the JPEG come on later tasks.
+ * Track fraction short of the photo marker the ride is put at: it must then ride past it (#701). Several frames short
+ * even at CI's ~800 ms frames (a frame there rides up to ~0.02): the first frames after the jump catch the level up
+ * (#887: a capture on that frame read 2.8x a usual one, the catch-up, not the snapshot).
+ */
+const PHOTO_APPROACH = 0.03
+/** Frames the ride is held frozen after the jump, so the jumped-to place has drawn before it moves on. */
+const PHOTO_SETTLE_FRAMES = 5
+/**
+ * The capture's frame, and the readback's frame after it, against the frame before the capture or the run's average, the
+ * longer (#701): a software renderer does the GPU's work on the CPU, so a fixed ms cap would only measure the runner.
+ * The JPEG comes on the worker.
  */
 const PHOTO_FRAME_FACTOR = 2
 
@@ -695,7 +701,7 @@ async function ridePhotoProblems(page, id) {
   if (!start) return { problems: ['on-ride photo: no marker (RidePhoto not mounted)'], result: null }
   let jumpedTo = null
   if (!start.taken) {
-    await page.waitForFunction((f) => window.__SC_TEST__.frames >= f + 3, start.frames, { timeout: 30000, polling: 50 }).catch(() => {})
+    await page.waitForFunction((f) => window.__SC_TEST__.frames >= f, start.frames + PHOTO_SETTLE_FRAMES, { timeout: 30000, polling: 50 }).catch(() => {})
     jumpedTo = await page.evaluate(() => {
       const s = window.__SC_TEST__
       s.setTimeScale(1)
@@ -706,7 +712,7 @@ async function ridePhotoProblems(page, id) {
     ? null
     : page.waitForFunction(() => window.__SC_TEST__.ridePhoto.flashed, null, { timeout: 60000, polling: 100 }).then(() => true, () => false)
   const arrived = await page
-    .waitForFunction(() => window.__SC_TEST__.ridePhoto.bytes != null && window.__SC_TEST__.ridePhoto.frameMs != null, null, { timeout: 60000, polling: 100 })
+    .waitForFunction(() => window.__SC_TEST__.ridePhoto.bytes != null && window.__SC_TEST__.ridePhoto.readMs != null, null, { timeout: 60000, polling: 100 })
     .then(() => true, () => false)
   const result = await page.evaluate(() => ({ ...window.__SC_TEST__.ridePhoto, avgFrameMs: window.__SC_TEST__.avgFrameMs }))
   const problems = []
@@ -714,8 +720,9 @@ async function ridePhotoProblems(page, id) {
   else {
     if (flash && !(await flash)) problems.push('on-ride photo: no flash on screen')
     const usual = Math.max(result.beforeMs, result.avgFrameMs)
-    if (result.frameMs > PHOTO_FRAME_FACTOR * usual)
-      problems.push(`on-ride photo: its frame took ${result.frameMs.toFixed(0)} ms, over ${PHOTO_FRAME_FACTOR}x a usual ${usual.toFixed(0)} ms (${JSON.stringify(result.trace)})`)
+    for (const [frame, ms] of [['its frame', result.frameMs], ['the readback frame', result.readMs]])
+      if (ms > PHOTO_FRAME_FACTOR * usual)
+        problems.push(`on-ride photo: ${frame} took ${ms.toFixed(0)} ms, over ${PHOTO_FRAME_FACTOR}x a usual ${usual.toFixed(0)} ms (${JSON.stringify(result.trace)})`)
     if (Math.max(result.width, result.height) > 1280 || result.bytes < 5000) problems.push(`on-ride photo is ${result.width}x${result.height}, ${result.bytes} bytes`)
   }
   return { problems, result: { ...result, flash: flash ? await flash : null, id } }

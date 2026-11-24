@@ -37,11 +37,12 @@ function startRun(s: RideState, runId: number, dist: number, snapshot: GpuSnapsh
   s.taken = false
   s.due = false
   s.timing = false
+  s.reading = false
   s.last = dist
   snapshot?.cancel()
   clearRidePhoto()
   const testApi = window.__SC_TEST__
-  if (testApi) Object.assign(testApi.ridePhoto, { taken: false, progress: null, captureMs: null, frameMs: null, beforeMs: null, bytes: null, flashed: false, trace: null })
+  if (testApi) Object.assign(testApi.ridePhoto, { taken: false, progress: null, captureMs: null, frameMs: null, readMs: null, beforeMs: null, bytes: null, flashed: false, trace: null })
 }
 
 interface RideState {
@@ -54,6 +55,8 @@ interface RideState {
   /** The frame after the capture: it reports how long the capture's frame took (under e2e), starts the readback and
    *  flashes, so the capture's frame does nothing but the blit. */
   timing: boolean
+  /** The frame after that: it reports how long the readback's frame took (under e2e). */
+  reading: boolean
   /** Frames the snapshot has been on its way back. */
   waited: number
 }
@@ -72,7 +75,7 @@ export default function RidePhoto({ table, at }: { table: ArcTable; at: number }
   const gl = useThree((s) => s.gl)
   const canvasSize = useThree((s) => s.size)
   const dpr = useThree((s) => s.viewport.dpr)
-  const state = useRef<RideState>({ runId: -1, last: 0, due: false, taken: false, timing: false, waited: 0 })
+  const state = useRef<RideState>({ runId: -1, last: 0, due: false, taken: false, timing: false, reading: false, waited: 0 })
   /** The darkroom worker, for the level's lifetime: started at mount, so the capture's frame never pays for it. */
   const darkroom = useRef<Worker | null>(null)
   const snapshot = useRef<GpuSnapshot | null>(null)
@@ -115,8 +118,14 @@ export default function RidePhoto({ table, at }: { table: ArcTable; at: number }
   useFrame((_, delta) => {
     const s = state.current
     const shot = snapshot.current
+    if (s.reading) {
+      s.reading = false
+      const testApi = window.__SC_TEST__
+      if (testApi) testApi.ridePhoto.readMs = delta * 1000
+    }
     if (s.timing) {
       s.timing = false
+      s.reading = true
       const testApi = window.__SC_TEST__
       if (testApi) testApi.ridePhoto.frameMs = delta * 1000
       tracePhoto('nextFrame')
