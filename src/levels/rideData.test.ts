@@ -58,9 +58,15 @@ describe('ride data', () => {
     let worst = 0
     shipped.forEach((p, i) => (worst = Math.max(worst, Math.hypot(p.x - source[i].x, p.y - source[i].y, p.z - source[i].z))))
     expect(worst).toBeLessThanOrEqual(Math.sqrt(3) / 2 + 1e-9)
-    // A straight along the frame's x packs as one repeated step.
+    // A straight along the frame's x packs as its one step, then zeros: no change from step to step.
     const straight = [0, 1, 2, 3].map((k) => ({ x: 100 * k * Math.cos(yaw), y: 5, z: -100 * k * Math.sin(yaw) }))
-    expect(packPoints(straight, precision, yaw).xyz.slice(3)).toEqual([100, 0, 0, 100, 0, 0, 100, 0, 0])
+    expect(packPoints(straight, precision, yaw).xyz.slice(3)).toEqual([100, 0, 0, 0, 0, 0, 0, 0, 0])
+  })
+
+  it('packs positions as the first point, the first step, then each step\'s change, in whole numbers', () => {
+    const turning = [{ x: 0, y: 2, z: 0 }, { x: 10, y: 2, z: 0 }, { x: 20, y: 3, z: 1 }, { x: 30, y: 4, z: 3 }]
+    expect(packPoints(turning, { position: 0, up: 2 }).xyz).toEqual([0, 2, 0, 10, 0, 0, 0, 1, 1, 0, 0, 1])
+    expect(unpackPoints(packPoints(turning, { position: 0, up: 2 }))).toEqual(turning)
   })
 
   it('packs positions as whole-number steps', () => {

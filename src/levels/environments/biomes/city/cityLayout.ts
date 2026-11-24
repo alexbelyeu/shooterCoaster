@@ -264,11 +264,50 @@ function clearOf(towers: readonly Tower[], p: Point, ground: number, c: Clearanc
 const STREETS_TRIED = 3
 
 /**
- * The spot `c` clear of every tower that the most of `eyesSeeing(spot)` see past the towers, the nearest of equals:
- * `p` itself, or `p` moved across onto the centre line of a nearby street (`STREET_GRID`: those lines lie at odd
- * multiples of half the pitch), along x or along z. Placed by the nearest open spot alone, a formation's drones sat in
- * the cross streets beside the ride's avenue, behind its towers (#871, #950). `ground` is the ground's height under
- * `p`; `p` when nothing in reach is clear.
+ * Calls `visit` with `p` moved across onto each street within `reach` either way of it, along x and along z, each of
+ * `offsets` off the street's centre line (`STREET_GRID`: those lines lie at odd multiples of half the pitch).
+ */
+function acrossStreets(p: Point, reach: number, offsets: readonly number[], visit: (q: Point) => void): void {
+  const { pitch } = STREET_GRID
+  for (const alongX of [true, false]) {
+    const nearest = Math.round((alongX ? p.z : p.x) / pitch - 0.5)
+    for (let k = -reach; k <= reach; k++) {
+      for (const offset of offsets) {
+        const across = (nearest + k + 0.5) * pitch + offset
+        visit(alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z })
+      }
+    }
+  }
+}
+
+/**
+ * Of the spots `offerAll` offers, the one the most of `eyesSeeing(spot)` see past the towers (`sight` over the spot,
+ * `ground` the street's height), the nearest `p` of equals; `p` when it offers none.
+ */
+function mostSeen(
+  towers: readonly Tower[],
+  p: Point,
+  ground: number,
+  sight: number,
+  eyesSeeing: (q: Point) => Point[],
+  offerAll: (offer: (q: Point) => void) => void,
+): Point {
+  let best = p
+  let bestSeen = -1
+  let bestDist = Infinity
+  offerAll((q) => {
+    const seen = eyesSeeing(q).filter((eye) => !hidden(towers, eye, q, ground, sight)).length
+    const dist = Math.hypot(q.x - p.x, q.z - p.z)
+    if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) [best, bestSeen, bestDist] = [q, seen, dist]
+  })
+  return best
+}
+
+/**
+ * The spot clear of every tower that the most of `eyesSeeing(spot)` see past the towers, the nearest of equals: `p`
+ * itself, or `p` moved across onto the centre line of a nearby street, along x or along z. Placed by the nearest open
+ * spot alone, a formation's drones sat in the cross streets beside the ride's avenue, behind its towers (#871, #950).
+ * `ground` is the ground's height under `p`; `p` when nothing in reach is clear.
  */
 export function clearOfTowers(
   towers: readonly Tower[],
@@ -277,25 +316,13 @@ export function clearOfTowers(
   c: Clearance,
   eyesSeeing: (q: Point) => Point[] = () => [],
 ): Point {
-  const { pitch } = STREET_GRID
-  let best = p
-  let bestSeen = -1
-  let bestDist = Infinity
-  const consider = (q: Point) => {
-    if (!clearOf(towers, q, ground, c)) return
-    const seen = eyesSeeing(q).filter((eye) => !hidden(towers, eye, q, ground, 0)).length
-    const dist = Math.hypot(q.x - p.x, q.z - p.z)
-    if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) [best, bestSeen, bestDist] = [q, seen, dist]
-  }
-  consider(p)
-  for (const alongX of [true, false]) {
-    const nearest = Math.round((alongX ? p.z : p.x) / pitch - 0.5)
-    for (let k = -STREETS_TRIED; k <= STREETS_TRIED; k++) {
-      const across = (nearest + k + 0.5) * pitch
-      consider(alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z })
+  return mostSeen(towers, p, ground, 0, eyesSeeing, (offer) => {
+    const ifClear = (q: Point) => {
+      if (clearOf(towers, q, ground, c)) offer(q)
     }
-  }
-  return best
+    ifClear(p)
+    acrossStreets(p, STREETS_TRIED, [0], ifClear)
+  })
 }
 
 /** How far off a street's centre line a ground enemy stands: past the traffic lanes, on the pavement's edge (#963). */
@@ -309,12 +336,13 @@ const PAVEMENT_TRACK_CLEARANCE = 44
  */
 const PAVEMENT_PASSES: readonly (readonly [number, number])[] = [[PAVEMENT_TRACK_CLEARANCE, 1], [30, 2]]
 const PAVEMENT_TOWER_CLEARANCE = 12
+const KERBS = [-KERB_OFFSET, KERB_OFFSET]
 
 /** Height over its foot of the bot's face, the point a tower must not hide from the rider. */
 const FACE_HEIGHT = 25
 
 /** Whether a tower stands across the line from `eye` to `sight` over `q` (`ground` the street's height): the line's lowest point over its footprint is under its roof. */
-function hidden(towers: readonly Tower[], eye: Point, q: Point, ground: number, sight = FACE_HEIGHT): boolean {
+function hidden(towers: readonly Tower[], eye: Point, q: Point, ground: number, sight: number): boolean {
   const dx = q.x - eye.x
   const dy = q.y + sight - eye.y
   const dz = q.z - eye.z
@@ -337,28 +365,16 @@ function hidden(towers: readonly Tower[], eye: Point, q: Point, ground: number, 
  * trackside placement already put clear of the rails.
  */
 export function onPavement(towers: readonly Tower[], index: TrackIndex, p: Point, eyesSeeing: (q: Point) => Point[] = () => []): Point {
-  const { pitch } = STREET_GRID
   const clearance = { x: PAVEMENT_TOWER_CLEARANCE, y: 0, z: PAVEMENT_TOWER_CLEARANCE }
-  let best = p
-  let bestSeen = -1
-  let bestDist = Infinity
   for (const [rails, reach] of PAVEMENT_PASSES) {
-    for (const alongX of [true, false]) {
-      const nearest = Math.round((alongX ? p.z : p.x) / pitch - 0.5)
-      for (let k = -reach; k <= reach; k++) {
-        for (const side of [-1, 1]) {
-          const across = (nearest + k + 0.5) * pitch + side * KERB_OFFSET
-          const q = alongX ? { x: p.x, y: p.y, z: across } : { x: across, y: p.y, z: p.z }
-          if (index.near(q.x, q.z, rails) || !clearOf(towers, q, p.y, clearance)) continue
-          const seen = eyesSeeing(q).filter((eye) => !hidden(towers, eye, q, p.y)).length
-          const dist = Math.hypot(q.x - p.x, q.z - p.z)
-          if (seen > bestSeen || (seen === bestSeen && dist < bestDist)) [best, bestSeen, bestDist] = [q, seen, dist]
-        }
-      }
-    }
+    const best = mostSeen(towers, p, p.y, FACE_HEIGHT, eyesSeeing, (offer) =>
+      acrossStreets(p, reach, KERBS, (q) => {
+        if (!index.near(q.x, q.z, rails) && clearOf(towers, q, p.y, clearance)) offer(q)
+      }),
+    )
     if (best !== p) return best
   }
-  return best
+  return p
 }
 
 /** Which way the street under a spot runs (the one along x where two cross); null inside a block. */

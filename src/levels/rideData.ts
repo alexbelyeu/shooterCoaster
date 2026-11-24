@@ -9,8 +9,8 @@ export interface RidePrecision {
   up: number
 }
 
-/** A ride's control points packed: `xyz` is the first point then each one's step from the last, in units of 10^-position
- * (whole numbers, so the steps along a straight repeat and gzip well); `ups` is each rolled point's index step from the last
+/** A ride's control points packed: `xyz` is the first point, the first step, then each step's change from the step before,
+ * in units of 10^-position (whole numbers: a straight is a run of zeros, a steady curve small ones, and they gzip well); `ups` is each rolled point's index step from the last
  * rolled point's (a run of rolled points repeats 1) then its up's x, y, z in units of 10^-up: whole numbers, no `0.` to repeat.
  * A ride laid out in a frame turned `yaw` about y (level 2's faces the Pyramid, #864) packs in that frame, where its straights
  * run along the axes and their steps repeat. */
@@ -68,11 +68,15 @@ export function packPoints(world: readonly RailPoint[], precision: RidePrecision
   const scale = 10 ** precision.position
   const xyz: number[] = []
   let last = [0, 0, 0]
-  for (const p of points) {
+  let lastStep = [0, 0, 0]
+  points.forEach((p, i) => {
     const units = [p.x, p.y, p.z].map((v) => Math.round(v * scale))
-    units.forEach((u, k) => xyz.push(u - last[k] + 0))
+    const step = units.map((u, k) => u - last[k])
+    // The first point whole, the first step whole, then each step's change
+    step.forEach((d, k) => xyz.push(i < 2 ? d + 0 : d - lastStep[k] + 0))
     last = units
-  }
+    lastStep = step
+  })
   const upScale = 10 ** precision.up
   const ups: number[] = []
   let lastRolled = 0
@@ -90,10 +94,15 @@ export function unpackPoints({ position, up, xyz, ups, yaw = 0 }: PackedPoints):
   const upScale = 10 ** up
   const points: RailPoint[] = []
   let [x, y, z] = [0, 0, 0]
+  let [dx, dy, dz] = [0, 0, 0]
   for (let i = 0; i < xyz.length; i += 3) {
-    x += xyz[i]
-    y += xyz[i + 1]
-    z += xyz[i + 2]
+    if (i === 3) [dx, dy, dz] = [0, 0, 0] // The first point was whole; from here the steps add up
+    dx += xyz[i]
+    dy += xyz[i + 1]
+    dz += xyz[i + 2]
+    x += dx
+    y += dy
+    z += dz
     points.push({ x: x / scale + 0, y: y / scale + 0, z: z / scale + 0 })
   }
   let rolled = 0
