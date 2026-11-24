@@ -24,6 +24,7 @@ import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from './headless.mjs'
+import { virtualFrames } from './virtualTime.mjs'
 
 const LEVEL = arg('level', 'level1')
 const FROM = Number(arg('from', 0.42))
@@ -65,47 +66,6 @@ if (!FRAMES_ONLY) {
     execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' })
   } catch {
     throw new Error('ffmpeg not found: install it (apt-get install -y ffmpeg) or pass --frames-only')
-  }
-}
-
-/** Page init script: seeded Math.random, a rAF that runs only on __clipFrame(), and __clipAnimations(ms) for CSS animations. */
-function virtualFrames(seed) {
-  let s = seed >>> 0
-  Math.random = () => {
-    s = (s + 0x6d2b79f5) | 0
-    let t = Math.imul(s ^ (s >>> 15), 1 | s)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-  let queue = []
-  let nextId = 1
-  window.requestAnimationFrame = (cb) => {
-    queue.push({ id: nextId, cb })
-    return nextId++
-  }
-  window.cancelAnimationFrame = (id) => {
-    queue = queue.filter((f) => f.id !== id)
-  }
-  window.__clipFrame = () => {
-    const due = queue
-    queue = []
-    const now = performance.now()
-    for (const f of due) f.cb(now)
-  }
-  const stepped = new WeakSet()
-  window.__clipAnimations = (ms) => {
-    for (const a of document.getAnimations()) {
-      if (!stepped.has(a)) {
-        stepped.add(a)
-        a.pause()
-        a.currentTime = 0
-        continue
-      }
-      const end = a.effect?.getComputedTiming().endTime ?? Infinity
-      const t = (a.currentTime ?? 0) + ms
-      if (t >= end) a.finish()
-      else a.currentTime = t
-    }
   }
 }
 
