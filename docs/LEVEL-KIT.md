@@ -82,11 +82,13 @@ biome or score that already exists is refused, so a second run changes nothing. 
    accent; an interior sizes `HALL` around its track (its `BIOME_TERRAIN_CONFIGS` `meshSize` sizes the floor mesh if the
    default 6000 doesn't fit it).
 3. Level. **(script)** `LevelRegistry.ts`: the level after the last one (its `nextLevel`, so the last
-   level's star unlocks it), level1's track params, a starter roster of balloons and crows through
+   level's star unlocks it), a starter `ride` on level1's curve family, a starter roster of balloons and crows through
    `paceLevel` ending on a finale wave, `maxScore` from `SCORE_VALUES`; its row in
    `LevelRegistry.test.ts`'s finales table and its pinned lap in `track/ridePhysics.test.ts` `LAPS`;
    `node scripts/gen-level-limits.mjs` (the server's limits). **(by hand)** The track (inside the
-   extent formula, or an authored spline from a blockout like the gym's; its `LAPS` pin follows), the
+   extent formula, or an authored spline from a blockout like the gym's; its `LAPS` pin follows; a generated ride,
+   `scripts/gen-ride-levels.mjs`, goes in the world's `world.ts` `rides` and `shippedLevels.ts`, never the registry,
+   which is startup JS, #960), the
    world's own roster and boss; then `maxScore`, the finales row and `gen-level-limits` again.
 4. Enemies **(by hand)**: anything new in `SharedEnemyAssets.ts` (warm-up finds it), the world's `world.ts` (each enemy and the boss its
    levels spawn: `worlds.test.ts` fails a missing one), `enemyComponents.ts` / `bossComponents.ts` (the turntable's),
