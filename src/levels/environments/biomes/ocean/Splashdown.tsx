@@ -14,10 +14,7 @@ const SPLASH_TRAUMA_MS = 500
 /** Spray either side of the rails and one dead ahead, this far off the centreline. */
 const SPRAY_SIDE = 14
 
-/**
- * The splashdown (#865): as the car dives into a glass tunnel (`TunnelSpec.glass`, level 3's under the sea), the water
- * at its portal throws spray either side and ahead, with a kick and the splash. Scenery: nothing to shoot.
- */
+/** The splashdown (#865): spray, a kick and the splash at the portal where the car dives into a glass tunnel. */
 export default function Splashdown({ track }: { track: ArcTable }) {
   useEffect(() => {
     const at = new THREE.Vector3()

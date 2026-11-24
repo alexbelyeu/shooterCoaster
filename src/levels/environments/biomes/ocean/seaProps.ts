@@ -180,10 +180,7 @@ export function createWhaleGeometry(length: number): THREE.BufferGeometry {
   return mergePainted([body, flippers, flukes]).scale(length, length, length)
 }
 
-/**
- * The sea arch (#865, `seaArch.ts`): a part-torus slab of stack rock across the rails, flat-shaded and knocked about,
- * moss on its crown. Built in place round the arch's centre (position it at `spec.x, centreY, spec.z`).
- */
+/** The sea arch's rock (`seaArch.ts`), built round its centre: position it at `spec.x, centreY, spec.z`. */
 export function createSeaArchGeometry(spec: SeaArchSpec): THREE.BufferGeometry {
   const { radius } = seaArchShape(spec)
   const torus = new THREE.TorusGeometry(radius, ARCH_TUBE, 7, 22, Math.PI + 2 * ARCH_LEG_ANGLE)

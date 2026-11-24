@@ -1,9 +1,6 @@
 import type { SeaArchSpec } from '@/types/level'
 
-/**
- * The sea arch (#865), pure: a part-torus of rock standing across the rails in the plane square to them, its centreline a
- * circle round the opening. Its legs run on past the horizontal by `ARCH_LEG_ANGLE`, so their open ends sit under the water.
- */
+/** The sea arch (#865), pure: a part-torus of rock across the rails, its legs run on past the horizontal so their ends sit under the water. */
 export const ARCH_TUBE = 14
 export const ARCH_LEG_ANGLE = 0.75
 /** The rock is this much thicker along the rails than across: a slab, not a ring. */

@@ -49,7 +49,6 @@ describe.each([
     const entry = table.y[Math.round((fromS / table.length) * (table.count - 1))]
     expect(entry).toBeGreaterThan(0)
     expect(entry).toBeLessThan(getTrackDimensions(track).eyeHeight)
-    // Somewhere in it the whole tube, its crown included, is under the sea.
     let deepest = Infinity
     for (let i = 0; i < table.count; i++) if (table.s[i] > fromS && table.s[i] < fromS + tunnel.length) deepest = Math.min(deepest, table.y[i])
     expect(deepest + dims.centreUp + dims.radius + dims.wall).toBeLessThan(0)
@@ -82,7 +81,6 @@ describe("level 3's sea arch (#865)", () => {
       if (Math.hypot(table.x[i] - arch.x, table.z[i] - arch.z) < 5) threads = true
     }
     expect(threads).toBe(true)
-    // The rider's head is within 0.8 eye-heights of the rails' axis in the screw: two eye-heights clear of the rock.
     expect(nearest).toBeGreaterThan(2 * eyeHeight)
     expect(nearest).toBeLessThan(5 * eyeHeight)
   })
