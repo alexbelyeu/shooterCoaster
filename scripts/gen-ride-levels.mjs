@@ -13,9 +13,14 @@ const KIT = { position: 0, up: 2 }
 /**
  * Each ride: its level, biome folder, track module and export, the generated module and its export, the decimals its control
  * points keep (`RidePrecision`) and any climbable walls it ships. Level 6's hall is small, so it keeps 0.01 units (#866).
+ * `yaw` names the track module's export of the angle its ride is laid out turned by: its points pack in that frame (#864).
  */
 const RIDES = [
   { level: 'level1', biome: 'themePark', track: 'parkTrack', from: 'PARK_TRACK', file: 'parkLevel', to: 'PARK_LEVEL_TRACK', precision: KIT },
+  {
+    level: 'level2', biome: 'desert', track: 'desertTrack', from: 'DESERT_TRACK', file: 'desertLevel', to: 'DESERT_LEVEL_TRACK',
+    precision: KIT, yaw: 'DESERT_RIDE_YAW',
+  },
   { level: 'level4', biome: 'arctic', track: 'arcticTrack', from: 'ARCTIC_TRACK', file: 'arcticLevel', to: 'ARCTIC_LEVEL_TRACK', precision: KIT },
   { level: 'level5', biome: 'volcanic', track: 'infernoTrack', from: 'INFERNO_TRACK', file: 'infernoLevel', to: 'INFERNO_LEVEL_TRACK', precision: KIT },
   {
@@ -39,7 +44,7 @@ await build({
   stdin: {
     contents: [
       "export { packPoints, roundNumbers } from '@/levels/rideData'",
-      ...rides.map((r) => `export { ${r.from} } from '${biomes}/${r.biome}/${r.track}'`),
+      ...rides.map((r) => `export { ${[r.from, r.yaw].filter(Boolean).join(', ')} } from '${biomes}/${r.biome}/${r.track}'`),
       ...rides.filter((r) => r.walls).map((r) => `export { ${r.walls.from} } from '${biomes}/${r.biome}/${r.walls.module}'`),
     ].join('\n'),
     resolveDir: root,
@@ -72,7 +77,7 @@ import type { TrackParams${ride.walls ? ', WallSurface' : ''} } from '@/types/le
 export const ${ride.to}: TrackParams = {
   ...${JSON.stringify(rest)},
   curve: 'spline',
-  controlPoints: unpackPoints(${JSON.stringify(packPoints(track.controlPoints, ride.precision))}),
+  controlPoints: unpackPoints(${JSON.stringify(packPoints(track.controlPoints, ride.precision, ride.yaw ? mod[ride.yaw] : 0))}),
 } as TrackParams
 ${walls}`
   fs.writeFileSync(outFile, body)
