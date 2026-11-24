@@ -5,7 +5,7 @@ import { FORTRESS_SITE } from './config'
 import IceCave from './IceCave'
 
 /** How much brighter the aurora burns per unit of the atmosphere's `lampGlow` (the polar night, #994). */
-const NIGHT_AURORA = 0.15
+const NIGHT_AURORA = 0.08
 
 export default function ArcticFeatures({ heightFn, groundFn, track, darkSections, atmosphere }: BiomeFeaturesProps) {
   return (

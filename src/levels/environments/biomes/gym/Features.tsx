@@ -11,7 +11,7 @@ import { gymShadowCasters } from './shadows'
 /** Light fittings and daylit windows: unlit and over 1, so Bloom picks them up. */
 const LIGHT_BOOST = 1.6
 /** After hours (a Night Ride's `lampGlow`): the house lights off, what is left of the strip lights' pools and the fittings' glow is the work lights; the Flame still burns. */
-const AFTER_HOURS = { pools: 0.3, fittings: 0.35 }
+const AFTER_HOURS = { pools: 0.15, fittings: 0.2 }
 
 /** The Climbing Gym's hall from Alex's blockout: walls, boulders, the Starr, the building, the holds on every climbing face, the Flame's fire, and the contact shadows of everything standing on the floor. */
 export default function GymFeatures({ atmosphere }: BiomeFeaturesProps) {

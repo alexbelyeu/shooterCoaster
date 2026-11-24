@@ -240,7 +240,7 @@ export const NIGHT_ATMOSPHERES: Partial<Record<BiomeType, AtmosphereConfig>> = {
     },
     sunDirection: [0.3, 1, 0.45],
     sunLightColor: 0x8aa4d8,
-    sunLightIntensity: 0.75,
+    sunLightIntensity: 0.55,
     hemiSkyColor: 0x5a6680,
     hemiGroundColor: 0x2a2420,
     hemiIntensity: 0.75,
@@ -249,7 +249,7 @@ export const NIGHT_ATMOSPHERES: Partial<Record<BiomeType, AtmosphereConfig>> = {
     envIntensity: 0.2,
     // Cold blue shadows, the work lights' and the fire's sodium in the highlights
     grade: {
-      exposure: 1.12,
+      exposure: 0.82,
       temperature: -0.04,
       tint: 0,
       shadowTint: 0x1e3a5a,
