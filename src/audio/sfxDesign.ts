@@ -88,6 +88,7 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   level5: { tonic: 60, minor: true }, // C minor
   level6: { tonic: 64, minor: true }, // E minor
   level7: { tonic: 60, minor: true }, // level5's score, aliased until Neon Metropolis's theme round
+  level8: { tonic: 67, minor: false }, // level3's score, aliased until Jungle Ruins's theme round
   'results-win': { tonic: 60, minor: false }, // C major
   'results-lose': { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
@@ -298,6 +299,7 @@ export const BIOME_REVERB: Record<BiomeType, BiomeReverb> = {
   // A big hard-walled hall: dense early reflections.
   gym: { seconds: 2.6, decayPow: 2.8, toneHz: 5000, level: 0.9, preDelayMs: 30, early: 0.4, slap: null },
   city: { seconds: 1.6, decayPow: 3.2, toneHz: 7000, level: 0.8, preDelayMs: 16, early: 0.08, slap: null },
+  jungle: { seconds: 1.6, decayPow: 3.2, toneHz: 7000, level: 0.8, preDelayMs: 16, early: 0.08, slap: null },
 }
 
 /** Where the early reflections land, as a share of the pre-delay gap, and their relative amplitudes. */

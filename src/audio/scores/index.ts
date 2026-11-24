@@ -20,8 +20,8 @@ const THEME_OPTIONS: Record<string, string> = Object.fromEntries(
   ),
 )
 
-// Neon Metropolis plays Inferno's score until its own theme round (#323): the same string, not a copy, so no bytes.
-export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6, level7: level5, 'results-win': resultsWin, 'results-lose': resultsLose, ...THEME_OPTIONS }
+// Neon Metropolis plays Inferno's score and Jungle Ruins the Pyramid's until their own theme rounds (#323, #870): the same strings, not copies, so no bytes.
+export const SCORES: Record<string, string> = { title, level1, level2, level3, level4, level5, level6, level7: level5, level8: level3, 'results-win': resultsWin, 'results-lose': resultsLose, ...THEME_OPTIONS }
 
 /** `?theme=neon,carousel` → `{ title: 'title.neon', level1: 'level1.carousel' }`: each named option replaces its slot's score; unknown names are ignored. */
 export function themesFromQuery(search: string, options: readonly string[] = Object.keys(THEME_OPTIONS)): Record<string, string> {

@@ -199,7 +199,7 @@ const LEVELS: LevelConfig[] = [
     biome: 'city',
     maxScore: 112 * 15, // 1680: no boss, a finale wave ends the run
     message: 'You cleared Neon Metropolis!',
-    nextLevel: null,
+    nextLevel: 'level8',
     // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
     // countdown, GO launches it over the fins and it drops straight into the street canyons; gravity rides the rest,
     // the beat keeping a run to about half the lap. level1's curve family, extent varC × 13 × scalar = 1040.
@@ -235,6 +235,39 @@ const LEVELS: LevelConfig[] = [
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},
+  },
+  {
+    id: 'level8',
+    name: 'Jungle Ruins',
+    description: 'Ride through Jungle Ruins',
+    order: 8,
+    biome: 'jungle',
+    maxScore: 60 * 13 + 44 * 15, // 1440: no boss, a finale wave ends the run
+    message: 'You cleared Jungle Ruins!',
+    nextLevel: null,
+    // Scaffolded by npm run new-world: level1's curve family; tune it inside the track extent formula (level-design skill).
+    track: {
+      varA: 3,
+      varB: 17,
+      varC: 4,
+      scalar: 20,
+      rollerSpeed: 0.00001,
+      minRollerSpeed: 0.00008,
+      curve: 'curve1',
+      color1: 0xffffff,
+      color2: 0x44aaff,
+    },
+    ...paceLevel({
+      waves: [
+        { type: 'balloon', count: 30, waveLabel: 'Here They Come!', weight: 2 },
+        { type: 'crow', count: 14, waveLabel: 'Crows!', formation: 'v', weight: 2 },
+        { type: 'balloon', count: 30, waveLabel: 'More Balloons!', weight: 2 },
+        { type: 'crow', count: 14, waveLabel: 'The Flock!', formation: 'spiral', weight: 3 },
+      ],
+      finale: { type: 'crow', count: 16, waveLabel: 'Final Wave!' },
+    }),
+    starThresholds: [0.25, 0.55, 0.85],
+    environment: { hasTrees: true, treeCount: 60 },
   },
 ]
 

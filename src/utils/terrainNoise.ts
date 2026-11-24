@@ -213,6 +213,19 @@ export const BIOME_TERRAIN_CONFIGS: Record<BiomeType, TerrainConfig> = {
     transitionWidth: 1200,
     meshSize: 6000,
   },
+  jungle: {
+    frequency: 0.0008,
+    amplitude: 450,
+    octaves: 5,
+    persistence: 0.45,
+    lacunarity: 2.2,
+    exponent: 1.4,
+    ridgeMode: false,
+    baseY: 0,
+    flatRadius: 600,
+    transitionWidth: 800,
+    meshSize: 6000,
+  },
 }
 
 /** Desert gets an extra macro-scale mesa layer */

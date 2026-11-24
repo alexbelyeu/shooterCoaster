@@ -78,6 +78,12 @@ export const BIOME_UI: Record<BiomeType, BiomeUITheme> = {
     accent2: '#ff2fb0', // its magenta
     sky: [['#05061a', 0], ['#1a1434', 0.55], ['#3a2a48', 1]], // atmosphere.ts city.sky, zenith to the hazy horizon
   }),
+  jungle: theme({
+    accent: '#eb4794', // scaffolded: pick the world's accent
+    glow: 'rgba(235, 71, 148, 0.55)',
+    accent2: '#42f048',
+    sky: [['#4d1a31', 0], ['#a63f6f', 0.6], ['#f0c2d7', 1]],
+  }),
 }
 
 export const DEFAULT_UI_THEME: BiomeUITheme = theme({
