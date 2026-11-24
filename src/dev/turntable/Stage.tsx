@@ -8,7 +8,7 @@ import { ENEMY_COMPONENTS } from '@/entities/enemies/enemyComponents'
 import { WALL_STANDOFF } from '@/entities/spawning/enemyPlacement'
 import GoldenBalloon from '@/entities/enemies/GoldenBalloon'
 import { BOSS_COMPONENTS } from '@/entities/bosses/bossComponents'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
 import Atmosphere from '@/levels/environments/shared/Atmosphere'
 import { buildArcTable, type ArcTable } from '@/track/arcLength'
@@ -48,7 +48,7 @@ const tracks = new Map<BossType, ArcTable>()
 function bossTrack(type: BossType): ArcTable {
   let table = tracks.get(type)
   if (!table) {
-    const level = getAllLevels().find((l) => l.boss?.type === type) ?? getAllLevels()[0]
+    const level = shippedLevels().find((l) => l.boss?.type === type) ?? shippedLevels()[0]
     table = buildArcTable(createTrackCurve(level.track))
     tracks.set(type, table)
   }

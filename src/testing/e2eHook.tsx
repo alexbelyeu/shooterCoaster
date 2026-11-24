@@ -34,7 +34,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import type { RideVariant, RunMode } from '@/types/game'
-import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig, levelRide } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
@@ -1262,7 +1262,7 @@ export function installE2EApi() {
     rideFastest: null,
     rideBeats: () => {
       const id = useGameStore.getState().currentLevel
-      return (id ? getLevelConfig(id)?.track.rideV2?.beats : undefined) ?? []
+      return (id ? levelRide(id)?.track.rideV2?.beats : undefined) ?? []
     },
     sight: readSight,
     graphics: () => {

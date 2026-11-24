@@ -5,7 +5,7 @@ import { rideModel } from '@/track/ridePhysics'
 import { BEAT_TOLERANCE_SECONDS } from '@/track/rideV2'
 import { getTunnelDims } from '@/track/setPieces'
 import { getTrackDimensions } from '@/track/trackDimensions'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import type { TrackParams } from '@/types/level'
 import { createHeightFunction, sampleTrackPath } from '@/utils/terrainNoise'
 import { buildOceanRide, OCEAN_SEA_ARCH, OCEAN_TRACK } from './oceanTrack'
@@ -13,7 +13,7 @@ import { ARCH_LEG_ANGLE, seaArchClearance, seaArchShape } from './seaArch'
 
 // The authored ride and the one the game ships (`oceanLevel.ts`, rounded by `gen-ride-levels.mjs`).
 describe.each([
-  ['as shipped', getLevelConfig('level3')!.track],
+  ['as shipped', shippedLevel('level3').track],
   ['as authored', OCEAN_TRACK],
 ] as [string, TrackParams][])("level 3's ride (#865), %s", (_name, track) => {
   const curve = createTrackCurve(track)
@@ -68,10 +68,10 @@ describe.each([
 })
 
 describe("level 3's sea arch (#865)", () => {
-  const track = getLevelConfig('level3')!.track
+  const track = shippedLevel('level3').track
   const table = buildArcTable(createTrackCurve(track))
   const { eyeHeight } = getTrackDimensions(track)
-  const arch = getLevelConfig('level3')!.environment.seaArch!
+  const arch = shippedLevel('level3').seaArch!
 
   it('stands across the corkscrew, the rails threading it with the crown a near miss over the car', () => {
     let nearest = Infinity

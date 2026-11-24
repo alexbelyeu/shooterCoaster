@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildContactShadowGeometry, roundCaster, SHADOW_LIFT, type ShadowCaster } from './contactShadows'
 import { createRng } from '@/utils/rng'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { getTrackDimensions } from '@/track/trackDimensions'
@@ -9,7 +9,7 @@ import { planTowers, towerShadowCasters } from '@/track/supportTowers'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
 
 // Arctic: the most ridged terrain, where the drawn mesh strays furthest from heightFn.
-const level = getLevelConfig('level4')!
+const level = shippedLevel('level4')
 const curve = createTrackCurve(level.track)
 const table = buildArcTable(curve)
 const heightFn = createHeightFunction('arctic', sampleTrackPath((t) => curve.getPointAt(t)))

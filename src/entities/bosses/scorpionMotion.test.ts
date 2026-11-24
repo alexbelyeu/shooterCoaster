@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { createHeightFunction, createTerrainSurface, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
@@ -135,7 +135,7 @@ describe('gait and facing', () => {
 })
 
 describe('perch (level 2)', () => {
-  const curve = createTrackCurve(getLevelConfig('level2')!.track)
+  const curve = createTrackCurve(shippedLevel('level2').track)
   const table = buildArcTable(curve)
   const groundFn = createTerrainSurface(
     createHeightFunction('desert', sampleTrackPath((t) => curve.getPointAt(t))),
