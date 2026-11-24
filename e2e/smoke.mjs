@@ -99,7 +99,7 @@ import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitFr
 import { planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
-import { pacingBudgetProblems, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
@@ -2392,14 +2392,14 @@ async function weatherCheck(page, id) {
 /** Level seconds a pacing step (settled steps, `settledSteps.mjs`: the same run on any runner): 0.5 is 120 steps a run. */
 const PACING_STEP = Number(arg('pacing-step', 0.5))
 
-/** Pacing (#450): the whole run unfired, sampled once a settled step; `rideRate` 1 rides as at 60 fps, so the rider meets each wave where a player would. */
+/** Pacing (#450): the whole run played (#925: `PLAYER_HITS_PER_SECOND` on what the rider can shoot), sampled once a settled step; `rideRate` 1 rides as at 60 fps, so the rider meets each wave where a player would. */
 async function pacingCheck(page, id) {
   const problems = []
-  const started = await page.evaluate(([lid, seed, step]) => {
+  const started = await page.evaluate(([lid, seed, step, rate]) => {
     const s = window.__SC_TEST__
     s.rideRate = 1
     s.holdLevelTime = false
-    s.autoFire(false)
+    s.autoFire(true, rate)
     const run = { samples: [], end: null, done: false }
     s.pacingRun = run
     run.stepper = window.__SC_STEP_SETTLED__(step, () => {
@@ -2411,9 +2411,12 @@ async function pacingCheck(page, id) {
       if (!w && !run.samples.length) return 'hold'
       if (st.phase === 'playing' && w) {
         run.end ??= w.levelTime + st.timeRemaining
+        // What the rider can shoot (#925): in view, readable and in sight, not every enemy whose centre projects on screen.
+        const v = s.sight()
         run.samples.push({
-          t: w.levelTime, targets: st.onScreenEnemies, track: s.rideProgress,
-          waveTell: w.due != null && w.levelTime >= w.due - s.waveTellSeconds, bossTell: s.boss().stage === 'incoming',
+          t: v.levelTime, targets: v.shootable, hidden: v.occluded, specks: v.tiny, track: s.rideProgress,
+          waveTell: w.due != null && v.levelTime >= w.due - s.waveTellSeconds, bossTell: v.bossStage === 'incoming',
+          bossStage: v.bossStage, bossFramed: v.bossFramed,
         })
       } else if (run.samples.length) {
         run.done = true
@@ -2422,7 +2425,7 @@ async function pacingCheck(page, id) {
     })
     s.startLevel(lid, seed)
     return s.frames
-  }, [id, SEED, PACING_STEP])
+  }, [id, SEED, PACING_STEP, PLAYER_HITS_PER_SECOND])
   let last = { frames: started, at: Date.now() }
   // A step that never settles (React committing on every held frame, or a level that never registers its waves) would hold
   // until the job's timeout (#535): each step gets FRAME_DEADLINE_MS, the first the level's load (LEVEL_READY_MS) on top.
@@ -2458,16 +2461,18 @@ async function pacingCheck(page, id) {
   const { samples, end, stepper } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
   if (!samples.length) return { id: 'pacing', level: id, problems: [...problems, 'no playing frame sampled'], pacing: null, timeline: [] }
   const pacing = pacingMetrics(samples, end)
+  pacing.boss = bossFraming(samples, end)
   const shaders = await programsAfterWarmup(page)
   gatePrograms(problems, shaders)
   if (samples.at(-1).t < end - 2 * PACING_STEP) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
   const budget = BUDGETS.pacing?.[id]
   // A placeholder is filled by the caller once the page's errors are counted too (`fillPlaceholderBudget`).
   const placeholder = isPlaceholder(budget) ? pacing : null
-  const over = placeholder ? [] : pacingBudgetProblems(id, pacing, budget)
-  // A level whose entry names `knownOver` (an open issue fixing it) only warns, like the scene budgets.
-  if (budget?.knownOver && over.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${over.join('; ')}`)
-  else problems.push(...over)
+  const { fail, warn } = placeholder
+    ? { fail: [], warn: [] }
+    : pacingGate(budget, pacingBudgetProblems(id, pacing, budget), bossFramingProblems(pacing.boss, budget))
+  if (warn.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${warn.join('; ')}`)
+  problems.push(...fail)
   return { id: 'pacing', level: id, problems, placeholder, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
@@ -2476,7 +2481,6 @@ async function pacingCheck(page, id) {
  * player hitting `BOSS_HITS_PER_SECOND` (a 60 ms blaster fires ~16 shots a second) clears it in that window: the game
  * seconds the boss moved before each phase was on screen, plus every weak point's hp at that rate.
  */
-const BOSS_FIGHT_SECONDS = 20
 const BOSS_HITS_PER_SECOND = 2
 /** Game seconds a `stepBoss` step moves the boss, and how far past its `seconds` it may go looking for `ready`. */
 const BOSS_STEP = 0.25
@@ -3823,24 +3827,45 @@ async function countdownCheck(page, levelId) {
   const skipped = await waitPhase('countdown', 30000)
   const introSkip = await page.evaluate(() => ({ skipped: window.__SC_TEST__.intro.skipped, seconds: window.__SC_TEST__.intro.seconds }))
 
-  // 5. Leave a fresh level mid-warm-up (#141); polled in the page so the unmount beats the warm-up's first check.
-  // Level select first unmounts the level (a transition, several frames at ~2 fps), so the start below remounts it.
+  // 5. Leave a fresh level mid-warm-up (#141). Level select first unmounts the level: its scene swap is a transition
+  // (#597) that a software renderer's slow frames starve, and a start before it commits keeps the mounted level, so
+  // nothing remounts (#646: at a 2-core runner's ~1.5 s frames that outlasted the 30 s this wait used to give up after,
+  // silently, and the check below found no warm-up; 11 s at ~1 s frames). Both waits
+  // are on their event, under the first warm-up's bound: a fast machine passes as soon as they happen.
   await page.evaluate(() => window.__SC_TEST__.setPhase('levelSelect'))
-  await page.waitForFunction(() => !window.__SC_TEST__.levelReady(), null, { timeout: 30000, polling: 100 }).catch(() => {})
+  const leftAt = Date.now()
+  const unmountMs = await page
+    .waitForFunction(() => !window.__SC_TEST__.levelReady(), null, { timeout: 180000, polling: 100 })
+    .then(() => Date.now() - leftAt, () => null)
+  const unmounted = unmountMs !== null
   await waitFrames(page, 2, { maxMs: 30000 })
-  const leftDuringWarmup = await page.evaluate(([lid, seed]) => new Promise((resolve) => {
+  // The remount's first write of `shaderWarmup` (its mount effect, before the warm-up's first step) leaves: `true`
+  // when that write is a warm-up under way, `false` when the level reported itself warm without one, `null` for none.
+  const leftDuringWarmup = !unmounted ? null : await page.evaluate(([lid, seed]) => new Promise((resolve) => {
     const api = window.__SC_TEST__
-    api.shaderWarmup = null
-    api.startLevel(lid, seed)
-    const until = performance.now() + 30000
-    const poll = () => {
-      const w = api.shaderWarmup
-      if (w || performance.now() > until) {
-        api.setPhase('levelSelect')
-        resolve(w ? !w.done : null)
-      } else setTimeout(poll, 0)
+    let warmup = null
+    let first = null
+    const leave = () => {
+      clearTimeout(timer)
+      delete api.shaderWarmup
+      api.shaderWarmup = warmup
+      api.setPhase('levelSelect')
+      resolve(first && !first.done)
     }
-    poll()
+    const timer = setTimeout(leave, 180000)
+    Object.defineProperty(api, 'shaderWarmup', {
+      configurable: true,
+      enumerable: true,
+      get: () => warmup,
+      set: (w) => {
+        warmup = w
+        if (!w || first) return
+        first = w
+        // Once the mount effect has returned, as a player's click would land.
+        setTimeout(leave, 0)
+      },
+    })
+    api.startLevel(lid, seed)
   }), [levelId, SEED])
   await waitFrames(page, 3, { minMs: 1500, maxMs: 30000 })
   const initTimings = await page.evaluate(() => window.__SC_TEST__.initTimings())
@@ -3885,7 +3910,9 @@ async function countdownCheck(page, levelId) {
   else if (afterTap.shotsFired > 0) problems.push(`the skip tap fired ${afterTap.shotsFired} shot(s)`)
   if (!warmIntro) problems.push('a new start of the warm level never reached its intro')
   else if (!skipped || !introSkip.skipped) problems.push('a tap did not skip the intro')
-  if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
+  if (!unmounted) problems.push('level select never unmounted the level')
+  else if (leftDuringWarmup === null) problems.push('the remounted level never started its shader warm-up')
+  else if (!leftDuringWarmup) problems.push('the remounted level reported itself warm without a shader warm-up')
   return {
     id: 'countdown',
     ok: problems.length === 0,
@@ -3902,6 +3929,7 @@ async function countdownCheck(page, levelId) {
       replayPhase,
       skipTapIn: tappedIn,
       swoop,
+      unmountMs,
       leftDuringWarmup,
       warmup,
       firstShot,
