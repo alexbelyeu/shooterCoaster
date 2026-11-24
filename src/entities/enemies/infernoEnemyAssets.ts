@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
+import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
 import { bent, darkUnder, grin, recolor } from './enemyPaint'
 import { withRim } from './enemyRim'
 import { IMP_ORANGE, IMP_DARK, OBSIDIAN as OBSIDIAN_HEX, LAVA, LAVA_HOT, DRAKE_CHARCOAL, DRAKE_MEMBRANE, DRAKE_GLOW, WISP_EMBER, WISP_FLAME, WISP_WHITE, WISP_RIM, WISP_RIBBON_ROOT, WISP_RIBBON_TIP } from './enemyPalette'
@@ -326,8 +326,9 @@ export const LAVA_GOLEM_FLARE_MAT = golemMaterial({ value: 7 }, 0.9)
 
 // ── Infernal Drake: a long-necked dragon on bat wings, a spade tail, horns and glowing eyes ──
 // One material for every part: a charcoal body and membrane wings whose scalloped trailing edges glow, as do the
-// eyes and the inside of the jaw (the glow is painted: a hot orange vertex colour lights itself). Moving parts: torso,
-// neck with head, jaw, tail, and each wing's arm and hand.
+// eyes and the inside of the jaw (the glow is painted: a hot orange vertex colour lights itself). Its eight moving
+// parts (torso, neck with head, jaw, tail, each wing's arm and hand) are one geometry, each vertex tagged with its part
+// (`aPart`), moved in the vertex shader by that part's matrix (`drakePose.hot.ts`): one draw call a drake (#922).
 
 const DRAKE_BELLY = new THREE.Color('#5a3026')
 const DRAKE_VEIN = '#3a0c0c'
@@ -391,7 +392,7 @@ const drakePart = (shaded: THREE.BufferGeometry[], glowing: THREE.BufferGeometry
 const DRAKE_TORSO = [[0, -5], [1.2, -4.6], [2.1, -3], [2.6, -0.5], [2.5, 1.8], [1.9, 3.5], [1.2, 4.4], [0, 4.8]]
 
 /** Torso (a warmer belly), tucked hind legs and a ridge of spines. */
-export const DRAKE_BODY_GEO = drakePart([
+const DRAKE_BODY_GEO = drakePart([
   recolor(paintedAt(new THREE.LatheGeometry(DRAKE_TORSO.map(([r, z]) => new THREE.Vector2(r, z)), 8), DRAKE_CHARCOAL,
     pose([0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.85])), (_x, y, _z, c) => c.lerp(DRAKE_BELLY, 1 - THREE.MathUtils.smoothstep(y, -1.6, -0.6))),
   ...[-1, 1].flatMap((s) => [
@@ -424,7 +425,7 @@ function drakeHorn(side: 1 | -1): THREE.BufferGeometry {
 }
 
 /** Neck and head, about `DRAKE_NECK_ROOT` (its origin): horns, brows, glowing eyes, the upper jaw. */
-export const DRAKE_NECK_GEO = (() => {
+const DRAKE_NECK_GEO = (() => {
   const [x, y, z] = DRAKE_HEAD
   const neck = paintedAt(bent(new THREE.CylinderGeometry(0.75, 1.2, NECK_LENGTH, 6, 4).translate(0, NECK_LENGTH / 2, 0), neckBend),
     DRAKE_CHARCOAL, pose([0, 0, 0], [NECK_LEAN, 0, 0]))
@@ -438,13 +439,13 @@ export const DRAKE_NECK_GEO = (() => {
 })()
 
 /** The lower jaw about `DRAKE_JAW_HINGE` (its origin), glowing inside: shown when it roars. */
-export const DRAKE_JAW_GEO = drakePart(
+const DRAKE_JAW_GEO = drakePart(
   [paintedAt(new THREE.CylinderGeometry(0.3, 0.6, 2.4, 5), DRAKE_CHARCOAL, pose([0, -0.15, 1.3], [Math.PI / 2, 0, 0], [1, 1, 0.6]))],
   [painted(new THREE.BoxGeometry(0.6, 0.1, 1.9), DRAKE_GLOW, [0, 0.05, 1.3])],
 )
 
 /** The tail from `DRAKE_TAIL_ROOT` (its origin) back to a spade, curling up a little at the end. */
-export const DRAKE_TAIL_GEO = (() => {
+const DRAKE_TAIL_GEO = (() => {
   const length = 9
   const curl = (h: number): [number, number] => [0.4 * Math.sin(h * 0.55), 0.03 * h * h]
   const tail = paintedAt(bent(new THREE.ConeGeometry(0.85, length, 4, 6).translate(0, length / 2, 0), curl), DRAKE_CHARCOAL,
@@ -456,7 +457,7 @@ export const DRAKE_TAIL_GEO = (() => {
 })()
 
 /** The right arm about `DRAKE_SHOULDER`: the arm bone along the leading edge, the inner membrane back to the flank. */
-export const DRAKE_WING_ARM_GEO = (() => {
+const DRAKE_WING_ARM_GEO = (() => {
   const trailing: Vec3[] = [DRAKE_ELBOW, [5.3, 0.1, -3.1], [2.6, 0, -3.6], [-0.3, -0.3, -4.2]]
   const [skin, glow] = membrane([0, 0, 0], trailing, [false, true, true])
   return drakePart([
@@ -465,7 +466,7 @@ export const DRAKE_WING_ARM_GEO = (() => {
 })()
 
 /** The right hand about `DRAKE_ELBOW`: three fingers out from the wrist, scalloped membrane between them. */
-export const DRAKE_WING_HAND_GEO = (() => {
+const DRAKE_WING_HAND_GEO = (() => {
   const fingers: Vec3[] = [[7.5, 0.5, -0.9], [6, 0, -3.9], [3, -0.1, -4.6]]
   const join: Vec3 = [5.3 - DRAKE_ELBOW[0], 0.1 - DRAKE_ELBOW[1], -3.1 - DRAKE_ELBOW[2]]
   // Each scallop's low point, pulled in towards the wrist between two tips.
@@ -488,6 +489,74 @@ const DRAKE_GLOW_APPLY = /* glsl */ `{
   float glow = smoothstep(0.55, 0.9, vColor.r) * (1.0 - smoothstep(0.08, 0.2, vColor.b));
   totalEmissiveRadiance += vColor.rgb * glow * 2.2;
 }`
-export const DRAKE_MAT = withEmissivePatch(withRim(new THREE.MeshStandardMaterial({
-  vertexColors: true, roughness: 0.6, metalness: 0.1, flatShading: true,
-}), { color: '#ffb070', intensity: 1.2, power: 2.0 }), 'drake-glow', {}, '', DRAKE_GLOW_APPLY)
+/** Each part's `aPart` in `DRAKE_GEO`: its matrix in `uDrakePose`. */
+export const DRAKE_PART = { body: 0, neck: 1, jaw: 2, tail: 3, rightArm: 4, rightHand: 5, leftArm: 6, leftHand: 7 } as const
+export const DRAKE_PARTS = 8
+
+const add3 = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+
+/** `g` at `at` (mirrored across x for the left wing, its triangles rewound to face out), non-indexed, tagged `part`. */
+function drakePartAt(g: THREE.BufferGeometry, part: number, at: Vec3, mirror = false): THREE.BufferGeometry {
+  const out = (g.index ? g.toNonIndexed() : g.clone()).translate(...at)
+  if (mirror) flipWinding(out.scale(-1, 1, 1))
+  out.setAttribute('aPart', new THREE.BufferAttribute(new Float32Array(out.attributes.position.count).fill(part), 1))
+  return out
+}
+
+/** The whole drake at rest, its parts laid where they hang: one geometry, `aPart` tagging each vertex with its part. */
+export const DRAKE_GEO = (() => {
+  const jaw = add3(DRAKE_NECK_ROOT, DRAKE_JAW_HINGE)
+  const hand = add3(DRAKE_SHOULDER, DRAKE_ELBOW)
+  const P = DRAKE_PART
+  const g = mergePainted([
+    drakePartAt(DRAKE_BODY_GEO, P.body, [0, 0, 0]),
+    drakePartAt(DRAKE_NECK_GEO, P.neck, DRAKE_NECK_ROOT),
+    drakePartAt(DRAKE_JAW_GEO, P.jaw, jaw),
+    drakePartAt(DRAKE_TAIL_GEO, P.tail, DRAKE_TAIL_ROOT),
+    drakePartAt(DRAKE_WING_ARM_GEO, P.rightArm, DRAKE_SHOULDER),
+    drakePartAt(DRAKE_WING_HAND_GEO, P.rightHand, hand),
+    drakePartAt(DRAKE_WING_ARM_GEO, P.leftArm, DRAKE_SHOULDER, true),
+    drakePartAt(DRAKE_WING_HAND_GEO, P.leftHand, hand, true),
+  ])
+  for (const part of [DRAKE_BODY_GEO, DRAKE_NECK_GEO, DRAKE_JAW_GEO, DRAKE_TAIL_GEO, DRAKE_WING_ARM_GEO, DRAKE_WING_HAND_GEO]) part.dispose()
+  // The pose swings the wings and neck about their roots: room for them in the culling sphere.
+  g.boundingSphere!.radius *= 1.15
+  return g
+})()
+
+const DRAKE_POSE_PARS = /* glsl */ `
+attribute float aPart;
+uniform mat4 uDrakePose[${DRAKE_PARTS}];
+`
+// Flat shading takes normals from screen derivatives, so only positions move.
+const DRAKE_POSE_APPLY = /* glsl */ `
+transformed = (uDrakePose[int(aPart + 0.5)] * vec4(transformed, 1.0)).xyz;
+`
+
+/** Moves each part of `material`'s drake by its matrix in `pose` (`drakePose.hot.ts` `poseDrake`); every material built the same way shares one program. */
+export function withDrakePose<T extends THREE.Material>(material: T, pose: { value: THREE.Matrix4[] }): T {
+  const base = material.onBeforeCompile
+  const baseKey = material.customProgramCacheKey()
+  material.onBeforeCompile = (shader, renderer) => {
+    base.call(material, shader, renderer)
+    shader.uniforms.uDrakePose = pose
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n${DRAKE_POSE_PARS}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${DRAKE_POSE_APPLY}`)
+  }
+  material.customProgramCacheKey = () => `${baseKey}-drake-pose`
+  return material
+}
+
+/** A drake at rest: each part's matrix the identity. */
+export const drakeRestPose = () => ({ value: Array.from({ length: DRAKE_PARTS }, () => new THREE.Matrix4()) })
+
+/** One drake's paint, its parts posed by `pose`. */
+export function createDrakeMaterial(pose: { value: THREE.Matrix4[] }): THREE.MeshStandardMaterial {
+  return withDrakePose(withEmissivePatch(withRim(new THREE.MeshStandardMaterial({
+    vertexColors: true, roughness: 0.6, metalness: 0.1, flatShading: true,
+  }), { color: '#ffb070', intensity: 1.2, power: 2.0 }), 'drake-glow', {}, '', DRAKE_GLOW_APPLY), pose)
+}
+
+/** Only for ShaderWarmup and the tests: every drake builds its own. */
+export const DRAKE_MAT = createDrakeMaterial(drakeRestPose())

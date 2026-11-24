@@ -157,7 +157,8 @@ export interface TunnelSpec {
  * A dark section (#752): from track parameter `from` to `to` (the ride's t, as `rideProgress` reports it), the light easing
  * down over `ramp` of t after `from` and back up over the `ramp` before `to`; it may not cross the track's seam. While
  * dark, a shot's muzzle flash lights what is ahead of and below the rider's view within `flashReach` world units. `look` is how it is dark
- * (`DarkSections.tsx` `LOOKS`): `blacklight` (the default, the gym's cave) or `ice` (level 4's ice cave, a blue glow).
+ * (`DarkSections.tsx` `LOOKS`): `blacklight` (the default, the gym's cave) or `ice` (level 4's ice cave, a blue glow). `reach`, when a set-piece
+ * is built over it (level 4's vault, #911), is how far from the centreline (XZ) that reaches: `trackClearance.ts` keeps props out, as a tunnel's.
  */
 export interface DarkSectionSpec {
   from: number
@@ -165,6 +166,7 @@ export interface DarkSectionSpec {
   ramp: number
   flashReach: number
   look?: DarkLook
+  reach?: number
 }
 
 export type DarkLook = 'blacklight' | 'ice'

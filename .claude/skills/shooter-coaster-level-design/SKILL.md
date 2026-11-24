@@ -234,6 +234,7 @@ timed by the run: a lap takes 99–228 s (`track/ridePhysics.ts`, pinned in its 
 - **Terrain-conforming features**: Follow the safeHeight() pattern above
 - **Custom shaders**: Create separate `*Shader.ts` file with `create*Material()` factory, drive uniforms in `useFrame`
 - **Tunnels** (`TrackParams.tunnels`, `docs/LEVEL-KIT.md` "Set-pieces: tunnels"): placement is pure `track/setPieces.ts`, the mesh `track/tunnelGeometry.ts`. It may not cross the seam, needs portal room at each end and may not overlap another. Keep it ~2 s of ride with nothing shootable inside; the `pacing` gate counts that dead time, so place it between waves and re-run `--steps pacing`
+- **Other set-pieces over the track** (a cave, an arcade): give its dark section a `reach` (`DarkSectionSpec`, how far from the centreline it stands), as level 4's ice cave does (#911). `setPieces.ts` `withDarkSections` puts it on the arc table and `trackClearance.ts` keeps every prop out, so no prop needs its own clearance for it
 - **Landmark components**: Create in `src/levels/environments/` (render them from the biome's `Features.tsx`), accept optional custom material props
 
 ## Common Pitfalls

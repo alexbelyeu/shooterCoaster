@@ -9,6 +9,7 @@ import { registerE2EEnemy, unregisterE2EEnemy } from '@/testing/e2eHook'
 import { entryPoint, type FormationMotion } from '@/entities/spawning/spawnPlacement'
 import type { Vec3 } from '@/utils/vec3'
 import type { WallSlot } from '@/entities/spawning/enemyPlacement'
+import type { SwimOrbit } from '@/entities/spawning/swimOrbit'
 import { DEATH_STYLES, type DeathStyle } from '@/effects/deathStyles'
 import { createKillPop, finishKillPop, startKillPop, tickKillPop } from './killPop'
 import { hitBystander } from '@/combat/bystanderHit'
@@ -25,6 +26,8 @@ export interface EnemyProps {
   /** A formation member's motion after its entry. */
   motion?: FormationMotion
   wall?: WallSlot
+  /** A swimmer's circle through `spawnPosition`, placed clear of the world (`spawning/swimOrbit.ts`). */
+  orbit?: SwimOrbit
   /** It got away unshot (a climber topped out): gone, unscored. */
   onEscape?: (id: string) => void
   /** Not a target (#518): a hit costs the penalty and the combo (`combat/bystanderHit.ts`), never a kill. */

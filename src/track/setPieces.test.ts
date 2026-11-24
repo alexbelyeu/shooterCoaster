@@ -5,7 +5,7 @@ import { createTrackCurve } from './curves/createTrackCurve'
 import { buildArcTable } from './arcLength'
 import { getTrackDimensions } from './trackDimensions'
 import { TUNNEL_TRACK_SHADE, buildTrackGeometry } from './trackGeometry'
-import { getTunnelDims, otherPassInTube, ribCentres, tunnelSpans, withTunnels } from './setPieces'
+import { getTunnelDims, otherPassInTube, ribCentres, tunnelSpans, withDarkSections, withTunnels } from './setPieces'
 import { planTowers } from './supportTowers'
 import { tunnelAt, tunnelDepth } from './tunnelRide.hot'
 
@@ -40,6 +40,14 @@ describe('tunnel placement', () => {
       const t = buildArcTable(createTrackCurve(l.track))
       expect(withTunnels(t, l.track.tunnels, 1)).toBe(t)
     }
+  })
+
+  it('puts only a dark section with a reach on the table (#911)', () => {
+    expect(withDarkSections(plain, undefined)).toBe(plain)
+    const dark = { from: 0.3, to: 0.4, ramp: 0.01, flashReach: 100 }
+    expect(withDarkSections(plain, [dark])).toBe(plain)
+    const [cave] = withDarkSections(plain, [{ ...dark, reach: 200 }]).clearances!
+    expect(cave).toEqual({ from: Math.round(0.3 * (plain.count - 1)), to: Math.round(0.4 * (plain.count - 1)), reach: 200 })
   })
 
   it('refuses a tunnel over the seam, an overlap or a bad spec', () => {

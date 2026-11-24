@@ -1,5 +1,5 @@
 import type { TrackCurve } from './curves/TrackCurve'
-import type { TunnelSpan } from './setPieces'
+import type { ClearanceSpan, TunnelSpan } from './setPieces'
 
 /**
  * Dense arc-length lookup for a track curve. Track curves are parametric in t
@@ -20,6 +20,8 @@ export interface ArcTable {
   length: number
   /** The level's tunnels in ride order (`setPieces.ts` `withTunnels`); absent on a track without any. */
   tunnels?: readonly TunnelSpan[]
+  /** Other set-pieces built over the track (a dark section's `reach`, `setPieces.ts` `withDarkSections`): props keep out, like a tunnel's. */
+  clearances?: readonly ClearanceSpan[]
   /** Arc-distance spans the seat rides facing back, between a backwards mechanic's turntables (`mechanics.ts` `withBackwards`). */
   backwards?: readonly { from: number; to: number }[]
 }

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
@@ -17,13 +17,16 @@ const TURN_ROLL = 0.45
  * track: its tail sweeps, the body swaying against it, and it rolls into its turn. Shot, it flinches nose-up.
  */
 export default function Shark(props: EnemyProps) {
-  // A circle through the spawn point, small enough to stay beside the track it was placed by (#316).
-  const orbit = useEnemyRandom(props.id, (rng) => ({
+  // Its circle through the spawn point, placed clear of the rails, the stacks and the shore (`spawning/swimOrbit.ts`, #922);
+  // a random one where nothing placed it (the turntable).
+  const drawn = useEnemyRandom(props.id, (rng) => ({
     radius: 25 + rng() * 35,
     rate: (0.4 + rng() * 0.4) * (rng() < 0.5 ? -1 : 1),
     phase: rng() * Math.PI * 2,
     swim: rng() * Math.PI * 2,
   }))
+  const placed = props.orbit
+  const orbit = useMemo(() => (placed ? { ...drawn, ...placed } : drawn), [drawn, placed])
   const startTime = useRef<number | null>(null)
   // The direction it swims, (sin, cos) of its heading in world x / z.
   const heading = useRef({ x: 0, z: 1 })

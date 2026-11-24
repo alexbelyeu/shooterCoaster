@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
 import {
-  DRAKE_BODY_GEO, DRAKE_JAW_GEO, DRAKE_MAT, DRAKE_NECK_GEO, DRAKE_TAIL_GEO, DRAKE_WING_ARM_GEO, DRAKE_WING_HAND_GEO,
+  DRAKE_ELBOW, DRAKE_GEO, DRAKE_JAW_HINGE, DRAKE_MAT, DRAKE_NECK_ROOT, DRAKE_PART, DRAKE_PARTS, DRAKE_SHOULDER, createDrakeMaterial, drakeRestPose,
   EMBER_WISP_CORE_GEO, EMBER_WISP_CORE_MAT, EMBER_WISP_RIBBON_MAT, EMBER_WISP_RIBBONS_GEO,
   FIRE_IMP_ARMS_GEO, FIRE_IMP_BODY_GEO, FIRE_IMP_EYES_GEO, FIRE_IMP_TAIL_GEO,
   LAVA_GOLEM_BODY_GEO, LAVA_GOLEM_FLARE_MAT, LAVA_GOLEM_LEFT_ARM_GEO, LAVA_GOLEM_LEG_GEO, LAVA_GOLEM_MAT,
   LAVA_GOLEM_RIGHT_ARM_GEO,
 } from './infernoEnemyAssets'
+import { DRAKE_ROAR_MAT, ENEMY_HIT_FLASH_MAT } from './SharedEnemyAssets'
+import { DRAKE_ROAR, poseDrake } from './drakePose.hot'
 
 const tris = (...gs: THREE.BufferGeometry[]) => gs.reduce((n, g) => n + (g.index?.count ?? g.attributes.position.count) / 3, 0)
 const box = (g: THREE.BufferGeometry) => new THREE.Box3().setFromBufferAttribute(g.attributes.position as THREE.BufferAttribute)
@@ -41,8 +43,7 @@ describe("inferno enemies (#463): the briefs' triangle caps", () => {
   })
 
   it('infernal drake: torso, neck, jaw, tail and both wings under 900', () => {
-    const wing = [DRAKE_WING_ARM_GEO, DRAKE_WING_HAND_GEO]
-    expect(tris(DRAKE_BODY_GEO, DRAKE_NECK_GEO, DRAKE_JAW_GEO, DRAKE_TAIL_GEO, ...wing, ...wing)).toBeLessThanOrEqual(900)
+    expect(tris(DRAKE_GEO)).toBeLessThanOrEqual(900)
   })
 })
 
@@ -90,17 +91,24 @@ describe('inferno enemy models', () => {
 
   it("paint the drake's glow only on the wings' trailing edges, the eyes and the mouth: never on its charcoal", () => {
     // The material's mask: red high, blue low (DRAKE_GLOW_APPLY).
-    const glowing = (g: THREE.BufferGeometry) => {
-      const c = g.attributes.color
+    const glowing = (part: number) => {
+      const c = DRAKE_GEO.attributes.color
+      const tag = DRAKE_GEO.attributes.aPart
       let n = 0
-      for (let i = 0; i < c.count; i++) if (c.getX(i) > 0.55 && c.getZ(i) < 0.2) n++
-      return n / c.count
+      let all = 0
+      for (let i = 0; i < c.count; i++) {
+        if (tag.getX(i) !== part) continue
+        all++
+        if (c.getX(i) > 0.55 && c.getZ(i) < 0.2) n++
+      }
+      return n / all
     }
-    expect(glowing(DRAKE_BODY_GEO)).toBe(0)
-    expect(glowing(DRAKE_TAIL_GEO)).toBe(0)
-    for (const g of [DRAKE_WING_ARM_GEO, DRAKE_WING_HAND_GEO, DRAKE_NECK_GEO, DRAKE_JAW_GEO]) {
-      expect(glowing(g)).toBeGreaterThan(0)
-      expect(glowing(g)).toBeLessThan(0.5)
+    const P = DRAKE_PART
+    expect(glowing(P.body)).toBe(0)
+    expect(glowing(P.tail)).toBe(0)
+    for (const part of [P.rightArm, P.rightHand, P.leftArm, P.leftHand, P.neck, P.jaw]) {
+      expect(glowing(part)).toBeGreaterThan(0)
+      expect(glowing(part)).toBeLessThan(0.5)
     }
   })
 
@@ -135,5 +143,66 @@ describe('inferno enemy materials', () => {
     const { vertexShader } = compiled(EMBER_WISP_RIBBON_MAT)
     expect(vertexShader.indexOf('aRibbon * aRibbon')).toBeGreaterThan(vertexShader.indexOf('#include <begin_vertex>'))
     expect(EMBER_WISP_RIBBONS_GEO.attributes.aRibbon).toBeDefined()
+  })
+})
+
+describe('infernal drake in one draw call (#922)', () => {
+  const partBox = (part: number) => {
+    const box = new THREE.Box3()
+    const { position, aPart } = DRAKE_GEO.attributes
+    const v = new THREE.Vector3()
+    for (let i = 0; i < position.count; i++) if (aPart.getX(i) === part) box.expandByPoint(v.fromBufferAttribute(position, i))
+    return box
+  }
+
+  it('tags every vertex with one of its eight parts, the left wing the right one mirrored', () => {
+    const counts = new Array<number>(DRAKE_PARTS).fill(0)
+    const { aPart } = DRAKE_GEO.attributes
+    for (let i = 0; i < aPart.count; i++) counts[aPart.getX(i)]++
+    expect(counts.every((n) => n > 0)).toBe(true)
+    expect(counts.reduce((a, b) => a + b)).toBe(aPart.count)
+    const P = DRAKE_PART
+    for (const [right, left] of [[P.rightArm, P.leftArm], [P.rightHand, P.leftHand]]) {
+      const r = partBox(right)
+      const l = partBox(left)
+      expect(l.min.x).toBeCloseTo(-r.max.x, 5)
+      expect(l.max.x).toBeCloseTo(-r.min.x, 5)
+      expect(r.min.x).toBeGreaterThan(0)
+    }
+  })
+
+  it('poses each part about its joint: at rest nothing moves, the jaw stays on the neck and each hand on its arm', () => {
+    const rest = drakeRestPose().value
+    poseDrake(rest, { neckX: 0, neckY: 0, jaw: 0, tailX: 0, tailY: 0, arm: 0, hand: 0 })
+    for (const m of rest) expect(m.equals(new THREE.Matrix4())).toBe(true)
+
+    const roar = drakeRestPose().value
+    poseDrake(roar, DRAKE_ROAR)
+    const P = DRAKE_PART
+    const at = (m: THREE.Matrix4, p: THREE.Vector3) => p.clone().applyMatrix4(m)
+    const neckRoot = new THREE.Vector3(...DRAKE_NECK_ROOT)
+    const hinge = new THREE.Vector3(...DRAKE_JAW_HINGE).add(neckRoot)
+    const shoulder = new THREE.Vector3(...DRAKE_SHOULDER)
+    const elbow = new THREE.Vector3(...DRAKE_ELBOW).add(shoulder)
+    expect(at(roar[P.neck], neckRoot).distanceTo(neckRoot)).toBeLessThan(1e-9)
+    expect(at(roar[P.jaw], hinge).distanceTo(at(roar[P.neck], hinge))).toBeLessThan(1e-9)
+    expect(at(roar[P.rightArm], shoulder).distanceTo(shoulder)).toBeLessThan(1e-9)
+    expect(at(roar[P.rightHand], elbow).distanceTo(at(roar[P.rightArm], elbow))).toBeLessThan(1e-9)
+    // Wings thrown up: the right elbow rises, and the left one with it.
+    const leftElbow = elbow.clone().setX(-elbow.x)
+    expect(at(roar[P.rightArm], elbow).y).toBeGreaterThan(elbow.y + 2)
+    expect(at(roar[P.leftArm], leftElbow).y).toBeCloseTo(at(roar[P.rightArm], elbow).y, 9)
+    expect(at(roar[P.leftArm], leftElbow).x).toBeCloseTo(-at(roar[P.rightArm], elbow).x, 9)
+  })
+
+  it('moves its parts in the vertex shader, one program for every drake, its roar flash and the warm-up', () => {
+    const { vertexShader, uniforms } = compiled(DRAKE_MAT)
+    expect(vertexShader).toContain(`uniform mat4 uDrakePose[${DRAKE_PARTS}];`)
+    expect(vertexShader.indexOf('uDrakePose[int(aPart')).toBeGreaterThan(vertexShader.indexOf('#include <begin_vertex>'))
+    expect(uniforms.uDrakePose.value).toHaveLength(DRAKE_PARTS)
+    const own = createDrakeMaterial(drakeRestPose())
+    expect(own.customProgramCacheKey()).toBe(DRAKE_MAT.customProgramCacheKey())
+    own.dispose()
+    expect(DRAKE_ROAR_MAT.customProgramCacheKey()).toBe(`${ENEMY_HIT_FLASH_MAT.customProgramCacheKey()}-drake-pose`)
   })
 })
