@@ -11,7 +11,7 @@ export const NEON_GAIN = 2.2
 
 /** How a sign lights (#324): steady, light bands chasing along it, blinking on and off, or steady with a stutter now and then. */
 const NEON_PATTERNS = ['steady', 'chase', 'blink', 'flicker'] as const
-type NeonPattern = (typeof NEON_PATTERNS)[number]
+export type NeonPattern = (typeof NEON_PATTERNS)[number]
 
 function hash01(i: number, salt: number): number {
   return Math.abs(Math.sin(i * salt + 311.7) * 43758.5453) % 1
@@ -23,22 +23,31 @@ function neonPattern(i: number): NeonPattern {
   return h < 0.4 ? 'chase' : h < 0.6 ? 'blink' : h < 0.75 ? 'flicker' : 'steady'
 }
 
-/** Every slab as one vertex-coloured geometry; `aNeon` is (distance along the slab's long axis, 0, seed, pattern). Caller disposes. */
+/**
+ * Sets `box`'s `aNeon` for `createNeonMaterial`: (distance along its long axis from `along(v)`, 0, `seed`, `pattern`).
+ * `box` is non-indexed; returns it.
+ */
+export function withNeon(box: THREE.BufferGeometry, pattern: NeonPattern, seed = 0, along: (v: number) => number = () => 0): THREE.BufferGeometry {
+  const count = box.attributes.position.count
+  const neon = new Float32Array(count * 4)
+  const index = NEON_PATTERNS.indexOf(pattern)
+  for (let v = 0; v < count; v++) {
+    neon[v * 4] = along(v)
+    neon[v * 4 + 2] = seed
+    neon[v * 4 + 3] = index
+  }
+  box.setAttribute('aNeon', new THREE.BufferAttribute(neon, 4))
+  return box
+}
+
+/** Every slab as one vertex-coloured geometry, with its `aNeon` (`withNeon`). Caller disposes. */
 export function neonGeometry(signs: readonly NeonSign[]): THREE.BufferGeometry {
   return mergePainted(
     signs.map((s, i) => {
       const box = new THREE.BoxGeometry(s.w, s.h, s.d).toNonIndexed()
       const pos = box.attributes.position
-      const neon = new Float32Array(pos.count * 4)
-      const seed = hash01(i, 78.233)
-      const pattern = NEON_PATTERNS.indexOf(neonPattern(i))
-      for (let v = 0; v < pos.count; v++) {
-        neon[v * 4] = s.w >= s.h ? pos.getX(v) + s.w / 2 : s.h / 2 - pos.getY(v)
-        neon[v * 4 + 2] = seed
-        neon[v * 4 + 3] = pattern
-      }
-      box.setAttribute('aNeon', new THREE.BufferAttribute(neon, 4))
-      return paintedAt(box, NEON_RGB[s.color], pose([s.x, s.y, s.z], [0, s.yaw, 0]))
+      const along = (v: number) => (s.w >= s.h ? pos.getX(v) + s.w / 2 : s.h / 2 - pos.getY(v))
+      return paintedAt(withNeon(box, neonPattern(i), hash01(i, 78.233), along), NEON_RGB[s.color], pose([s.x, s.y, s.z], [0, s.yaw, 0]))
     }),
   )
 }

@@ -1,7 +1,8 @@
 import type { ArcTable } from '@/track/arcLength'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { createRng } from '@/utils/rng'
-import { STREET_GRID, type Tower } from './cityLayout'
+import type { Tower } from './cityLayout'
+import { STREET_GRID } from './config'
 
 /** Neon Metropolis's traffic (#324), pure and seeded: lanes cut into runs clear of the towers (the skyline and the hero tower stand across some streets) and of the track's supports. */
 

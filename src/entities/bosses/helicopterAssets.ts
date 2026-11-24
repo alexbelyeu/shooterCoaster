@@ -109,7 +109,7 @@ export const HELI_TAIL_ROTOR_GEO = mergePainted([
   painted(new THREE.BoxGeometry(3, 7, 58), HULL_TOP, [2, 0, 0]),
 ])
 
-/** The tail rotor's own blur disc: the main blur turned into the yz plane. */
+/** The tail rotor's blur disc radius: the unit main blur disc (`HELI_ROTOR_BLUR_GEO`) scaled to the ring, turned into the yz plane where it is mounted. */
 export const HELI_TAIL_BLUR_SCALE = 30
 
 /** The main rotor's hub: a cap on the mast ringed in amber, the last weak point. */

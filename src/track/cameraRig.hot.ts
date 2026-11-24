@@ -7,6 +7,7 @@
 
 import { distanceAtT, tAtLoopDistance, type ArcTable } from './arcLength'
 import { smoothNoise1 } from '@/utils/valueNoise.hot'
+import { smoothstep } from '@/utils/ease'
 
 export interface Vec3Like {
   x: number
@@ -92,19 +93,14 @@ export function pitchAngle(longitudinalAccel: number, trackScale: number): numbe
 /** 0 on the flat or climbing, easing to 1 on a steep drop. */
 export function dropAmount(descent: number): number {
   if (!Number.isFinite(descent)) return 0
-  const x = Math.min(Math.max((descent - DROP_START) / (DROP_FULL - DROP_START), 0), 1)
-  return x * x * (3 - 2 * x)
+  return smoothstep((descent - DROP_START) / (DROP_FULL - DROP_START))
 }
 
-const smoothstep01 = (x: number) => {
-  const c = Math.min(Math.max(x, 0), 1)
-  return c * c * (3 - 2 * c)
-}
 
 /** 0 off a crest, easing to 1 where it throws the rider up out of the seat. `verticalAccel` is negative over a crest. */
 export function airtimeAmount(verticalAccel: number, trackScale: number): number {
   if (!Number.isFinite(verticalAccel) || !(trackScale > 0)) return 0
-  return smoothstep01((-verticalAccel / trackScale - AIRTIME_START) / (AIRTIME_FULL - AIRTIME_START))
+  return smoothstep((-verticalAccel / trackScale - AIRTIME_START) / (AIRTIME_FULL - AIRTIME_START))
 }
 
 /** What the camera reads off the ride each frame; one reused object. */

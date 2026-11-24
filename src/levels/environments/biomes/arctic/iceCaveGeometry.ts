@@ -4,6 +4,7 @@ import { distanceAtT } from '@/track/arcLength'
 import type { DarkSectionSpec } from '@/types/level'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import { trackFrameAt } from '../../shared/trackClearance'
+import { smoothstep } from '@/utils/ease'
 
 /** Level 4's ice cave (#866), pure: a faceted vault over the ice dark section, wide enough that the trackside snowmen stand inside it. */
 export const ICE_CAVE = {
@@ -29,8 +30,7 @@ const SNOW = new THREE.Color(0.92, 0.95, 1.0)
 
 /** The vault's crown over the rails `u` units into the cave: the lip at the mouth, easing up to the vault. */
 export function iceCaveCrown(u: number): number {
-  const k = Math.min(Math.max(u / ICE_CAVE.mouth, 0), 1)
-  return ICE_CAVE.lip + (ICE_CAVE.vault - ICE_CAVE.lip) * k * k * (3 - 2 * k)
+  return ICE_CAVE.lip + (ICE_CAVE.vault - ICE_CAVE.lip) * smoothstep(u / ICE_CAVE.mouth)
 }
 
 /** The cave's span on the arc table: its dark section's, in arc distance. */
