@@ -212,17 +212,15 @@ palettes, ghost replay, the WebGPU event, the Daily Run board).
 
 1. **Night Ride for levels 4–6** — after #880 (Desert, Ocean) sets the pattern; one issue.
 2. **Medals for new worlds** — each world adds its three to `medals.ts` once #879 lands.
-3. **Phone haptics** — `navigator.vibrate` on kill, boss weak point and boss defeat, off in
-   Settings and under reduced motion.
-4. **Remappable input** — keyboard and gamepad bindings in Settings, saved locally.
-5. **PWA install + offline play** — a service worker that caches the hashed assets (never the
+3. **Remappable input** — keyboard and gamepad bindings in Settings, saved locally.
+4. **PWA install + offline play** — a service worker that caches the hashed assets (never the
    `api/` calls), the manifest's install prompt from the title.
-6. **Boss rush** — every boss back to back, unlocked when every level has 3★; a local best.
-7. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only if a world can't
+5. **Boss rush** — every boss back to back, unlocked when every level has 3★; a local best.
+6. **Spatial chunking + fog-distance cut** for whole-level InstancedMeshes; only if a world can't
    hold 250 draws by batching alone.
-8. **The Blender spike** (#381 step 4) — one enemy from a Blender script, with a recorded adopt /
+7. **The Blender spike** (#381 step 4) — one enemy from a Blender script, with a recorded adopt /
    don't-adopt decision.
-9. **Daily Run ghost** — today's World best as a ghost crosshair (needs a column; Alex runs the
+8. **Daily Run ghost** — today's World best as a ghost crosshair (needs a column; Alex runs the
    migration).
 
 Not doing (from the slop-newyork review, #126): unpinned three.js from a CDN,
