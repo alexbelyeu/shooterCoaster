@@ -6,7 +6,7 @@ import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
 // Level 4's ride too (#866), and level 5's (#867).
 import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
 import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
-import { GYM_LEVEL } from './environments/biomes/gym/gymLevel'
+import { GYM_LEVEL_TRACK, GYM_LEVEL_WALLS } from './environments/biomes/gym/gymLevel'
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
@@ -168,8 +168,8 @@ const LEVELS: LevelConfig[] = [
     message: 'You sent the Climbing Gym!',
     nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
-    track: GYM_LEVEL.track,
-    walls: [...GYM_LEVEL.walls],
+    track: GYM_LEVEL_TRACK,
+    walls: [...GYM_LEVEL_WALLS],
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
     // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
     // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
