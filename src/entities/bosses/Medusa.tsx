@@ -14,7 +14,7 @@ import { currentPhase, weakPointHp, type WeakPointSpec } from './bossModel'
 import { MEDUSA } from './bossSpecs'
 import {
   MEDUSA_BODY_GEO, MEDUSA_CROWN_HEAD_GEO, MEDUSA_CROWN_SNAKE_COLOR, MEDUSA_HAIR_GEO, MEDUSA_HAIR_MAT, MEDUSA_HUB_GEO, MEDUSA_HUB_MAT,
-  MEDUSA_JEWEL_GEO, MEDUSA_JEWEL_MAT, MEDUSA_SKIN_MAT, MEDUSA_SNAKE_BEAD_GEO, MEDUSA_SNAKE_COLORS,
+  MEDUSA_JEWEL_GEO, MEDUSA_JEWEL_MAT, MEDUSA_SKIN_MAT, MEDUSA_SNAKE_SEGMENT_GEO, MEDUSA_SNAKE_COLORS,
   MEDUSA_SNAKE_HEAD_GEO, MEDUSA_SNAKE_HEAD_MAT, MEDUSA_SNAKE_MAT, MEDUSA_STAR_GLOW_GEO, MEDUSA_STAR_GLOW_MAT,
 } from './bossAssets'
 import {
@@ -23,7 +23,7 @@ import {
 } from './medusaMotion'
 
 const N = SNAKE.segments
-const BEADS = SNAKE_SLOTS.length * N
+const SEGMENTS = SNAKE_SLOTS.length * N
 const TELL_SECONDS = MEDUSA.tell.seconds
 /** Phase 0's snakes uncoil as she finishes rising. */
 const FIRST_SNAKES_AT = MEDUSA_RISE.riseS * 0.5
@@ -61,7 +61,7 @@ const _place = { y: 0, z: 0, scale: 1, pitch: 0 }
 /** Climbing Gym finale: she rises out of the Starr; shoot the snakes in her curls, four, four more, then the crown snake. */
 export default function Medusa(props: BossProps) {
   const { incoming, active } = props
-  const beadsRef = useRef<THREE.InstancedMesh>(null)
+  const spineRef = useRef<THREE.InstancedMesh>(null)
   const starRef = useRef<THREE.Group>(null)
   const starSpinRef = useRef<THREE.Group>(null)
   const hubRef = useRef<THREE.Mesh>(null)
@@ -83,18 +83,18 @@ export default function Medusa(props: BossProps) {
   )
 
   useEffect(() => {
-    const beads = beadsRef.current
-    if (!beads) return
+    const spine = spineRef.current
+    if (!spine) return
     const color = new THREE.Color()
     SNAKE_SLOTS.forEach((s, i) => {
       color.set(s.phase === 2 ? MEDUSA_CROWN_SNAKE_COLOR : MEDUSA_SNAKE_COLORS[i % MEDUSA_SNAKE_COLORS.length])
       for (let k = 0; k < N; k++) {
-        beads.setColorAt(i * N + k, color)
-        beads.setMatrixAt(i * N + k, ZERO)
+        spine.setColorAt(i * N + k, color)
+        spine.setMatrixAt(i * N + k, ZERO)
       }
     })
-    beads.instanceMatrix.needsUpdate = true
-    if (beads.instanceColor) beads.instanceColor.needsUpdate = true
+    spine.instanceMatrix.needsUpdate = true
+    if (spine.instanceColor) spine.instanceColor.needsUpdate = true
   }, [])
 
   useEffect(
@@ -178,7 +178,7 @@ export default function Medusa(props: BossProps) {
       // The camera, root-local: what the snakes strike at.
       _camLocal.copy(_cam)
       root.worldToLocal(_camLocal)
-      const beads = beadsRef.current
+      const spine = spineRef.current
       let hissed = false
       for (let i = 0; i < SNAKE_SLOTS.length; i++) {
         const s = SNAKE_SLOTS[i]
@@ -193,10 +193,10 @@ export default function Medusa(props: BossProps) {
         _dir[2] = _b.z
         const p = points[i]
         laySnake(s, age, grown, alive, _dir, p)
-        // A bead per segment, stretched over it and overlapping the next.
-        for (let k = 0; beads && k < N; k++) {
+        // A vertebra per segment, stretched over it and overlapping the next.
+        for (let k = 0; spine && k < N; k++) {
           if (grown < 0.02) {
-            beads.setMatrixAt(i * N + k, ZERO)
+            spine.setMatrixAt(i * N + k, ZERO)
             continue
           }
           _a.set(p[k * 3], p[k * 3 + 1], p[k * 3 + 2])
@@ -206,7 +206,7 @@ export default function Medusa(props: BossProps) {
           const len = _b.length()
           if (len > 1e-6) _q.setFromUnitVectors(Y_AXIS, _b.divideScalar(len))
           const r = snakeRadius(s, k + 0.5) * Math.min(1, 0.4 + grown)
-          beads.setMatrixAt(i * N + k, _m.compose(_s, _q, _p.set(r, len * 0.62 + r * 0.2, r)))
+          spine.setMatrixAt(i * N + k, _m.compose(_s, _q, _p.set(r, len * 0.62 + r * 0.2, r)))
         }
         const part = parts.get(w.id)
         const head = heads.get(w.id)
@@ -221,7 +221,7 @@ export default function Medusa(props: BossProps) {
           sfx().kill(0, 'hiss', placeSound(part.getWorldPosition(_p)))
         }
       }
-      if (beads) beads.instanceMatrix.needsUpdate = true
+      if (spine) spine.instanceMatrix.needsUpdate = true
     },
     [sim, points, heads, showStar],
   )
@@ -249,7 +249,7 @@ export default function Medusa(props: BossProps) {
       spec={MEDUSA}
       move={move}
       body={body}
-      rigging={<instancedMesh ref={beadsRef} args={[MEDUSA_SNAKE_BEAD_GEO, MEDUSA_SNAKE_MAT, BEADS]} frustumCulled={false} />}
+      rigging={<instancedMesh ref={spineRef} args={[MEDUSA_SNAKE_SEGMENT_GEO, MEDUSA_SNAKE_MAT, SEGMENTS]} frustumCulled={false} />}
       renderWeakPoint={renderWeakPoint}
       exitSeconds={EXIT_SECONDS}
       defeatBurst={BOSS_DEFEAT_DEATH_STYLE}

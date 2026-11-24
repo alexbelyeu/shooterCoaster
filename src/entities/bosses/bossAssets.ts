@@ -846,7 +846,8 @@ export const TITAN_CROWN_GEO = mergePainted([
 // Modelled, with her blessing, on a real person: warm brown skin (darker underneath, lighter where the hall's light
 // falls), a bony jaw with a crisp jawline, high cheekbones, a big straight nose with a sharp bridge from the brow and a
 // jewel each side of it, almond eyes with a sideways, mischievous glance, curly dark hair.
-// Realistic, flattering proportions; faceted curls and beaded toy snakes with big round eyes.
+// Realistic, flattering proportions, carved in flat facets like the gym's volumes with her bone structure defined (#930);
+// faceted curls, and snakes with ridged spines and skulls.
 
 const SKIN_LOW = new THREE.Color('#4f2b19')
 const SKIN_HIGH = new THREE.Color('#9b5f3c')
@@ -883,12 +884,21 @@ function skin(geo: THREE.BufferGeometry, matrix: THREE.Matrix4, tint?: (p: THREE
   return g
 }
 
-type V3 = readonly [number, number, number]
-const skinBall = ([x, y, z]: V3, [sx, sy, sz]: V3, detail = 3) =>
-  skin(new THREE.IcosahedronGeometry(1, detail), pose([x, y, z], [0, 0, 0], [sx, sy, sz]))
+/** `geo` (disposed) non-indexed with one normal per face: carved flat, like the gym's holds and volumes. */
+function carved(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  const g = geo.index ? geo.toNonIndexed() : geo
+  if (g !== geo) geo.dispose()
+  g.deleteAttribute('normal')
+  g.computeVertexNormals()
+  return g
+}
 
-/** A limb from `a` to `b`, radius `ra` at `a` tapering to `rb`. */
-function limb(a: [number, number, number], b: [number, number, number], ra: number, rb: number): THREE.BufferGeometry {
+type V3 = readonly [number, number, number]
+const skinBall = ([x, y, z]: V3, [sx, sy, sz]: V3, detail = 1, rotation: V3 = [0, 0, 0]) =>
+  skin(carved(new THREE.IcosahedronGeometry(1, detail)), pose([x, y, z], [...rotation], [sx, sy, sz]))
+
+/** A carved limb from `a` to `b` with `sides` faces round it, radius `ra` at `a` tapering to `rb`. */
+function limb(a: V3, b: V3, ra: number, rb: number, sides = 7): THREE.BufferGeometry {
   const from = new THREE.Vector3(...a)
   const to = new THREE.Vector3(...b)
   const dir = to.clone().sub(from)
@@ -897,28 +907,67 @@ function limb(a: [number, number, number], b: [number, number, number], ra: numb
     new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize()),
     new THREE.Vector3(1, 1, 1),
   )
-  return skin(new THREE.CylinderGeometry(rb, ra, dir.length(), 12, 2), m)
+  return skin(carved(new THREE.CylinderGeometry(rb, ra, dir.length(), sides, 1)), m)
+}
+
+/** A carved bar through `points`, `r` thick, with a knuckle at each bend. */
+function bar(points: V3[], r: number): THREE.BufferGeometry[] {
+  return points.flatMap((p, k) => (k === 0 ? [] : [limb(points[k - 1], p, r, r, 5), ...(k + 1 < points.length ? [skinBall(p, [r, r, r], 0)] : [])]))
+}
+
+/** The point on her shoulders' surface at (x, y), `lift` out of it. */
+function onShoulders(x: number, y: number, lift = 0): V3 {
+  const { at, radii } = MEDUSA_BUST.shoulders
+  const k = 1 - ((x - at[0]) / radii[0]) ** 2 - ((y - at[1]) / radii[1]) ** 2
+  return [x, y, at[2] + radii[2] * Math.sqrt(Math.max(0, k)) + lift]
+}
+
+/**
+ * Her hand on `side` at the end of her forearm, gripping an edge: a carved palm, knuckles, fingers that reach on and
+ * curl down over it, the thumb under it and the knob of her wrist bone.
+ */
+function hand(side: number): THREE.BufferGeometry[] {
+  const wrist = new THREE.Vector3(side * 130, -196, 112)
+  const z = wrist.clone().sub(new THREE.Vector3(side * 172, -168, 40)).normalize()
+  const x = new THREE.Vector3(0, 1, 0).cross(z).normalize()
+  const y = z.clone().cross(x)
+  const frame = new THREE.Matrix4().makeBasis(x, y, z).setPosition(wrist)
+  const at = (p: readonly number[]): V3 => new THREE.Vector3(p[0], p[1], p[2]).applyMatrix4(frame).toArray()
+  const fingers = [-11, -4, 3, 10].flatMap((fx, k) => {
+    const reach = k === 0 || k === 3 ? 0.85 : 1
+    return bar([[fx, 2, 32], [fx * 1.05, -3, 32 + 15 * reach], [fx * 1.05, -17 * reach, 36 + 18 * reach]].map(at), 4.2)
+  })
+  return [
+    skin(carved(new THREE.BoxGeometry(30, 10, 30, 1, 1, 1)), pose([0, 0, 18]).premultiply(frame)),
+    ...[-11, -4, 3, 10].map((fx) => skinBall(at([fx, 3, 32]), [5.5, 5, 5.5], 0)),
+    ...fingers,
+    ...bar([[-side * 12, -2, 8], [-side * 19, -8, 26], [-side * 15, -16, 34]].map(at), 5),
+    skinBall(at([side * 13, 4, 0]), [5.5, 5.5, 5.5], 0),
+  ]
 }
 
 function gown(): THREE.BufferGeometry {
   const [x, y, z] = MEDUSA_BUST.gown.at
   const [sx, sy, sz] = MEDUSA_BUST.gown.radii
-  return paintedAt(new THREE.IcosahedronGeometry(1, 3), GOWN, pose([x, y, z], [0, 0, 0], [sx, sy, sz]))
+  return paintedAt(carved(new THREE.IcosahedronGeometry(1, 2)), GOWN, pose([x, y, z], [0, 0, 0], [sx, sy, sz]))
 }
 
 const HEAD = MEDUSA_BUST.head
+/** Her head's icosphere detail: facets big enough to read as carved planes from the ride, small enough to keep her likeness. */
+const HEAD_FACETS = 8
 const NOSTRIL = '#2a140c'
 
 /** Her bony landmarks: bumps (+) and hollows (-) of her head's radius, round unit directions from its centre (+z her face). */
 const HEAD_RELIEF = [
   ...[-1, 1].flatMap((side) => [
-    { at: [side * 0.74, -0.52, 0.42], amount: 0.14, width: 0.3 }, // jaw angles
-    { at: [side * 0.62, 0.06, 0.78], amount: 0.1, width: 0.2 }, // cheekbones
-    { at: [side * 0.56, -0.3, 0.76], amount: -0.035, width: 0.18 }, // the hollows under them
-    { at: [side * 0.3, 0.34, 0.9], amount: 0.045, width: 0.22 }, // brow ridge
-    { at: [side * 0.38, 0.12, 0.92], amount: -0.03, width: 0.16 }, // eye sockets
+    { at: [side * 0.74, -0.52, 0.42], amount: 0.17, width: 0.26 }, // jaw angles
+    { at: [side * 0.64, 0.04, 0.76], amount: 0.15, width: 0.17 }, // cheekbones
+    { at: [side * 0.58, -0.3, 0.74], amount: -0.09, width: 0.18 }, // the hollows under them
+    { at: [side * 0.86, 0.36, 0.34], amount: -0.07, width: 0.22 }, // temples
+    { at: [side * 0.32, 0.36, 0.9], amount: 0.1, width: 0.2 }, // brow ridge
+    { at: [side * 0.38, 0.12, 0.92], amount: -0.1, width: 0.15 }, // eye sockets
   ]),
-  { at: [0, -0.86, 0.5], amount: 0.14, width: 0.26 }, // chin
+  { at: [0, -0.86, 0.5], amount: 0.17, width: 0.22 }, // chin
 ].map(({ at, amount, width }) => ({ at: new THREE.Vector3(at[0], at[1], at[2]).normalize(), amount, width2: width * width }))
 
 const _n = new THREE.Vector3()
@@ -951,9 +1000,9 @@ function softMin(a: number, b: number, k: number): number {
  */
 function jaw(q: THREE.Vector3): void {
   const halfWidth = 0.84 + (q.y + 0.4) * (q.y > -0.4 ? 2 : 0.93)
-  q.x = Math.sign(q.x) * softMin(Math.abs(q.x), halfWidth, 0.08)
+  q.x = Math.sign(q.x) * softMin(Math.abs(q.x), halfWidth, 0.03)
   const underside = -0.55 - Math.max(0, q.z + 0.05) * 0.7
-  q.y = -softMin(-q.y, -underside, 0.06)
+  q.y = -softMin(-q.y, -underside, 0.03)
 }
 
 /** A flush of warmth over her cheekbones and shadow in her eye sockets: a tint for `skin`. */
@@ -964,9 +1013,9 @@ function faceTint(p: THREE.Vector3, c: THREE.Color): void {
   c.multiplyScalar(1 - 0.18 * Math.exp(-((Math.abs(p.x) - 27) ** 2 + (p.y - 52) ** 2) / 260))
 }
 
-/** The head ellipsoid sculpted by `HEAD_RELIEF` and its jaw, smooth-shaded. */
+/** The head ellipsoid sculpted by `HEAD_RELIEF` and its jaw, carved in facets. */
 function sculptedHead(): THREE.BufferGeometry {
-  const ico = new THREE.IcosahedronGeometry(1, 18)
+  const ico = new THREE.IcosahedronGeometry(1, HEAD_FACETS)
   ico.deleteAttribute('normal')
   ico.deleteAttribute('uv')
   const g = mergeVertices(ico)
@@ -979,8 +1028,7 @@ function sculptedHead(): THREE.BufferGeometry {
     jaw(_n.multiplyScalar(headRelief(_n)))
     pos.setXYZ(i, cx + _n.x * rx, cy + _n.y * ry, cz + _n.z * rz)
   }
-  g.computeVertexNormals()
-  return skin(g, new THREE.Matrix4(), faceTint)
+  return skin(carved(g), new THREE.Matrix4(), faceTint)
 }
 
 /**
@@ -1037,7 +1085,7 @@ const EYE = { radii: [14, 9.5, 8] as V3, lids: 1.12, upperLid: -0.55, lowerLid: 
 function almondEye(side: number): THREE.BufferGeometry[] {
   const [ex, ey, ez] = EYE.radii
   const lidRadii: [number, number, number] = [ex * EYE.lids, ey * EYE.lids, ez * EYE.lids]
-  const placed = pose([side * 27, 48, 57.5], [0, side * 0.3, side * 0.1])
+  const placed = pose([side * 27, 48, onFace(side * 27, 48)[2] - 3.5], [0, side * 0.3, side * 0.1])
   const at = (m: THREE.Matrix4) => m.premultiply(placed)
   const lid = (thetaStart: number, turn: number) =>
     skin(new THREE.SphereGeometry(1, 20, 8, 0, Math.PI * 2, thetaStart, Math.PI / 2), at(pose([0, 0, 0], [turn, 0, 0], lidRadii)))
@@ -1061,27 +1109,32 @@ function brow(side: number, raise: number, tilt: number): THREE.BufferGeometry {
     pos.setY(i, pos.getY(i) * (1 - 0.6 * t) + Math.sin(t * Math.PI) * 2.5)
   }
   g.computeVertexNormals()
-  return painted(g, BROW, [side * 28, 64 + raise, 60], [0, side * 0.25, side * tilt])
+  return painted(g, BROW, [side * 28, 64 + raise, onFace(side * 28, 64 + raise)[2] + 0.5], [0, side * 0.25, side * tilt])
 }
 
-/** Root at the star's hub, +z towards the rider: bust, arms on the star's points, neck, head and face. */
+/** Root at the star's hub, +z towards the rider: carved bust, collarbones, arms and hands, neck and tendons, head and face. */
 export const MEDUSA_BODY_GEO = mergePainted([
-  // Shoulders and a jewel-purple gown with a gold neckline.
-  skinBall(MEDUSA_BUST.shoulders.at, MEDUSA_BUST.shoulders.radii),
+  // Carved shoulders with deltoid caps and collarbones, and a jewel-purple gown with a gold neckline.
+  skinBall(MEDUSA_BUST.shoulders.at, MEDUSA_BUST.shoulders.radii, 2),
+  ...[-1, 1].flatMap((side) => [
+    skinBall([side * 116, -84, -4], [38, 34, 40], 1, [0, 0, side * 0.5]),
+    ...bar([8, 34, 62, 92, 112].map((x, k) => onShoulders(side * x, -64 - k * 2 + (k === 0 ? -6 : 0), 1)), 6),
+  ]),
   gown(),
   paintedAt(new THREE.TorusGeometry(1, 0.06, 6, 32), GOLD_TRIM, pose([0, -112, 18], [Math.PI / 2 - 0.25, 0, 0], [118, 52, 60])),
   // A little gold star on a chain: the Starr's queen.
   paintedAt(new THREE.TorusGeometry(36, 2.4, 5, 24, Math.PI), GOLD_TRIM, pose([0, -60, 34], [0.35, 0, Math.PI])),
   paintedAt(new THREE.OctahedronGeometry(1, 0), GOLD_TRIM, pose([0, -100, 52], [0, 0, Math.PI / 4], [11, 11, 5])),
-  // Arms resting forwards on the star's points, big soft hands.
+  // Carved arms reaching forwards, bony hands gripping the edge she climbs out over.
   ...[-1, 1].flatMap((side) => [
-    limb([side * 118, -92, -5], [side * 172, -168, 40], 30, 24),
-    limb([side * 172, -168, 40], [side * 128, -198, 118], 24, 20),
-    skinBall([side * 172, -168, 40], [25, 25, 25], 2),
-    skinBall([side * 124, -200, 128], [26, 17, 30], 2),
+    limb([side * 122, -96, -4], [side * 172, -168, 40], 28, 21),
+    skinBall([side * 172, -168, 40], [24, 22, 24], 1),
+    limb([side * 172, -168, 40], [side * 130, -196, 112], 21, 15),
+    ...hand(side),
   ]),
-  // Neck, a head with a bony jaw, chin and cheekbones, and a big, straight nose.
-  limb([0, -80, -8], [0, -10, -4], 33, 29),
+  // A carved neck, its tendons standing from behind her jaw to the notch between her collarbones.
+  limb([0, -80, -8], [0, -10, -4], 31, 27, 8),
+  ...[-1, 1].map((side) => limb([side * 34, -8, 2], [side * 10, -72, 46], 8, 7, 5)),
   sculptedHead(),
   ...[-1, 1].flatMap((side) => [
     skinBall([side * 64, 36, -2], [9, 16, 11], 2),
@@ -1144,35 +1197,69 @@ export const MEDUSA_JEWEL_MAT = new THREE.MeshStandardMaterial({
   color: '#7ff6ff', emissive: '#3fe8ff', emissiveIntensity: 1.6, roughness: 0.15, metalness: 0.3, flatShading: true,
 })
 
-/** One bead of a toy snake: a unit sphere stretched along y between two points of its body (instance colour per snake). */
-export const MEDUSA_SNAKE_BEAD_GEO = new THREE.SphereGeometry(1, 10, 8).deleteAttribute('uv')
+/**
+ * One vertebra of a snake's body, stretched along y between two points of it (instance colour per snake): a faceted
+ * seven-sided segment, narrow at its joints, swelling to a sharp ridge with a knuckle on every other side, so a body
+ * reads as a spine.
+ */
+export const MEDUSA_SNAKE_SEGMENT_GEO = (() => {
+  const SIDES = 7
+  const profile = [[0, -1], [0.6, -1], [0.88, -0.6], [1.04, -0.12], [1.12, 0], [0.86, 0.16], [0.8, 0.6], [0.6, 1], [0, 1]]
+  const g = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r, y)), SIDES)
+  const pos = g.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    if (pos.getY(i) !== 0) continue
+    const side = Math.round((Math.atan2(pos.getX(i), pos.getZ(i)) / (Math.PI * 2)) * SIDES)
+    if (side % 2 === 0) pos.setXYZ(i, pos.getX(i) * 1.14, 0, pos.getZ(i) * 1.14)
+  }
+  return carved(g)
+})()
 export const MEDUSA_SNAKE_MAT = withRim(
-  new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.05 }),
+  new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.05 }),
   { color: '#e8ffd0', intensity: 0.6, power: 2.2 },
 )
 export const MEDUSA_SNAKE_COLORS = ['#2fb36a', '#25a593', '#7cc63a', '#3ec28a'] as const
 export const MEDUSA_CROWN_SNAKE_COLOR = '#d8b03a'
+const BONE = '#efe2c2'
 
-const snakeHead = (skinColor: string) => [
-  paintedAt(new THREE.SphereGeometry(1, 12, 8), skinColor, pose([0, 0, 8], [0, 0, 0], [15, 11, 21])),
-  paintedAt(new THREE.SphereGeometry(1, 10, 6), '#f4f0b0', pose([0, -4, 12], [0, 0, 0], [12, 6, 16])),
-  ...[-1, 1].flatMap((side) => [
-    paintedAt(new THREE.SphereGeometry(1, 10, 8), '#ffffff', pose([side * 8, 7, 17], [0, 0, 0], [5.5, 5.5, 5])),
-    paintedAt(new THREE.SphereGeometry(1, 8, 6), '#141414', pose([side * 8.6, 7.4, 21.3], [0, 0, 0], [2.8, 2.8, 1.6])),
-    painted(new THREE.BoxGeometry(1.6, 1, 9), '#ff5c8a', [side * 2, -3, 32], [0, side * 0.35, 0]),
-  ]),
-]
+/**
+ * A snake's skull, +z its snout: a faceted wedge in its own colour, wide at the jaw hinges and narrowing to the snout;
+ * bone plates jutting over deep sockets with big yellow slit eyes, a ridge of bone down its crown, a bony lower jaw just
+ * open, two fangs and a forked tongue.
+ */
+function snakeSkull(skinColor: string): THREE.BufferGeometry[] {
+  const cranium = new THREE.IcosahedronGeometry(1, 1)
+  const pos = cranium.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const front = (pos.getZ(i) + 1) / 2
+    pos.setXYZ(i, pos.getX(i) * 15 * (1.05 - 0.45 * front), Math.min(pos.getY(i), 0.7) * 10, pos.getZ(i) * 21)
+  }
+  return [
+    paintedAt(carved(cranium), skinColor, pose([0, 1, 8])),
+    paintedAt(carved(new THREE.CylinderGeometry(0.55, 1, 1, 4, 1)), BONE, pose([0, -6, 12], [Math.PI / 2 - 0.12, Math.PI / 4, 0], [11, 24, 4])),
+    ...[-1, 1].flatMap((side) => [
+      paintedAt(new THREE.SphereGeometry(1, 8, 6), '#120c0a', pose([side * 8.5, 6, 17], [0, 0, 0], [6, 5.5, 4.5])),
+      paintedAt(new THREE.SphereGeometry(1, 10, 8), '#ffe23d', pose([side * 9, 6.2, 19], [0, 0, 0], [4.2, 4.2, 3.4])),
+      painted(new THREE.BoxGeometry(1.3, 5.6, 1.2), '#141414', [side * 9.6, 6.2, 22.2]),
+      painted(carved(new THREE.BoxGeometry(9, 3, 11)), BONE, [side * 8.5, 11, 15], [0.25, side * 0.3, side * -0.35]),
+      paintedAt(carved(new THREE.OctahedronGeometry(1, 0)), BONE, pose([side * 12, 0, 6], [0, side * 0.4, 0], [4, 6, 8])),
+      painted(new THREE.ConeGeometry(1.7, 9, 5), BONE, [side * 4.2, -5, 25], [Math.PI, 0, 0]),
+      painted(new THREE.BoxGeometry(1.6, 1, 9), '#ff5c8a', [side * 2, -3, 32], [0, side * 0.35, 0]),
+    ]),
+    ...[0, 7, 14].map((z, k) => painted(new THREE.ConeGeometry(2.6 - k * 0.5, 7 - k, 4), BONE, [0, 10, z], [-0.5, 0, 0])),
+  ]
+}
 
-/** A snake's head about its neck, +z where it looks: big round eyes, a pale jaw, a little forked tongue. */
-export const MEDUSA_SNAKE_HEAD_GEO = mergePainted(snakeHead(MEDUSA_SNAKE_COLORS[0]))
+/** A snake's head about its neck, +z where it looks. */
+export const MEDUSA_SNAKE_HEAD_GEO = mergePainted(snakeSkull(MEDUSA_SNAKE_COLORS[0]))
 
 /** The crown snake's head: gold, with a tiny gold crown. */
 export const MEDUSA_CROWN_HEAD_GEO = mergePainted([
-  ...snakeHead(MEDUSA_CROWN_SNAKE_COLOR),
-  painted(new THREE.CylinderGeometry(9, 8, 5, 10, 1, true), GOLD_TRIM, [0, 12, 6]),
+  ...snakeSkull(MEDUSA_CROWN_SNAKE_COLOR),
+  painted(new THREE.CylinderGeometry(9, 8, 5, 10, 1, true), GOLD_TRIM, [0, 14, 4]),
   ...Array.from({ length: 5 }, (_, k) => {
     const a = (k / 5) * Math.PI * 2
-    return painted(new THREE.ConeGeometry(2.6, 8, 4), k === 0 ? '#ff4f9a' : GOLD_TRIM, [Math.sin(a) * 8.5, 18, 6 + Math.cos(a) * 8.5])
+    return painted(new THREE.ConeGeometry(2.6, 8, 4), k === 0 ? '#ff4f9a' : GOLD_TRIM, [Math.sin(a) * 8.5, 20, 4 + Math.cos(a) * 8.5])
   }),
 ])
 
