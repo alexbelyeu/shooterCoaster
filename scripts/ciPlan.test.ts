@@ -22,6 +22,24 @@ describe('ciPlan', () => {
     }
   })
 
+  it('runs the offline check only on a PR touching the service worker\'s inputs', () => {
+    for (const f of ['src/sw/sw.ts', 'scripts/swPrecache.mjs', 'vite.config.ts', 'vercel.json', 'src/app/serviceWorker.ts', 'e2e/prod-check.mjs', '.github/workflows/ci.yml']) {
+      expect(pr(f).offline, f).toBe(true)
+    }
+    for (const f of ['src/app/App.tsx', 'scripts/swPrecache.test.ts', 'src/sw/sw.test.ts', 'index.html', 'docs/x.md']) {
+      expect(pr(f).offline, f).toBe(false)
+    }
+    expect(ciPlan({ event: 'push' }).offline).toBe(false)
+    expect(ciPlan({ event: 'schedule' }).offline).toBe(true)
+  })
+
+  it('verify fails on a planned offline job that did not pass', () => {
+    const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
+    const verify = ci.split(/\n {2}(?=[a-z]+:\n)/).find((b) => b.startsWith('verify:'))!
+    expect(verify).toMatch(/needs: \[[^\]]*\boffline\b/)
+    expect(verify).toContain('offline: $plan.offline')
+  })
+
   it('docs/audio/ is read by unit tests and the game, so it is not docs-only', () => {
     expect(pr('docs/audio/SCORE-FORMAT.md').game).toBe(true)
   })
@@ -35,7 +53,7 @@ describe('ciPlan', () => {
 
   it('ci.yml gates every job but the decider and the verify gate on the plan', () => {
     const ci = readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8')
-    for (const [job, output] of [['unit', 'unit'], ['lighthouse', 'game'], ['smoke', 'game'], ['portal', 'portal']]) {
+    for (const [job, output] of [['unit', 'unit'], ['lighthouse', 'game'], ['smoke', 'game'], ['portal', 'portal'], ['offline', 'offline']]) {
       const block = ci.split(/\n {2}(?=[a-z]+:\n)/).find((b) => b.startsWith(`${job}:`))!
       expect(block, job).toContain(`needs.changes.outputs.${output} == 'true'`)
     }
