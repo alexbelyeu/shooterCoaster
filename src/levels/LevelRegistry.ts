@@ -164,7 +164,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 14 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1422 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2322
+    maxScore: 20 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1512 (the V8's rats included) + the Medusa's eight snakes and reward (bossSpecs.ts) = 2412
     message: 'You sent the Climbing Gym!',
     nextLevel: null,
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
@@ -182,7 +182,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
         { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 4 },
         { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 8, bystanders: { type: 'climber', count: 3 } },
-        { type: 'lanternfly', count: 14, waveLabel: 'Lanternflies!', weight: 5 },
+        { type: 'lanternfly', count: 20, waveLabel: 'Lanternflies!', weight: 5 },
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
