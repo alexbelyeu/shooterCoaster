@@ -8,7 +8,7 @@ import { ATMOSPHERES, type AtmosphereConfig } from './atmosphere'
  * `combineFog`'s base fog and the post grade. A biome with no entry has no Night Ride.
  *
  * The moon is the sun slot (`sunDirection`, a small cool disc); the directional light stays strong enough, and the
- * hemisphere fill bright enough, for enemies to read against the dark sky. `lampGlow` lights the biome's own lamps, `enemyRimLift` brightens the enemies' edges.
+ * hemisphere fill bright enough, for enemies to read against the dark sky. `lampGlow` lights the biome's own lamps (the aurora, the lava, the gym's work lights in place of its house lights), `enemyRimLift` brightens the enemies' edges.
  */
 export const NIGHT_ATMOSPHERES: Partial<Record<BiomeType, AtmosphereConfig>> = {
   // The fair after dark: deep blue sky, a high moon, the midway's bulbs and the wheels' cabins lit
@@ -132,6 +132,136 @@ export const NIGHT_ATMOSPHERES: Partial<Record<BiomeType, AtmosphereConfig>> = {
       vibrance: 0.35,
       vignette: 0.44,
     },
+    lampGlow: 1,
+    enemyRimLift: 2.5,
+    aerialFog: { strength: 0 },
+  },
+  // Polar night: a black-blue sky with the aurora burning brighter in it, the moon low where the day's sun hangs
+  arctic: {
+    sky: {
+      zenith: 0x050a1e,
+      horizon: 0x142240,
+      ground: 0x121a30,
+      horizonFalloff: 0.55,
+      sunColor: 0xe8f0ff,
+      sunSize: 0.024,
+      sunGlow: 0.3,
+      cloudiness: 0.15,
+      cloudColor: 0x283452,
+      cloudSpeed: 3,
+      cloudStretch: 2,
+    },
+    sunDirection: [0.6, 0.22, 0.75],
+    sunLightColor: 0xa8c0ff,
+    sunLightIntensity: 0.7,
+    // The snow holds the moonlight: a cool fill bright enough that the ice and the enemies keep their shapes
+    hemiSkyColor: 0x88a8d8,
+    hemiGroundColor: 0x2a3050,
+    hemiIntensity: 0.85,
+    fogNear: 200,
+    fogFar: 4800,
+    envIntensity: 0.3,
+    // Blue snow, the aurora's green in the highlights
+    grade: {
+      exposure: 0.95,
+      temperature: -0.12,
+      tint: 0,
+      shadowTint: 0x1e3a7a,
+      highlightTint: 0xb8ffe0,
+      splitTone: 0.3,
+      contrast: 1.08,
+      saturation: 1.0,
+      vibrance: 0.25,
+      vignette: 0.44,
+    },
+    // The aurora (`ArcticFeatures`)
+    lampGlow: 1,
+    enemyRimLift: 2.5,
+    aerialFog: { strength: 0 },
+  },
+  // Black ash night: no red in the sky, the key light the volcano's and the fill coming up off the lava, which burns hotter
+  volcanic: {
+    sky: {
+      zenith: 0x030203,
+      // A low, deep red band, the lava's glow under the ash: the ridges and the volcano stand black against it
+      horizon: 0x380200,
+      ground: 0x140402,
+      horizonFalloff: 1.2,
+      sunColor: 0x000000,
+      sunSize: 0,
+      sunGlow: 0,
+      cloudiness: 0.7,
+      cloudColor: 0x2a0c06,
+      cloudSpeed: 10,
+      cloudStretch: 3,
+    },
+    sunDirection: [0.8, 0.3, -0.5],
+    sunLightColor: 0xff6020,
+    sunLightIntensity: 1.0,
+    // Lit from below: the ground's half of the fill is the lava's orange, the sky's half near black
+    hemiSkyColor: 0x2a1a20,
+    hemiGroundColor: 0x7a2408,
+    hemiIntensity: 0.75,
+    fogNear: 1,
+    fogFar: 5000,
+    envIntensity: 0.45,
+    grade: {
+      exposure: 1.15,
+      temperature: 0.14,
+      tint: 0,
+      shadowTint: 0x2a3a6a,
+      highlightTint: 0xff7a2a,
+      splitTone: 0.3,
+      contrast: 1.1,
+      saturation: 1.08,
+      vibrance: 0.2,
+      vignette: 0.46,
+    },
+    // The lava rivers (`VolcanicFeatures`)
+    lampGlow: 1,
+    enemyRimLift: 2.5,
+    aerialFog: { strength: 0 },
+  },
+  // The Climbing Gym after hours, an interior with no sky to darken: moonlight through the high windows, the house
+  // lights off and only the work lights' pools left (`GymFeatures`), the Flame still burning
+  gym: {
+    sky: {
+      zenith: 0x101218,
+      horizon: 0x121418,
+      ground: 0x0c0b0a,
+      horizonFalloff: 0.6,
+      sunColor: 0xffffff,
+      sunSize: 0,
+      sunGlow: 0,
+      cloudiness: 0,
+      cloudColor: 0xffffff,
+      cloudSpeed: 0,
+      cloudStretch: 1,
+    },
+    sunDirection: [0.3, 1, 0.45],
+    sunLightColor: 0x8aa4d8,
+    sunLightIntensity: 0.55,
+    hemiSkyColor: 0x5a6680,
+    hemiGroundColor: 0x2a2420,
+    hemiIntensity: 0.75,
+    fogNear: 2100,
+    fogFar: 15000,
+    envIntensity: 0.2,
+    // Cold blue shadows, the work lights' and the fire's sodium in the highlights
+    grade: {
+      exposure: 0.82,
+      temperature: -0.04,
+      tint: 0,
+      shadowTint: 0x1e3a5a,
+      highlightTint: 0xffb070,
+      splitTone: 0.35,
+      contrast: 1.12,
+      saturation: 1.0,
+      vibrance: 0.35,
+      vignette: 0.48,
+    },
+    heatShimmer: true,
+    // The house lights going off (`GymFeatures`)
     lampGlow: 1,
     enemyRimLift: 2.5,
     aerialFog: { strength: 0 },

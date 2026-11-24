@@ -15,6 +15,8 @@ const ERUPTION_TRAUMA_MS = 3000
 /** How far the fog closes in on an eruption (`eruption:start` may pass its own: the Magma Titan's keeps it in view). */
 const ERUPTION_FOG_FAR = 200
 const RIVER_INTENSITY = 1.7
+/** How much hotter the rivers burn per unit of the atmosphere's `lampGlow`: on the Night Ride the lava does the lighting (#994). */
+const NIGHT_RIVER_GAIN = 0.4
 /** A boss defeated (the Magma Titan): the lava rivers flare once and settle. */
 const RIVER_PULSE = { gain: 1.4, seconds: 1.6 }
 
@@ -23,6 +25,7 @@ export default function VolcanicFeatures({ heightFn, groundFn, track, atmosphere
   const fogPulseRef = useRef({ active: false, startTime: 0, far: ERUPTION_FOG_FAR })
   const riverPulseRef = useRef({ active: false, startTime: 0 })
   const runId = useGameStore((s) => s.runId)
+  const riverIntensity = RIVER_INTENSITY * (1 + NIGHT_RIVER_GAIN * (atmosphere.lampGlow ?? 0))
 
   // Animated molten rock; bright enough that the hot cracks pass the Bloom threshold
   const octaves = useFbmOctaves()
@@ -65,8 +68,8 @@ export default function VolcanicFeatures({ heightFn, groundFn, track, atmosphere
   useEffect(() => {
     fogPulseRef.current.active = false
     riverPulseRef.current.active = false
-    lavaRiverMat.uniforms.uIntensity.value = RIVER_INTENSITY
-  }, [runId, lavaRiverMat])
+    lavaRiverMat.uniforms.uIntensity.value = riverIntensity
+  }, [runId, lavaRiverMat, riverIntensity])
 
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
@@ -78,7 +81,7 @@ export default function VolcanicFeatures({ heightFn, groundFn, track, atmosphere
       if (river.startTime < 0) river.startTime = t
       const u = (t - river.startTime) / RIVER_PULSE.seconds
       if (u >= 1) river.active = false
-      lavaRiverMat.uniforms.uIntensity.value = RIVER_INTENSITY * (1 + (u < 1 ? RIVER_PULSE.gain * Math.sin(u * Math.PI) : 0))
+      lavaRiverMat.uniforms.uIntensity.value = riverIntensity * (1 + (u < 1 ? RIVER_PULSE.gain * Math.sin(u * Math.PI) : 0))
     }
 
     // Fog pulse (a modifier `BiomeEnvironment` combines): close in over 2s, recover over 8s
