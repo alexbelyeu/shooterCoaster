@@ -4,7 +4,7 @@ import type { HardRoute } from '@/track/mechanics'
 import { rideProfile, riddenBetween, type RideSpeeds } from '@/track/ridePhysics'
 import { RUN_SECONDS } from '@/levels/pacing'
 import { waveWindows } from './waveSchedule'
-import type { HeightFunction } from '@/utils/terrainNoise'
+import { sightClear, type HeightFunction } from '@/utils/terrainNoise'
 import type { Rng } from '@/utils/rng'
 import type { Vec3 } from '@/utils/vec3'
 import { maxReadableDistance } from '../enemies/enemyReadability'
@@ -347,6 +347,7 @@ export function formationFrame(
   step: number = FORMATIONS[formation].groupGap,
   origin: FormationOrigin = FORMATIONS[formation].origin,
   centre: Vec3 = { x: 0, y: 0, z: 0 },
+  ground?: HeightFunction,
 ): FormationFrame {
   const view = trackView(table, indexAhead(table, riderIndex, group * step + ride.entry), ride.trackScale)
   const { ahead, up } = origin
@@ -354,17 +355,23 @@ export function formationFrame(
   const along = back ? -Math.max(ahead, group * step) : ahead
   const preferred = origin.side * (group % 2 === 0 ? 1 : -1)
   const sides = preferred === 0 ? [0] : [preferred, -preferred]
-  for (let k = 0; k <= ANCHOR_SEARCH_STEPS; k++) {
-    const i = indexAhead(table, view.index, along * (1 + ((ANCHOR_SEARCH - 1) * k) / ANCHOR_SEARCH_STEPS))
-    const track = trackPoint(table, i)
-    const d = sub(track, view.eye)
-    if (Math.hypot(d.x, d.z) < Math.abs(along) * ANCHOR_MIN_REACH) continue // over the top of a loop
-    const tangent = trackTangent(table, i)
-    // Facing back, the group's forward is the rider's look: a V flies in from down it and marches back up it at the car.
-    if (back) Object.assign(tangent, { x: -tangent.x, y: -tangent.y, z: -tangent.z })
-    for (const side of sides) {
-      const f = frameAt(track, tangent, side, up, true)
-      if (inView(view, slotWorld(formation, f, centre), reach)) return f
+  // Given the `ground` a ground group stands on, first only where the terrain doesn't hide it from the rider (#937).
+  for (const sighted of ground ? [true, false] : [false]) {
+    for (let k = 0; k <= ANCHOR_SEARCH_STEPS; k++) {
+      const i = indexAhead(table, view.index, along * (1 + ((ANCHOR_SEARCH - 1) * k) / ANCHOR_SEARCH_STEPS))
+      const track = trackPoint(table, i)
+      const d = sub(track, view.eye)
+      if (Math.hypot(d.x, d.z) < Math.abs(along) * ANCHOR_MIN_REACH) continue // over the top of a loop
+      const tangent = trackTangent(table, i)
+      // Facing back, the group's forward is the rider's look: a V flies in from down it and marches back up it at the car.
+      if (back) Object.assign(tangent, { x: -tangent.x, y: -tangent.y, z: -tangent.z })
+      for (const side of sides) {
+        const f = frameAt(track, tangent, side, up, true)
+        const anchor = slotWorld(formation, f, centre)
+        if (!inView(view, anchor, reach)) continue
+        if (sighted && ground && !terrainClear(view.eye, { ...anchor, y: ground(anchor.x, anchor.z) }, ground)) continue
+        return f
+      }
     }
   }
   // The track doubles back (hairpin, loop): anchor straight ahead of where the rider looks.
@@ -489,7 +496,9 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
         (c, s) => ({ x: c.x + s.local.x / members.length, y: c.y + s.local.y / members.length, z: c.z + s.local.z / members.length }),
         { x: 0, y: 0, z: 0 },
       )
-      const at = (origin?: FormationOrigin) => formationFrame(table, riderIndex, formation, group, ride, reach, step, origin, centre)
+      const at = (origin?: FormationOrigin) => formationFrame(
+        table, riderIndex, formation, group, ride, reach, step, origin, centre, surface === 'ground' ? groundFn : undefined,
+      )
       let f = at(input.origin)
       if (surface === 'water') f = findWater(at, input.origin ?? FORMATIONS[formation].origin, groundFn, f)
       const anchor = slotWorld(formation, f, centre)
@@ -915,22 +924,12 @@ function lookCos(table: ArcTable, riderIndex: number, at: number, p: Vec3, reach
 
 /** Height over its foot of the point a ground slot is sighted at: the body, not the snow it stands in. */
 const SIGHT_HEIGHT = 25
-/** Samples along the sight line. */
-const SIGHT_SAMPLES = 16
-
 /**
  * No terrain over the line from `eye` to `SIGHT_HEIGHT` over `p` (#937): Antarctica's valley walls and ridges hid most
  * of its trackside snowmen from the rider who was looking right at them.
  */
 export function terrainClear(eye: Vec3, p: Vec3, ground: HeightFunction): boolean {
-  const ty = p.y + SIGHT_HEIGHT
-  for (let k = 1; k < SIGHT_SAMPLES; k++) {
-    const t = k / SIGHT_SAMPLES
-    const x = eye.x + (p.x - eye.x) * t
-    const z = eye.z + (p.z - eye.z) * t
-    if (ground(x, z) > eye.y + (ty - eye.y) * t) return false
-  }
-  return true
+  return sightClear(ground, eye.x, eye.y, eye.z, p.x, p.y + SIGHT_HEIGHT, p.z)
 }
 
 /** Point on an entry path at `t` (0–1, eased out); `spin` unwinds the horizontal offset around `from`. */
