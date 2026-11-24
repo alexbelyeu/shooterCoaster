@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { sampleTrackPath } from '@/utils/terrainNoise'
 import { biomeHeightFunction } from '@/levels/environments/biomeRegistry'
@@ -42,7 +42,7 @@ describe('scatterSpawn', () => {
 })
 
 describe('readableScatterSpawn', () => {
-  it.each(getAllLevels().map((l) => [l.id, l] as const))('%s: scatter waves spawn within readable range of the track', (_id, level) => {
+  it.each(shippedLevels().map((l) => [l.id, l] as const))('%s: scatter waves spawn within readable range of the track', (_id, level) => {
     const curve = createTrackCurve(level.track)
     const table = buildArcTable(curve)
     const heightFn = biomeHeightFunction(level.biome, sampleTrackPath((t) => curve.getPointAt(t)))
@@ -122,7 +122,7 @@ describe('wall enemies', () => {
     expect(p.y).toBeCloseTo(slab.origin.y + 100 * Math.cos(Math.PI / 6) + 8 * n.y)
   })
 
-  it.each(getAllLevels().map((l) => [l.id, l] as const))('%s: has walls if it has wall enemies', (_id, level) => {
+  it.each(shippedLevels().map((l) => [l.id, l] as const))('%s: has walls if it has wall enemies', (_id, level) => {
     const onLevel = level.enemies.flatMap((w) => (w.bystanders ? [w.type, w.bystanders.type] : [w.type]))
     if (onLevel.some((t) => ENEMY_PLACEMENT[t].surface === 'wall')) expect(level.walls?.length).toBeGreaterThan(0)
   })

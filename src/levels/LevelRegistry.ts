@@ -1,14 +1,8 @@
-import type { LevelConfig } from '@/types/level'
+import type { LevelConfig, LevelRide } from '@/types/level'
 import { paceLevel } from './pacing'
-// Level 6's track and walls as plain numbers: the blockout they are built from stays out of the startup JS (#589).
-// Levels 1 and 2's rides as plain numbers: the ride elements that build them stay out of the startup JS.
-import { PARK_LEVEL_TRACK } from './environments/biomes/themePark/parkLevel'
-import { DESERT_LEVEL_TRACK } from './environments/biomes/desert/desertLevel'
-// Level 3's ride too (#865), level 4's (#866), level 5's (#867) and level 2's (#864).
-import { OCEAN_LEVEL_TRACK, OCEAN_SEA_ARCH } from './environments/biomes/ocean/oceanLevel'
-import { ARCTIC_LEVEL_TRACK } from './environments/biomes/arctic/arcticLevel'
-import { INFERNO_LEVEL_TRACK } from './environments/biomes/volcanic/infernoLevel'
-import { GYM_LEVEL_TRACK, GYM_LEVEL_WALLS } from './environments/biomes/gym/gymLevel'
+// Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS (#863). Every other generated
+// ride is its world chunk's (`World.rides`), out of the startup JS altogether (#960).
+import { PARK_LEVEL_RIDE } from './environments/biomes/themePark/parkLevel'
 
 /** Level 1's lift-hill rings (`formationOrigin`). */
 const LIFT_RINGS = { ahead: 700, side: 250, up: 150 }
@@ -25,7 +19,7 @@ const LEVELS: LevelConfig[] = [
     message: 'Well, that was easy...',
     nextLevel: 'level2',
     // The ride kit's classic (#863, `parkTrack.ts`): a station launch, a lift hill, camelbacks, past the Ferris wheel.
-    track: PARK_LEVEL_TRACK,
+    ride: PARK_LEVEL_RIDE,
     goldenBalloons: 3,
     ...paceLevel({
       waves: [
@@ -55,7 +49,6 @@ const LEVELS: LevelConfig[] = [
     message: 'Ready for this one?',
     nextLevel: 'level3',
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
-    track: DESERT_LEVEL_TRACK,
     ...paceLevel({
       // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all
       // thirty in view (#864: draws); a first V over the lift hill's crest, where the climb pitches the view at the sky (5 s);
@@ -84,7 +77,6 @@ const LEVELS: LevelConfig[] = [
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
-    track: OCEAN_LEVEL_TRACK,
     ...paceLevel({
       waves: [
         // "Into the Deep!": the jellyfish arrive as the car dives into the glass tunnel (~14 s).
@@ -100,7 +92,6 @@ const LEVELS: LevelConfig[] = [
       hasWater: true,
       /** Out to sea down the south channel, past the drawn terrain, dead ahead as the car tips over the first drop (~12 s). */
       whale: { startSeconds: 11, lead: 4000, aim: 0.2 },
-      seaArch: OCEAN_SEA_ARCH,
     },
   },
   {
@@ -112,7 +103,7 @@ const LEVELS: LevelConfig[] = [
     maxScore: 36 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2540 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3060
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
-    track: ARCTIC_LEVEL_TRACK,
+    // The ride kit's (#866, `arcticTrack.ts`).
     ...paceLevel({
       waves: [
         // A wave to each stretch of the storyboard (weights in seconds of the 45 s wave span), so no element rides empty
@@ -145,7 +136,7 @@ const LEVELS: LevelConfig[] = [
     maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60 + 3 * 60 + 500, // 2234 + the Magma Titan's vents, heart and reward (bossSpecs.ts) = 2914
     message: 'You conquered the Inferno!',
     nextLevel: 'level6',
-    track: INFERNO_LEVEL_TRACK,
+    // The ride kit's (#867, `infernoTrack.ts`).
     ...paceLevel({
       waves: [
         { type: 'emberWisp', count: 26, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 2 },
@@ -173,8 +164,6 @@ const LEVELS: LevelConfig[] = [
     message: 'You sent the Climbing Gym!',
     nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
-    track: GYM_LEVEL_TRACK,
-    walls: [...GYM_LEVEL_WALLS],
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
     // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
     // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
@@ -209,18 +198,20 @@ const LEVELS: LevelConfig[] = [
     // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
     // countdown, GO launches it over the fins and it drops straight into the street canyons; gravity rides the rest,
     // the beat keeping a run to about half the lap. level1's curve family, extent varC × 13 × scalar = 1040.
-    track: {
-      varA: 3,
-      varB: 17,
-      varC: 4,
-      scalar: 20,
-      curve: 'curve1',
-      ride: 'v2',
-      mechanics: [{ kind: 'station', from: 0, to: 0.012, speed: 260 }],
-      rideV2: { crawl: 100, drag: 0.001 },
-      color1: 0xff3fb4,
-      color2: 0x2ee6ff,
-      glow: 0.6,
+    ride: {
+      track: {
+        varA: 3,
+        varB: 17,
+        varC: 4,
+        scalar: 20,
+        curve: 'curve1',
+        ride: 'v2',
+        mechanics: [{ kind: 'station', from: 0, to: 0.012, speed: 260 }],
+        rideV2: { crawl: 100, drag: 0.001 },
+        color1: 0xff3fb4,
+        color2: 0x2ee6ff,
+        glow: 0.6,
+      },
     },
     // Hover drones patrol the street canyons in Vs and rings, then the Helicopter (#325) drops in over the street ahead.
     // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the boss at 40 s. A wave of drones is
@@ -249,6 +240,19 @@ export function getLevelConfig(id: string): LevelConfig | undefined {
 
 export function getAllLevels(): LevelConfig[] {
   return [...LEVELS].sort((a, b) => a.order - b.order)
+}
+
+/** The rides that came with their worlds' chunks (`addRides`, from `loadWorld`), by level. */
+const arrivedRides = new Map<string, LevelRide>()
+
+/** A world chunk's rides, once it has arrived (`loadWorld`). */
+export function addRides(rides: Readonly<Record<string, LevelRide>>): void {
+  for (const [id, ride] of Object.entries(rides)) arrivedRides.set(id, ride)
+}
+
+/** A level's ride: the registry's (level 1's), else its world's once that chunk is in (#960); undefined before. */
+export function levelRide(id: string): LevelRide | undefined {
+  return getLevelConfig(id)?.ride ?? arrivedRides.get(id)
 }
 
 /** The level whose `nextLevel` is `id` (its star unlocks `id`); null for the first level or an unknown id. */

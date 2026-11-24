@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { buildArcTable, indexAtT, tAtLoopDistance } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { rideModel, rideProfile, riddenBetween } from '@/track/ridePhysics'
@@ -8,11 +8,11 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { ENEMY_PLACEMENT } from '@/entities/spawning/enemyPlacement'
 import { FORMATIONS, TRACKSIDE } from '@/entities/spawning/spawnPlacement'
 import { createHeightFunction, getTerrainMeshSize, sampleTrackPath } from '@/utils/terrainNoise'
-import type { LevelConfig, WhaleBreachSpec } from '@/types/level'
+import type { RiddenLevel, WhaleBreachSpec } from '@/types/level'
 import { maxGroundUnder } from './seaPlacement'
 import { BREACH, WHALE_LENGTH, breachPhase, breachSite, rideHeading, whalePose, type WhalePose } from './whaleBreach'
 
-const WHALE_LEVELS = getAllLevels().filter((l): l is LevelConfig & { environment: { whale: WhaleBreachSpec } } => !!l.environment.whale)
+const WHALE_LEVELS = shippedLevels().filter((l): l is RiddenLevel & { environment: { whale: WhaleBreachSpec } } => !!l.environment.whale)
 const HALF = WHALE_LENGTH / 2
 const STEPS = 24
 const pose: WhalePose = { x: 0, y: 0, z: 0, pitch: 0, roll: 0 }

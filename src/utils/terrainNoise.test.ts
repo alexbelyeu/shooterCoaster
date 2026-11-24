@@ -8,15 +8,15 @@ import {
   sampleTrackPath,
   sightClear,
 } from './terrainNoise'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { BIOMES, biomeHeightFunction } from '@/levels/environments/biomeRegistry'
 import { GYM_SCALE } from '@/levels/environments/biomes/gym/blockout'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
-import { BIOME_TYPES, type BiomeType, type LevelConfig } from '@/types/level'
+import { BIOME_TYPES, type BiomeType, type RiddenLevel } from '@/types/level'
 
 // The noise-terrain biomes (an interior's ground is its authored floor: `biomeHeightFunction`).
 const NOISE_BIOMES = BIOME_TYPES.filter((b) => !BIOMES[b].floor)
-const levels = getAllLevels()
+const levels = shippedLevels()
 
 function noiseConfig(biome: BiomeType): NoiseTerrainConfig {
   const c = BIOME_TERRAIN_CONFIGS[biome]
@@ -24,7 +24,7 @@ function noiseConfig(biome: BiomeType): NoiseTerrainConfig {
   return c
 }
 
-function trackSamplesFor(level: LevelConfig) {
+function trackSamplesFor(level: RiddenLevel) {
   const c = createTrackCurve(level.track)
   return { curve: c, samples: sampleTrackPath((t) => c.getPointAt(t)) }
 }

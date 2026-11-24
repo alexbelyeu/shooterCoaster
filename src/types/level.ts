@@ -244,7 +244,12 @@ export interface LevelConfig {
   maxScore: number
   message: string
   nextLevel: string | null
-  track: TrackParams
+  /**
+   * The ride, when the registry carries it: level 1's (the run most players start first) and small hand-written tracks.
+   * Every other ride comes with its world's chunk (`World.rides`, #960), so its data is never startup JS: read a level's
+   * ride with `levelRide`, which has it once that chunk is in.
+   */
+  ride?: LevelRide
   enemies: EnemyWave[]
   starThresholds: [number, number, number] // 1-star, 2-star, 3-star percentages
   /** Finale: the boss arrives `at` seconds of level time after the start (its tell comes before). Spec in `entities/bosses/bossSpecs.ts`. */
@@ -253,8 +258,6 @@ export interface LevelConfig {
   goldenBalloons?: number
   /** Weapon pickups floating over the track, 2–4 (`combat/pickups/pickupPlacement.ts`); default one of each. */
   pickups?: PickupWeaponId[]
-  /** Walls its wall enemies (`ENEMY_PLACEMENT` surface `'wall'`) climb; required when it has any. */
-  walls?: WallSurface[]
   /** Per-level bullet look; unset fields fall back to BulletPool's defaults (red, size 10). */
   combat?: {
     bulletColor?: string
@@ -266,7 +269,17 @@ export interface LevelConfig {
     treeCount?: number
     /** Opt-in: an ocean level's whale breach; none when unset. */
     whale?: WhaleBreachSpec
-    /** Opt-in: a sea arch over the rails (Ocean's Features); none when unset. */
-    seaArch?: SeaArchSpec
   }
 }
+
+/** A level's track and what is built to it: `LevelConfig.ride`, or its world's chunk's (`World.rides`, #960). */
+export interface LevelRide {
+  track: TrackParams
+  /** Walls its wall enemies (`ENEMY_PLACEMENT` surface `'wall'`) climb; required when it has any. */
+  walls?: readonly WallSurface[]
+  /** A sea arch over the rails (Ocean's Features); none when unset. */
+  seaArch?: SeaArchSpec
+}
+
+/** A level with its ride in hand: what a run builds (`LevelScene`), and every level as tests see it (`shippedLevels.ts`). */
+export type RiddenLevel = Omit<LevelConfig, 'ride'> & LevelRide

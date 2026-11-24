@@ -228,16 +228,19 @@ export function planNewWorld(opts, { files, templates, biomeDirs }) {
     message: 'You cleared ${name}!',
     nextLevel: null,
     // Scaffolded by npm run new-world: level1's curve family; tune it inside the track extent formula (level-design skill).
-    track: {
-      varA: 3,
-      varB: 17,
-      varC: 4,
-      scalar: 20,
-      rollerSpeed: 0.00001,
-      minRollerSpeed: 0.00008,
-      curve: 'curve1',
-      color1: 0xffffff,
-      color2: ${kind === 'interior' ? '0xff3355' : '0x44aaff'},
+    // A kit ride goes in this world's chunk instead (World.rides, docs/LEVEL-KIT.md), out of the startup JS.
+    ride: {
+      track: {
+        varA: 3,
+        varB: 17,
+        varC: 4,
+        scalar: 20,
+        rollerSpeed: 0.00001,
+        minRollerSpeed: 0.00008,
+        curve: 'curve1',
+        color1: 0xffffff,
+        color2: ${kind === 'interior' ? '0xff3355' : '0x44aaff'},
+      },
     },
     ...paceLevel({
       waves: [
@@ -377,7 +380,7 @@ function checklist({ id, biome, kind }, previous) {
   const dir = biomeDir(biome)
   return [
     'Read .claude/skills/shooter-coaster-level-design and docs/art/ENEMIES.md.',
-    `Track: tune ${id}'s curve in LevelRegistry.ts inside the extent formula (or author a spline, like the gym's)${kind === 'interior' ? `, and size HALL in ${dir}/config.ts around it` : ''}.`,
+    `Track: tune ${id}'s curve in LevelRegistry.ts inside the extent formula (or author a ride from the ride kit: a scripts/gen-ride-levels.mjs row, its generated ride in ${dir}/world.ts \`rides\` and no \`ride\` in the registry, docs/LEVEL-KIT.md)${kind === 'interior' ? `, and size HALL in ${dir}/config.ts around it` : ''}.`,
     `Look: ${dir}/config.ts palette, ATMOSPHERES.${biome} (atmosphere.ts), the hero landmark in Features.tsx and its hero shot in index.ts, props in Decorations.tsx (seeded, off the track), contact shadows.`,
     `Level select: draw the landmark in LevelPostcard.tsx SCENES.${biome}, pick the BIOME_UI.${biome} accent (theme.ts).`,
     `Roster: swap the starter waves for the world's own enemies; a boss goes in LevelConfig.boss. maxScore and the finales row in LevelRegistry.test.ts follow, then node scripts/gen-level-limits.mjs.`,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAllLevels } from '@/levels/LevelRegistry'
+import { shippedLevels } from '@/levels/shippedLevels'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { getTrackDimensions, getTrackScale } from '@/track/trackDimensions'
 import { TOUCH_HIT_SCALE } from '@/combat/aimAssist'
@@ -34,7 +34,7 @@ describe('placePickups', () => {
   })
 
   it('every level has 2–4 pickups at finite points on its track', () => {
-    for (const level of getAllLevels()) {
+    for (const level of shippedLevels()) {
       const { track } = level
       const curve = createTrackCurve(track)
       const spots = placePickups(level.id, level.pickups, (t) => curve.getPointAt(t), getTrackScale(track.scalar))
@@ -45,7 +45,7 @@ describe('placePickups', () => {
   })
 
   it("every level keeps the passing rider's eye outside the pickup, its touch hit sphere and its ring", () => {
-    for (const level of getAllLevels()) {
+    for (const level of shippedLevels()) {
       const s = getTrackScale(level.track.scalar)
       const { eyeHeight } = getTrackDimensions(level.track)
       const lowestCentre = (PICKUP_HEIGHT - PICKUP_BOB) * s

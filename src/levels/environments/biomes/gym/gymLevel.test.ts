@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { roundNumbers } from '@/levels/rideData'
 import { GYM_LEVEL_WALLS } from './gymLevel'
 import { GYM_WALLS } from './walls'
@@ -11,6 +11,6 @@ describe('gym level walls', () => {
   })
 
   it('are what level 6 climbs', () => {
-    expect(getLevelConfig('level6')!.walls).toEqual(GYM_LEVEL_WALLS)
+    expect(shippedLevel('level6').walls).toEqual(GYM_LEVEL_WALLS)
   })
 })

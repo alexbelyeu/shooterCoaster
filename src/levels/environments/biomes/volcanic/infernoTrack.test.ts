@@ -3,7 +3,7 @@ import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { buildArcTable } from '@/track/arcLength'
 import { rideModel } from '@/track/ridePhysics'
 import { BEAT_TOLERANCE_SECONDS } from '@/track/rideV2'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { shippedLevel } from '@/levels/shippedLevels'
 import { createHeightFunction } from '@/utils/terrainNoise'
 import type { TrackParams } from '@/types/level'
 import { coneCrossings, coneRadius, VOLCANO, VOLCANO_SITE } from '../../volcanoGeometry'
@@ -18,7 +18,7 @@ it("stands the volcano where the ride's base height says (the ground at its site
 
 // The authored ride and the one the game ships (`infernoLevel.ts`, rounded by `scripts/gen-ride-levels.mjs`).
 describe.each([
-  ['as shipped', getLevelConfig('level5')!.track],
+  ['as shipped', shippedLevel('level5').track],
   ['as authored', INFERNO_TRACK],
 ] as [string, TrackParams][])("level 5's ride (#867), %s", (_name, track) => {
   const curve = createTrackCurve(track)
