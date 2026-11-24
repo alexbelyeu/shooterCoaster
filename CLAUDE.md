@@ -63,7 +63,7 @@ The smoke has two depths (#372). On a PR, CI runs the rendering and integration 
 and speed, the phone run's touch play), each under a `smokeSeconds` budget in `budgets.json` (over it is a warning; on CI the shard
 fails only past 1.5x it: `level3 shard took 11.0 min, budget 7.0, fails past 10.5`; a level shard's budget is scaled up, at most 2x, on a runner whose ride rendered
 slower than a normal one's, `e2e/shardTime.mjs`). The deep checks (full boss fights, waves, the weather pulses, the Night Rides (levels 1–6), FRENZY end, initials entry,
-share, daily, pause, countdown, pickups, scrim, the phone menus, and `pacing`: every level's whole run played as a player (#925), failing a level whose
+share, daily, Boss Rush, pause, countdown, pickups, scrim, the phone menus, and `pacing`: every level's whole run played as a player (#925), failing a level whose
 time with nothing it can shoot is over its `budgets.json` `pacing` ceilings, `e2e-results/pacing.json`; game logic among them has unit tests next to its
 pure module) run in the full smoke, nightly on production (`prod-smoke.yml`, as three parallel parts, `--nightly-part <main|deep|pacing>`, plus `slow`, level1 and level3's ride + results under cpu 4x (#539); a red one opens `agent:prod-broken`).
 Every level's ride and `pacing` line ends with `programs after warm-up: +N` (shaders `ShaderWarmup` missed, with the moment
@@ -82,9 +82,10 @@ smoke step checks, or when a failure needs more than its summary line.
 React 19 + @react-three/fiber 9 + drei + @react-three/postprocessing, three 0.172,
 Web Audio (procedural music and SFX, no audio library), zustand (state),
 framer-motion (UI), Vite 6, TypeScript strict. Fonts (Ultra, Big Shoulders; Lobster for the logo) are self-hosted from `public/fonts/` (OFL, Ultra Apache 2.0); the game makes no
-third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel: every push to
-`main` goes to production at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it). Preview deployments
-are disabled (`git.deploymentEnabled` in `vercel.json`) — verification happens in CI. `vercel.json` rewrites only
+third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it).
+A merge to `main` is **not** live at once: `deploy.yml` ships main's head daily at 05:00 UTC, when Alex starts it (Deploy now in the
+control center), and after every green CI on `main` while an `agent:prod-broken` issue is open (`scripts/deploy.cjs`). Vercel builds no
+push itself (`git.deploymentEnabled` in `vercel.json`: Standard build minutes are billed) — verification happens in CI. `vercel.json` rewrites only
 the `/go/<campaign>` landing paths to the game; any other unknown path gets `public/404.html` with a real 404,
 and it sets the security headers, a year's `immutable` cache on Vite's hashed `/assets/*` (so nothing unhashed goes in
 `public/assets/`) and `no-cache` on `/sw.js`; `scripts/vercelRoutes.mjs` models the routing and headers, which `scripts/site.test.ts` checks (with the share card, manifest and icons) and `e2e/prod-check.mjs` holds the live site to. `index.html` carries

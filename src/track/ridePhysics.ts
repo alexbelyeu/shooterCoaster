@@ -67,6 +67,12 @@ export function resetRide(state: RideState): void {
   state.time = 0
 }
 
+/** Where a run that starts at level second `seconds` picks the ride up (a Boss Rush stage, #1011): the ride from GO, that long. */
+export function rideStartingAt(state: RideState, tangentY: TangentY, speeds: RideSpeeds, seconds: number): RideState {
+  resetRide(state)
+  return seconds > 0 ? advanceRide(state, tangentY, speeds, seconds * 60) : state
+}
+
 /** Puts the car at track parameter `t` (the smoke's `rideTo`); a v2 ride resumes its plan from the first time it gets there. */
 export function jumpRide(state: RideState, speeds: RideSpeeds, t: number): void {
   state.progress = t

@@ -5,8 +5,12 @@
  */
 export type GamePhase = 'title' | 'levelSelect' | 'loading' | 'intro' | 'countdown' | 'playing' | 'paused' | 'results'
 
-/** How a run was started: the campaign, or the Daily Run of a UTC day (`levels/daily.ts`). */
-export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string }
+/**
+ * How a run was started: the campaign, the Daily Run of a UTC day (`levels/daily.ts`), or a Boss Rush stage
+ * (`levels/bossRush.ts`, #1011): `stage` is its index in `rushStages`, `seconds` the level seconds of the stages behind
+ * it (on the results, the whole rush's).
+ */
+export type RunMode = { mode: 'campaign' } | { mode: 'daily'; dateKey: string } | { mode: 'bossRush'; stage: number; seconds: number }
 
 /** A campaign run's look (#829): the level as built, or its Night Ride (`levels/environments/nightPreset.ts`). */
 export type RideVariant = 'day' | 'night'

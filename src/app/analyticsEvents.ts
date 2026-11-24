@@ -40,6 +40,8 @@ export function tensPercent(fraction: number): number {
 export function analyticsEventFor(prev: RunSnapshot, next: RunSnapshot): AnalyticsEvent | null {
   const newRun = next.runId !== prev.runId
   if (prev.phase === next.phase && !newRun) return null
+  // A Boss Rush (#1011) is no level's start, finish or quit.
+  if (next.runMode.mode === 'bossRush') return null
   const config = next.currentLevel ? getLevelConfig(next.currentLevel) : undefined
   if (!config) return null
   const level = config.id
