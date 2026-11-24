@@ -92,7 +92,8 @@ biome or score that already exists is refused, so a second run changes nothing. 
    levels spawn: `worlds.test.ts` fails a missing one), `enemyComponents.ts` / `bossComponents.ts` (the turntable's),
    `ENEMY_PLACEMENT`, `SCORE_VALUES`, `deathStyles.ts`, `sfxDesign.ts`, the turntable's `subjects.ts`.
    Its three medals in `src/levels/medals.ts` `LEVEL_MEDALS` (#879; `medals.test.ts` fails a level without them,
-   or one a 60 s run can't win).
+   or one a 60 s run can't win): **(script)** writes three starter medals any starter roster wins (a 20 chain,
+   70% over 30 shots, a clean Frenzy); rename them for the world and swap one for a boss / golden / hard-route feat once it has one.
 5. Music. **(script)** `scores/<levelId>.scrim`, a copy of `--score-from`'s score (level1 by default), in
    `scores/index.ts`, with that score's key in `SCORE_KEYS`. **(by hand)** A theme round for Alex
    (`Listen:`); the winner replaces the copy and its `SCORE_KEYS` row.
