@@ -78,7 +78,9 @@ no such row), turns that toggle on, picks Low and a music volume, cycles Med / H
 and fails if the renderer's GPU textures grew over the last two cycles (each change rebuilds the post composer, #249),
 closes with Esc, and requires both to survive a reload and the title's "Internal device, not tracked" marker to show after it. A `quality` step loads the first level at device dpr 2 with the default quality and with
 `?quality=low` (any preset name works as a URL override and is saved like the setting) on the same seed and frozen
-track point: low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
+track point, each held at the level's start from its first frame (level timer, game clock and ride at 0, so no enemy flies in
+however long the level takes to load) and counted once its draw count has held for 5 frames (`waitDrawsSettled`, #972: the same counts on
+any runner): low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
 A `levelSelect` step seeds saved progress (3★ + 1★) and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
 and requires one card per level plus the Daily card, each top's initials on its card after the reload, the right locked count and `★ x / 15` total, every card
 inside 1280×720 with no sideways scroll, and keyboard-only play (arrows move focus, Enter on a
