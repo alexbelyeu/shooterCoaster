@@ -30,14 +30,22 @@ const LOOKS: Record<DarkLook, Look> = {
 
 /** The muzzle flash's light at its peak, and how long it lasts (ms) after each shot. */
 const FLASH = { intensity: 2.2, ms: 110 } as const
+/**
+ * The flash is a spot from the rider's eye, its axis `pitch` radians below the view's forward and its cone `angle` wide
+ * either side, so its top edge sits at the view's horizon: it lights the rats and the floor ahead and never a low
+ * ceiling, which would strobe at the blaster's rate (#929, the Training Area's cave).
+ */
+const FLASH_CONE = { pitch: 0.6, angle: 0.6, penumbra: 0.5 } as const
+/** The spot's aim in the camera's frame: ahead (-z) and down. */
+const FLASH_AIM = new THREE.Vector3(0, -Math.sin(FLASH_CONE.pitch), -Math.cos(FLASH_CONE.pitch))
 
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k
 
 /**
  * A level's dark sections (#752, `TrackParams.darkSections`): while the rider is in one, the hemisphere, sun, sky
  * reflections and fog dim and close in (`darkSectionDepth`, eased at each end) and `DARKNESS` tells the level's own
- * shaders; each shot's muzzle flash lights what is near the rider. The fog's far is a modifier (`fog.dark`) that
- * `BiomeEnvironment` combines with the others'; its colour, which nothing else changes, is set here. The flash's point light is always in the scene,
+ * shaders; each shot's muzzle flash lights what is near the rider and below the view's horizon (`FLASH_CONE`). The fog's far is a modifier (`fog.dark`) that
+ * `BiomeEnvironment` combines with the others'; its colour, which nothing else changes, is set here. The flash's spot light is always in the scene,
  * at 0 outside the dark, so no material's program changes on the first shot (`ShaderWarmup` compiles them with it).
  */
 export default function DarkSections({
@@ -56,7 +64,8 @@ export default function DarkSections({
   fog: FogModifiers
 }) {
   const scene = useThree((s) => s.scene)
-  const flashRef = useRef<THREE.PointLight>(null)
+  const flashRef = useRef<THREE.SpotLight>(null)
+  const flashAim = useMemo(() => new THREE.Object3D(), [])
   const flashLeft = useRef(0)
   const colours = useMemo(
     () => ({
@@ -108,6 +117,7 @@ export default function DarkSections({
     const flash = flashRef.current
     if (!flash) return
     flash.position.copy(camera.position)
+    flashAim.position.copy(FLASH_AIM).applyQuaternion(camera.quaternion).add(camera.position)
     flash.intensity = FLASH.intensity * depth * Math.min(Math.max(flashLeft.current, 0) / FLASH.ms, 1)
     const testApi = window.__SC_TEST__
     if (testApi) {
@@ -117,5 +127,19 @@ export default function DarkSections({
     if (flashLeft.current > 0 && !isFeedbackHeld()) flashLeft.current -= delta * useGameStore.getState().timeScale * 1000
   })
 
-  return <pointLight ref={flashRef} color="#fff1d6" intensity={0} distance={reach} decay={0} />
+  return (
+    <>
+      <primitive object={flashAim} />
+      <spotLight
+        ref={flashRef}
+        target={flashAim}
+        color="#fff1d6"
+        intensity={0}
+        distance={reach}
+        decay={0}
+        angle={FLASH_CONE.angle}
+        penumbra={FLASH_CONE.penumbra}
+      />
+    </>
+  )
 }
