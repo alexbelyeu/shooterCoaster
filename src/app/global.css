@@ -2527,8 +2527,8 @@ canvas {
   opacity: 0.55;
 }
 
-/* Clear local data: a second tap confirms, on the fair's red. */
-.settings-clear .fair-plate {
+/* Clear local data: a second tap confirms, on the fair's red. Install (#999) is the same plate. */
+:is(.settings-clear, .settings-install) .fair-plate {
   flex-shrink: 0;
   padding: 0.5rem 0.8rem 0.4rem;
   font-size: 1.15rem;

@@ -11,7 +11,9 @@ import {
   browserStorage,
   dropInternalEvents,
   searchWithoutInternalParam,
+  serviceWorkerEnabled,
 } from './app/analyticsGate'
+import { captureInstallPrompt } from './app/installPrompt'
 import './app/global.css'
 import { eventBus } from './core/EventBus'
 import { markStartup } from './core/startupMarks'
@@ -32,6 +34,11 @@ const internal = applyInternalParam(search, storage)
 const strippedSearch = searchWithoutInternalParam(search)
 if (strippedSearch !== null) {
   window.history.replaceState(window.history.state, '', pathname + strippedSearch + hash)
+}
+
+if (serviceWorkerEnabled(__BUILT_ON_VERCEL__, __PORTAL_BUILD__, search) && 'serviceWorker' in navigator) {
+  captureInstallPrompt(window)
+  window.addEventListener('load', () => void import('./app/serviceWorker').then((m) => m.registerServiceWorker()), { once: true })
 }
 
 const analyticsOn = analyticsEnabled(__BUILT_ON_VERCEL__, search, internal)
