@@ -1,8 +1,10 @@
+import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
 import { bossMaxScore, currentPhase, applyHit, createBossState, exposedWeakPoints } from './bossModel'
 import { HELICOPTER } from './bossSpecs'
 import {
-  BEAM, HELI, HELI_FALL, TAIL_LOST_WOBBLE, beamSpot, dropInHeight, fallDrop, fallSpin, heliPose, type BeamSpot, type HeliPose,
+  BEAM, HELI, HELI_FALL, TAIL_LOST_WOBBLE, anchorAt, beamSpot, dropInHeight, fallDrop, fallSpin, heliPose, spotAt, type BeamSpot,
+  type HeliPose,
 } from './helicopterMotion.hot'
 
 const pose = (): HeliPose => ({ dy: 0, pitch: 0, roll: 0, yaw: 0, drop: 0 })
@@ -100,5 +102,42 @@ describe('the Helicopter motion', () => {
     expect(Math.abs(beamSpot(s, 0, 0).side)).toBeGreaterThan(BEAM.tellSide * 0.9)
     expect(Math.abs(beamSpot(s, 0, 0.5).side)).toBeLessThan(BEAM.tellSide * 0.9)
     expect(beamSpot(s, 1, 1).side).toBe(beamSpot(s, 1).side)
+  })
+  it('hovers ahead of the camera on the rider\'s heading, within `side` of it, above the camera and clear of the street', () => {
+    const cam = new THREE.Vector3(40, 120, -300)
+    const out = new THREE.Vector3()
+    const ground = (x: number, z: number) => 60 + 0.2 * x + 0.1 * z
+    let minAhead = Infinity
+    let maxAhead = -Infinity
+    let maxSide = 0
+    let minAbove = Infinity
+    let minClear = Infinity
+    for (const a of [0, 0.7, 2, Math.PI, 4.5]) {
+      const h = { x: Math.sin(a), z: -Math.cos(a) }
+      for (const t of times(0, 40, 0.25)) {
+        anchorAt(out, cam, h, t, ground)
+        const dx = out.x - cam.x
+        const dz = out.z - cam.z
+        minAhead = Math.min(minAhead, dx * h.x + dz * h.z)
+        maxAhead = Math.max(maxAhead, dx * h.x + dz * h.z)
+        maxSide = Math.max(maxSide, Math.abs(dz * h.x - dx * h.z))
+        minAbove = Math.min(minAbove, out.y - (cam.y + HELI.above))
+        minClear = Math.min(minClear, out.y - (ground(out.x, out.z) + HELI.minClearance))
+      }
+    }
+    expect(minAhead).toBeCloseTo(HELI.ahead, 6)
+    expect(maxAhead).toBeCloseTo(HELI.ahead, 6)
+    expect(maxSide).toBeLessThanOrEqual(HELI.side + 1e-9)
+    expect(maxSide).toBeGreaterThan(HELI.side * 0.95)
+    expect(minAbove).toBeGreaterThanOrEqual(0)
+    expect(minClear).toBeGreaterThanOrEqual(0)
+    // Over high ground it climbs to keep its clearance.
+    expect(anchorAt(out, cam, { x: 0, z: -1 }, 0, () => 500).y).toBe(500 + HELI.minClearance)
+  })
+
+  it('lands the searchlight\'s spot on the street, `ahead` along the heading and `side` to its right', () => {
+    const out = new THREE.Vector3()
+    const spot = spotAt(out, new THREE.Vector3(10, 200, 20), { x: 0, z: -1 }, { ahead: 300, side: 50 }, () => 7)
+    expect([spot.x, spot.y, spot.z]).toEqual([60, 8, -280])
   })
 })
