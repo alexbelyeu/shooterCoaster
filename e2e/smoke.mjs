@@ -2937,8 +2937,7 @@ async function darkSectionShot(page, levelId, { shots: shoot = false } = {}) {
 /** The dark shots' floors: the share of the frame that is dark, of saturated bright pixels (the blacklit glow), and how much the flash brightens the frame's mean (0–255). */
 const DARK_SHOT = { dark: 0.4, glow: 0.002, flash: 3 }
 
-/** `branchWave`: the hard route's own wave (#720, `LevelRegistry.ts` level6's `branch`): its banner, size and second. */
-const SWITCH_CHECK = { level: STEP_LEVELS.switch[0], branchWave: { label: 'Pad Rats!', count: 8, at: 17 } }
+const SWITCH_CHECK = { level: STEP_LEVELS.switch[0] }
 /** On-screen rats on the branch the hard run must see once its wave is in. */
 const BRANCH_WAVE_ON_SCREEN = 2
 /** Track-parameter leads behind the switch sign to park the coaster at. */
@@ -2953,7 +2952,7 @@ const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
  * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
  */
 async function switchCheck(page, { darkShots = false } = {}) {
-  const { level, branchWave } = SWITCH_CHECK
+  const { level } = SWITCH_CHECK
   const problems = []
   const api = (fn, arg) => page.evaluate(fn, arg)
   /** Jumps the held level timer to `seconds` in one frame and lets the waves due by then tell and arrive, the ride held. */
@@ -3001,6 +3000,9 @@ async function switchCheck(page, { darkShots = false } = {}) {
   if (!(await start())) return { id: 'switch', problems: [NOT_LOADED(level)] }
   let sw = await read()
   if (!sw) return { id: 'switch', problems: [`${level} has no switch (trackSwitch() is null)`] }
+  // The hard route's own wave (#720, the level's roster `branch`), read from the game so a re-timed fork can't drift from it.
+  const { branchWave } = sw
+  if (!branchWave) return { id: 'switch', problems: [`${level} has a switch but no hard-route wave`] }
   const mid = (sw.from + sw.to) / 2
   const result = { t: sw.t, lead: null, px: null, hard: null, easy: null, branchRats: null, totals: { hard: null, easy: null } }
 

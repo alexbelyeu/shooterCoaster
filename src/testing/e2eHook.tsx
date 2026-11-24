@@ -405,6 +405,8 @@ export interface E2ESwitch {
   open: boolean
   /** The run's kill-count total: a hard-route wave joins it when it arrives (#720). */
   totalEnemies: number
+  /** The level's hard-route wave (`EnemyWave.route` 'hard', from its roster's `branch`): banner, size and second; null without one. */
+  branchWave: { label: string; count: number; at: number } | null
   x: number
   y: number
   ndcX: number
@@ -744,6 +746,7 @@ function readSwitch(): E2ESwitch | null {
     riding,
     open: s.open(),
     totalEnemies: useGameStore.getState().totalEnemies,
+    branchWave: readBranchWave(),
     x: ((_v.x + 1) / 2) * probeSize.width,
     y: ((1 - _v.y) / 2) * probeSize.height,
     ndcX: _v.x,
@@ -751,6 +754,12 @@ function readSwitch(): E2ESwitch | null {
     onScreen: ahead && Math.abs(_v.x) <= 1 && Math.abs(_v.y) <= 1,
     distance: position.distanceTo(_w),
   }
+}
+
+function readBranchWave(): E2ESwitch['branchWave'] {
+  const level = useGameStore.getState().currentLevel
+  const wave = (level ? getLevelConfig(level)?.enemies : undefined)?.find((e) => e.route === 'hard')
+  return wave ? { label: wave.waveLabel ?? '', count: wave.count, at: wave.spawnDelay ?? 0 } : null
 }
 
 const _toPickup = new THREE.Vector3()
