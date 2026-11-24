@@ -563,6 +563,21 @@ describe('placeWallSwarm (#516)', () => {
     expect(unseen.map((p) => p.wall.id)).toEqual([])
   })
 
+  it('lands level 6\'s lanternflies group by group through the wave (#928), not all at its tell', () => {
+    const { level, table: gym, rideFor } = world(getAllLevels().find((l) => l.id === 'level6')!)
+    const wave = level.enemies.find((w) => w.type === 'lanternfly')!
+    const ride = rideFor(wave)
+    const placed = placeWallSwarm({ table: gym, riderIndex: 0, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })
+    const arrivals = [...new Set(placed.map((p) => p.after ?? 0))]
+    expect(arrivals[0]).toBe(0)
+    expect(arrivals.length).toBeGreaterThanOrEqual(5)
+    for (let g = 1; g < arrivals.length; g++) expect(arrivals[g]).toBeGreaterThan(arrivals[g - 1])
+    // All down before the wave's window is over, so the last group meets the rider too.
+    expect(arrivals[arrivals.length - 1]).toBeLessThan(ride.seconds!)
+    // Off a level (no window), a swarm comes at once.
+    expect(placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [wallAt('ahead', 400)], slots, ride: STILL }).every((p) => !p.after)).toBe(true)
+  })
+
   it('needs the level to have walls', () => {
     expect(() => placeWallSwarm({ table, riderIndex: 0, type: 'lanternfly', walls: [], slots, ride: STILL })).toThrow(/walls/)
   })
