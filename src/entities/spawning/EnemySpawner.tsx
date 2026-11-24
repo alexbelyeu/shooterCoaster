@@ -332,8 +332,8 @@ export default function EnemySpawner({
   const lastWaveTick = useRef<number | null>(null)
   const goneEnemies = useRef(new Set<string>())
   const escapedEnemies = useRef(new Set<string>())
-  /** Golden balloons popped: outside the kill tally, but one still up is something left to shoot. */
-  const poppedGolden = useRef(new Set<string>())
+  /** Golden balloons popped or floated off: outside the kill tally, but one still up is something left to shoot. */
+  const goneGolden = useRef(new Set<string>())
   const bossBeaten = useRef(false)
   /** `run:cleared` went out this run (#961). */
   const cleared = useRef(false)
@@ -356,7 +356,7 @@ export default function EnemySpawner({
     lastWaveTick.current = null
     goneEnemies.current.clear()
     escapedEnemies.current.clear()
-    poppedGolden.current.clear()
+    goneGolden.current.clear()
     bossBeaten.current = false
     cleared.current = false
     joinedEnemies.current = 0
@@ -444,7 +444,7 @@ export default function EnemySpawner({
     // The boss beaten with nothing left to shoot or still to come: GameTimer ends the run after the defeat's hold (#961).
     if (cleared.current) return
     const left = enemiesLeft(totalEnemyCount + joinedEnemies.current, goneEnemies.current.size, escapedEnemies.current.size)
-    if (!nothingLeft(bossBeaten.current, left, goldenBalloons.length - poppedGolden.current.size, nextWaveDue(waveDelays, waveProgress.current))) return
+    if (!nothingLeft(bossBeaten.current, left, goldenBalloons.length - goneGolden.current.size, nextWaveDue(waveDelays, waveProgress.current))) return
     cleared.current = true
     eventBus.emit('run:cleared')
   })
@@ -458,11 +458,11 @@ export default function EnemySpawner({
   useEffect(() => {
     const gone = goneEnemies.current
     const escaped = escapedEnemies.current
-    const popped = poppedGolden.current
+    const golden = goneGolden.current
     return () => {
       gone.clear()
       escaped.clear()
-      popped.clear()
+      golden.clear()
     }
   }, [])
 
@@ -474,7 +474,7 @@ export default function EnemySpawner({
     [publishCounts],
   )
 
-  const onGoldenPop = useCallback((id: string) => { poppedGolden.current.add(id) }, [])
+  const onGoldenGone = useCallback((id: string) => { goneGolden.current.add(id) }, [])
 
   // Gone without a kill (a climber topped out): off the total, so never a kill (#480); no last-kill slow-mo. A bystander
   // is in no count.
@@ -525,7 +525,8 @@ export default function EnemySpawner({
           spawnPosition={gb.position}
           scoreValue={gb.scoreValue}
           radius={gb.radius}
-          onKill={onGoldenPop}
+          onKill={onGoldenGone}
+          onEscape={onGoldenGone}
         />
       ))}
       {boss && (
