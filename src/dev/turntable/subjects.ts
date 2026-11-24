@@ -88,6 +88,8 @@ const BOSS_SUBJECTS: Record<BossType, Spec> = {
   magmaTitan: { front: 0, holdHeading: 'root', motion: at(1.2, 2.4), animated: true },
   // Risen with her first four snakes out; the strip is one strike cycle of theirs, taking turns.
   medusa: { front: 0, holdHeading: 'root', motion: at(3), animated: true },
+  // Nose to the camera, held from its three-quarter turn; the strip is one bob of its hover, rotors turning.
+  helicopter: { front: 0, holdHeading: 'root', motion: at(cycle(1.1)), animated: true },
 }
 
 const subjectsOf = <K extends SubjectId>(kind: Subject['kind'], specs: Record<K, Spec>): Subject[] =>

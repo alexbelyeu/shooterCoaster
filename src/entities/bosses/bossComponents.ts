@@ -3,6 +3,7 @@ import type { BossType } from '@/types/level'
 import type { BossProps } from './BossBase'
 import GiantScorpion from './GiantScorpion'
 import GoldenBlimp from './GoldenBlimp'
+import Helicopter from './Helicopter'
 import Kraken from './Kraken'
 import MagmaTitan from './MagmaTitan'
 import Medusa from './Medusa'
@@ -16,4 +17,5 @@ export const BOSS_COMPONENTS: Record<BossType, ComponentType<BossProps>> = {
   yeti: Yeti,
   magmaTitan: MagmaTitan,
   medusa: Medusa,
+  helicopter: Helicopter,
 }

@@ -198,7 +198,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 112 * 15, // 1680: no boss, a finale wave ends the run
+    maxScore: 82 * 15 + 60 + 60 + 400, // 1230 + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1750
     message: 'You cleared Neon Metropolis!',
     nextLevel: null,
     // The first v2 ride (#323; the full storyboard is #871): the car waits in a station on the curve's crest for the
@@ -217,12 +217,11 @@ const LEVELS: LevelConfig[] = [
       color2: 0x2ee6ff,
       glow: 0.6,
     },
-    // Hover drones patrol the street canyons in Vs and rings; no boss yet (the helicopter is #322's), a finale wave ends the run.
-    // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the finale at 40 s. A wave of drones is
+    // Hover drones patrol the street canyons in Vs and rings, then the Helicopter (#325) drops in over the street ahead.
+    // Every wave is a formation ahead of the rider, one every ~6 s to 29 s, then the boss at 40 s. A wave of drones is
     // shot down in a few seconds and the towers hide stragglers: four big waves 10 s apart, two scattered over the whole
     // city, left the rider with nothing to shoot for most of the run (the pacing gate). The ring comes second, centred on
-    // the track, so the drop into the canyons has targets; the last wave and the finale come in three rings each, so
-    // they last until the next arrives and to the end of the run.
+    // the track, so the drop into the canyons has targets; the last wave comes in three rings, so it lasts until the boss.
     ...paceLevel({
       waves: [
         { type: 'hoverDrone', count: 9, waveLabel: 'Drones Incoming!', formation: 'v', weight: 0.75 },
@@ -232,7 +231,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'hoverDrone', count: 14, waveLabel: 'Swarm Protocol!', formation: 'v' },
         { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.5 },
       ],
-      finale: { type: 'hoverDrone', count: 30, waveLabel: 'Final Wave!', formation: 'ring' },
+      boss: 'helicopter',
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {},

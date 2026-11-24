@@ -23,6 +23,9 @@ import {
   LAVA_BURST_DEATH_STYLE,
   MEDUSA_SNAKE_DEATH_STYLE,
   MEDUSA_CHALK_BURST_DEATH_STYLE,
+  HELI_PART_DEATH_STYLE,
+  HELI_SMOKE_DEATH_STYLE,
+  HELI_CRASH_DEATH_STYLE,
   nextAge,
   particleOffset,
   pickDeathSlot,
@@ -32,6 +35,7 @@ import {
 } from './deathStyles'
 import { MEDUSA_DEFEAT_BURST_YS } from '@/entities/bosses/medusaMotion'
 import { TITAN_BREAK_POINTS } from '@/entities/bosses/titanMotion.hot'
+import { HELI_FALL } from '@/entities/bosses/helicopterMotion.hot'
 
 const ALL: [string, DeathStyle][] = [
   ...Object.entries(DEATH_STYLES),
@@ -50,6 +54,9 @@ const ALL: [string, DeathStyle][] = [
   ['lavaBurst', LAVA_BURST_DEATH_STYLE],
   ['medusaSnake', MEDUSA_SNAKE_DEATH_STYLE],
   ['medusaChalkBurst', MEDUSA_CHALK_BURST_DEATH_STYLE],
+  ['heliPart', HELI_PART_DEATH_STYLE],
+  ['heliSmoke', HELI_SMOKE_DEATH_STYLE],
+  ['heliCrash', HELI_CRASH_DEATH_STYLE],
 ]
 
 describe('death styles', () => {
@@ -57,7 +64,9 @@ describe('death styles', () => {
     // The confetti lives 3.2 s and every boss's own defeat bursts fire within it, so all of these overlap.
     const lastPart = 1
     const spareForAKill = 1
-    const ownDefeatBursts = { magmaTitan: TITAN_BREAK_POINTS.length, medusa: MEDUSA_DEFEAT_BURST_YS.length, other: 0 }
+    // The Helicopter's: the smoke puffs alive at once as it falls, and its crash.
+    const helicopter = Math.ceil(HELI_SMOKE_DEATH_STYLE.lifetime / HELI_FALL.smokeEvery) + 1
+    const ownDefeatBursts = { magmaTitan: TITAN_BREAK_POINTS.length, medusa: MEDUSA_DEFEAT_BURST_YS.length, helicopter, other: 0 }
     for (const own of Object.values(ownDefeatBursts)) {
       expect(lastPart + BOSS_DEFEAT_BURST_OFFSETS.length + own + spareForAKill).toBeLessThanOrEqual(DEATH_SLOTS)
     }
