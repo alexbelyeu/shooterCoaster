@@ -10,11 +10,13 @@ export interface RidePrecision {
 }
 
 /** A ride's control points packed: `xyz` is the first point then each one's step from the last, in units of 10^-position
- * (whole numbers, so the steps along a straight repeat and gzip well); `ups` is index, x, y, z of each rolled point's up.
+ * (whole numbers, so the steps along a straight repeat and gzip well); `ups` is each rolled point's index step from the last
+ * rolled point's (a run of rolled points repeats 1) then its up's x, y, z in units of 10^-up: whole numbers, no `0.` to repeat.
  * A ride laid out in a frame turned `yaw` about y (level 2's faces the Pyramid, #864) packs in that frame, where its straights
  * run along the axes and their steps repeat. */
 export interface PackedPoints {
   position: number
+  up: number
   xyz: number[]
   ups: number[]
   yaw?: number
@@ -71,14 +73,21 @@ export function packPoints(world: readonly RailPoint[], precision: RidePrecision
     units.forEach((u, k) => xyz.push(u - last[k] + 0))
     last = units
   }
-  const ups = points.flatMap((p, i) =>
-    p.up ? [i, roundTo(p.up.x, precision.up), roundTo(p.up.y, precision.up), roundTo(p.up.z, precision.up)] : [],
-  )
-  return yaw ? { position: precision.position, xyz, ups, yaw } : { position: precision.position, xyz, ups }
+  const upScale = 10 ** precision.up
+  const ups: number[] = []
+  let lastRolled = 0
+  points.forEach(({ up }, i) => {
+    if (!up) return
+    ups.push(i - lastRolled, ...[up.x, up.y, up.z].map((v) => Math.round(v * upScale) + 0))
+    lastRolled = i
+  })
+  const packed = { position: precision.position, up: precision.up, xyz, ups }
+  return yaw ? { ...packed, yaw } : packed
 }
 
-export function unpackPoints({ position, xyz, ups, yaw = 0 }: PackedPoints): RailPoint[] {
+export function unpackPoints({ position, up, xyz, ups, yaw = 0 }: PackedPoints): RailPoint[] {
   const scale = 10 ** position
+  const upScale = 10 ** up
   const points: RailPoint[] = []
   let [x, y, z] = [0, 0, 0]
   for (let i = 0; i < xyz.length; i += 3) {
@@ -87,6 +96,10 @@ export function unpackPoints({ position, xyz, ups, yaw = 0 }: PackedPoints): Rai
     z += xyz[i + 2]
     points.push({ x: x / scale + 0, y: y / scale + 0, z: z / scale + 0 })
   }
-  for (let i = 0; i < ups.length; i += 4) points[ups[i]].up = { x: ups[i + 1], y: ups[i + 2], z: ups[i + 3] }
+  let rolled = 0
+  for (let i = 0; i < ups.length; i += 4) {
+    rolled += ups[i]
+    points[rolled].up = { x: ups[i + 1] / upScale + 0, y: ups[i + 2] / upScale + 0, z: ups[i + 3] / upScale + 0 }
+  }
   return yaw ? points.map((p) => turnPoint(p, yaw, true)) : points
 }

@@ -68,6 +68,12 @@ describe('ride data', () => {
     expect(xyz.every(Number.isInteger)).toBe(true)
   })
 
+  it('packs ups as whole numbers, each after its index step from the last rolled point', () => {
+    const up = { x: 0.5, y: 0.86, z: -0.123456 }
+    const source = [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0, up }, { x: 2, y: 0, z: 0, up }, { x: 3, y: 0, z: 0 }, { x: 4, y: 0, z: 0, up }]
+    expect(packPoints(source, { position: 0, up: 2 }).ups).toEqual([1, 50, 86, -12, 1, 50, 86, -12, 2, 50, 86, -12])
+  })
+
   it('keeps 6 significant digits of everything else and drops float dust', () => {
     const rounded = roundNumbers({ a: 0.123456789, b: [123456.789, -1.11e-16], c: 'kept', d: { e: 98765.4321 } })
     expect(rounded).toEqual({ a: 0.123457, b: [123457, 0], c: 'kept', d: { e: 98765.4 } })
