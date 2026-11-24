@@ -4,7 +4,7 @@ import type * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { DRONE_BOB, DRONE_SWING } from './hoverDroneMotion'
-import { DRONE_BODY_GEO, DRONE_GLOW_GEO, DRONE_GLOW_MAT, DRONE_MAT } from './SharedEnemyAssets'
+import { DRONE_GEO, DRONE_MAT } from './SharedEnemyAssets'
 
 /** Radians of figure-eight per game second. */
 const FIGURE_EIGHT_RATE = 0.9
@@ -47,8 +47,7 @@ export default function HoverDrone(props: EnemyProps) {
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group ref={modelRef} scale={[9, 9, 9]}>
-        <mesh geometry={DRONE_BODY_GEO} material={DRONE_MAT} />
-        <mesh geometry={DRONE_GLOW_GEO} material={DRONE_GLOW_MAT} />
+        <mesh geometry={DRONE_GEO} material={DRONE_MAT} />
       </group>
     </EnemyBase>
   )
