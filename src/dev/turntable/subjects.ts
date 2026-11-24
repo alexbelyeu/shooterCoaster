@@ -1,5 +1,6 @@
 import { BIOME_TYPES, type BiomeType, type BossType, type EnemyType } from '@/types/level'
 import { CLIMB } from '@/entities/enemies/climbMotion'
+import { WADDLE_RATE } from '@/entities/enemies/billboardBotMotion'
 import { RAT_CYCLE } from '@/entities/enemies/ratMotion.hot'
 import { DUST_BUNNY_BOUNCE } from '@/entities/enemies/dustBunnyMotion.hot'
 import { HOP, hopRoute } from '@/entities/enemies/hopGlideMotion'
@@ -72,6 +73,8 @@ const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon', Spec> = {
   lanternfly: { front: 0, motion: at(FIRST_HOP.span, FIRST_HOP.from), animated: true, stage: 'wall', wallGap: HOP.standoff },
   // Turns to the rider; the strip is one figure-eight (HoverDrone.tsx's FIGURE_EIGHT_RATE).
   hoverDrone: { front: 0, holdHeading: 'model', motion: at(cycle(0.9)), animated: true },
+  // Turns to the rider; the strip is one waddle, a step to each foot (BillboardBot.tsx's WADDLE_RATE).
+  billboardBot: { front: 0, holdHeading: 'model', motion: at(cycle(WADDLE_RATE)), animated: true },
 }
 
 /** Every boss. A `Record`, so a missing one fails `tsc -b`. */

@@ -1,5 +1,8 @@
 import * as THREE from 'three'
 import type { Point3, RailPoint } from '../curves/SplineCurve'
+import { smoothstep } from '@/utils/ease'
+
+export { smoothstep }
 
 /** The ride elements (`docs/RIDE-KIT.md`, #698). */
 export type ElementKind =
@@ -54,11 +57,6 @@ const MAX_TWIST_PER_POINT = (20 * Math.PI) / 180
 const Y = new THREE.Vector3(0, 1, 0)
 const Z = new THREE.Vector3(0, 0, 1)
 
-/** 0 → 1 with zero slope at both ends. */
-export function smoothstep(u: number): number {
-  const x = Math.min(1, Math.max(0, u))
-  return x * x * (3 - 2 * x)
-}
 
 /**
  * A turtle that drives a frame through the elements and drops control points with their up (`RailPoint`) every

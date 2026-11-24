@@ -3,7 +3,9 @@ import { shippedLevel } from '@/levels/shippedLevels'
 import { buildArcTable } from '@/track/arcLength'
 import { createTrackCurve } from '@/track/curves/createTrackCurve'
 import { trackExtent } from '../../shared/trackScatter'
-import { layoutCity } from './cityLayout'
+import { buildTrackIndex } from '../../shared/trackClearance'
+import { createRng } from '@/utils/rng'
+import { cityTowers, KERB_OFFSET, layoutCity, onPavement, streetAxis } from './cityLayout'
 import { STREET_GRID } from './config'
 
 const table = buildArcTable(createTrackCurve(shippedLevel('level7').track))
@@ -51,5 +53,44 @@ describe('layoutCity', () => {
     expect(layout.signs.length).toBeGreaterThan(30)
     expect(new Set(layout.signs.map((s) => s.color))).toEqual(new Set(['magenta', 'cyan', 'amber']))
     for (const s of layout.signs) expect(trackDistance(s.x, s.z)).toBeGreaterThan(8)
+  })
+})
+
+describe('onPavement', () => {
+  const towers = cityTowers(table, extent)
+  const index = buildTrackIndex(table)
+
+  it('moves a ground spot onto a pavement kerb, off the rails and out of every tower', () => {
+    const rng = createRng(963)
+    const { pitch } = STREET_GRID
+    const misplaced: string[] = []
+    for (let k = 0; k < 400; k++) {
+      const p = { x: rng.range(-extent, extent), y: 0, z: rng.range(-extent, extent) }
+      const q = onPavement(towers, index, p, () => [])
+      // On a kerb along one street or the other (where streets cross, `streetAxis` reads the one along x)
+      const kerbOff = (c: number) => Math.abs(Math.abs(c - (Math.round(c / pitch - 0.5) + 0.5) * pitch) - KERB_OFFSET)
+      const onKerb = streetAxis(q.x, q.z) !== null && Math.min(kerbOff(q.x), kerbOff(q.z)) < 1e-6
+      const inTower = towers.some((t) => Math.abs(q.x - t.x) < t.w / 2 && Math.abs(q.z - t.z) < t.d / 2)
+      if (!onKerb || inTower || trackDistance(q.x, q.z) < 40 || Math.hypot(q.x - p.x, q.z - p.z) > pitch * 1.5) {
+        misplaced.push(`${p.x.toFixed(0)},${p.z.toFixed(0)}`)
+      }
+    }
+    expect(misplaced).toEqual([])
+  })
+
+  it('picks the kerb spot the approach sees past the towers over a nearer hidden one', () => {
+    // One block's tower; the rider looks at it from the south, so the kerb north of it is hidden
+    const block = [{ x: 0, z: 0, w: 176, d: 176, h: 200 }]
+    const offRails = { near: () => false } as unknown as Parameters<typeof onPavement>[1]
+    const p = { x: 0, y: 0, z: 130 }
+    expect(onPavement(block, offRails, p, () => [])).toEqual({ x: 0, y: 0, z: STREET_GRID.pitch / 2 + KERB_OFFSET })
+    expect(onPavement(block, offRails, p, () => [{ x: 0, y: 30, z: -400 }])).toEqual({ x: 0, y: 0, z: -STREET_GRID.pitch / 2 - KERB_OFFSET })
+  })
+
+  it('reads the street a spot is on, null inside a block', () => {
+    const { pitch } = STREET_GRID
+    expect(streetAxis(10, pitch / 2 + KERB_OFFSET)).toBe('x')
+    expect(streetAxis(-pitch / 2 - KERB_OFFSET, 10)).toBe('z')
+    expect(streetAxis(0, 0)).toBeNull()
   })
 })

@@ -14,7 +14,11 @@ const comparable = (text: string) => JSON.stringify(compile(text), (key, value) 
 
 describe('stripScrim', () => {
   it('drops comments, the about line and empty lines, keeping a sharp note', () => {
-    expect(stripScrim('title T\nabout prose # here\n\n# a note\nlead | C#4 D # trailing\n  bass | C2')).toBe('title T\nlead | C#4 D\n  bass | C2')
+    expect(stripScrim('title T\nabout prose # here\n\n# a note\nlead | C#4 D # trailing\n  bass | C2')).toBe('title T\nlead | C#4 D\nbass | C2')
+  })
+
+  it('collapses spacing and keeps a voice named about', () => {
+    expect(stripScrim('voice lead   square  vol=0.6 # loud\nabout | C4 |\n')).toBe('voice lead square vol=0.6\nabout | C4 |')
   })
 
   it.each(files)('%s compiles to the same song stripped', (file) => {
