@@ -1,5 +1,0 @@
-## 2026-11-23 — The Inferno ride's holes in the volcano are cut by the rock's shader, not the mesh (builder, #867)
-
-**Context:** Level 5's v2 ride enters the volcano through its flank, falls on a drop track inside the hollow cone and leaves through a second hole. The cone is one procedural mesh (`buildVolcanoRock`) shared with its lava streaks and glow.
-**Decision:** `Volcano.tsx` discards fragments within `CONE_HOLE.radius` of each crossing (`volcanoGeometry.ts` `coneCrossings`, fed the track by `volcanic/Features.tsx`) and draws the rock two-sided so the inside of the cone reads. One extra program (`terrain-glow-holes`), warmed like the rest (programs after warm-up +0). Cutting the mesh would have meant re-triangulating round each hole and re-deriving the streaks on the cut surface for a hole the rider sees for about a second.
-**Consequences:** The holes are round and soft-edged rather than framed; at most four. A ride that passes through other landmarks can reuse the same cut. The track inside the cone is checked by `infernoTrack.test.ts`, not by a mesh clearance test.
