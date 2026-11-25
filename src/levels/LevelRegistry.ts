@@ -66,7 +66,7 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: 39 * 20 + 81 * 15 + 2 * 60 + 4 * 40 + 400, // 1995 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2675
+    maxScore: 56 * 20 + 63 * 15 + 2 * 60 + 4 * 40 + 400, // 2065 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2745
     message: 'Ready for this one?',
     nextLevel: 'level3',
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
@@ -76,10 +76,10 @@ const LEVELS: LevelConfig[] = [
       // packs so the straight run to the lift doesn't put all of them in view (#864: draws); Vs up the lift hill (2, 6 and
       // 7 s: one wave per V of nine, so a second group doesn't fly in with the first), holding the sky to the crest; the
       // second pack on the sand before the door, under the drop (11 s), and ten on the passage's floor in the dark (13 s);
-      // the sandstorm's V meets the car out of the Pyramid (16 s); More Crows over the airtime crest (22, 23 s), a V through
-      // the jump gap (26 s), four scorpions trackside along the crest (27 s), a V (30 s) and a last small one (32 s) that
-      // arrives as the one before it is cleared. What is left at the Giant Scorpion's arrival (40 s) delays its fight, and
-      // past ~46 s the final lift turns the view away from it: the waves after the jump gap stay small.
+      // the sandstorm's V meets the car out of the Pyramid (16 s); More Crows over the airtime crest (22 s); then only
+      // trackside scorpions (23 to 32 s), each pack in view as the one before it is cleared. The ride review saw every V
+      // placed after the crest arrive late, on the straight to the boss, with the Giant Scorpion (40 s): what is left then
+      // delays the fight, and past ~46 s the final lift turns the view away from it.
       waves: [
         { type: 'scorpion', count: 15, waveLabel: 'Incoming!', weight: 2 },
         { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 4 },
@@ -89,11 +89,11 @@ const LEVELS: LevelConfig[] = [
         { type: 'scorpion', count: 10, waveLabel: 'In the Tomb!', darkFloor: true, weight: 3 },
         { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 6 },
         { type: 'crow', count: 9, waveLabel: 'More Crows!', formation: 'v', weight: 1 },
-        { type: 'crow', count: 3, formation: 'v', weight: 3 },
-        { type: 'crow', count: 7, formation: 'v', weight: 1 },
+        { type: 'scorpion', count: 3, weight: 3 },
+        { type: 'scorpion', count: 5, weight: 1 },
         { type: 'scorpion', count: 4, weight: 3 },
-        { type: 'crow', count: 5, formation: 'v', weight: 2 },
-        { type: 'crow', count: 3, formation: 'v', weight: 13 },
+        { type: 'scorpion', count: 5, weight: 2 },
+        { type: 'scorpion', count: 4, weight: 13 },
       ],
       boss: 'giantScorpion',
     }),
