@@ -92,9 +92,9 @@ export const SCORE_KEYS: Record<string, MusicKey> = {
   'results-win': { tonic: 60, minor: false }, // C major
   'results-lose': { tonic: 60, minor: false }, // C major
   // Theme options waiting on Alex's pick (`?theme=`, scores/themes/) get a row each: `'<slot>.<name>': key`
-  'level7.overpass': { tonic: 71, minor: true }, // B minor
-  'level7.gridlock': { tonic: 66, minor: true }, // F-sharp minor
-  'level7.pixel': { tonic: 68, minor: false }, // A-flat major
+  'level7.robot': { tonic: 62, minor: true }, // D Dorian
+  'level7.undercity': { tonic: 61, minor: true }, // C-sharp minor
+  'level7.noir': { tonic: 67, minor: true }, // G minor
 }
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11]

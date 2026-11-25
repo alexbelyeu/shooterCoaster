@@ -1,0 +1,101 @@
+title    Neon Noir
+composer Claude (ShooterCoaster)
+about    Neon Metropolis (level7) option, round 2 (#1053): a dark sequencer piece in G minor at 152. A metallic FM-bell hook rings over a driving sixteenth saw arpeggio and a galloping synth bass, with rain hissing under the whole loop and a siren far off in the B section. The A section turns Gm-Eb-D (the harmonic minor's F sharp), the B section Cm-Eb-Bb to D7. The last eight bars lift a semitone, to A-flat minor. Layers: hook, arpeggio, bass, rain and siren from the start, then a half-time kick and snare with sixteenth hats at 2x, synth brass doubling the hook an octave down at 3x, open hats and a crash at FRENZY. The helicopter's boss section turns G Phrygian (A flat), chops the bass into rotor sixteenths under a tom and orchestra hits; the sting is G major.
+tempo    152
+beats    4
+steps    4
+reverb   0.26
+
+# untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
+voice bell   fmbell   vol=0.6
+voice arp    saw      vol=0.2 pan=0.25 gate=0.45
+voice bass   synbass  vol=0.62 gate=0.7
+voice rain   rain     vol=0.3 pan=-0.2 att=0.08 rel=0.1
+voice siren  siren    vol=0.16 pan=-0.5
+voice stab   orchhit  vol=0.32 pan=0.1
+voice rotor  tommid   vol=0.5 pan=0.15
+voice kick   kick     vol=0.75 layer=drums
+voice snare  snare    vol=0.6 layer=drums
+voice hat    hat      vol=0.3 pan=0.3 layer=drums
+voice brass  synbrass vol=0.28 pan=-0.2 layer=lead
+voice ohat   ohat909  vol=0.2 pan=-0.35 layer=frenzy
+voice crash  crash    vol=0.28 pan=0.2 layer=frenzy
+
+pattern intro
+bell  | _ | G5--- D5--- A#5--- A5--- |
+brass | _ | G4--- D4--- A#4--- A4--- |
+arp   | G3 A#3 D4 G4 A#4 G4 D4 A#3 G3 A#3 D4 G4 A#4 G4 D4 A#3 | D3 F#3 A3 D4 F#4 D4 A3 F#3 D3 F#3 A3 D4 F#4 D4 A3 F#3 |
+bass  | G1- G2 G2 G1- G2 G2 G1- G2 G2 G1- G2- | D2- D3 D3 D2- D3 D3 D2- D3 D3 D2- D3- |
+rain  | G5--------------- | G5--------------- |
+kick  | _ | X... ..X. X... X.X. |
+snare | _ | .... .... XxXx XXXX |
+
+pattern A
+bell  | G5--- D5- G5- A#5--- A5- G5- | D6------- C6- A#5- A5- F5- | G5--- D#5- G5- A#5--- C6- A#5- | A5------- F#5- A5- D6- A5- |
+brass | G4--- D4- G4- A#4--- A4- G4- | D5------- C5- A#4- A4- F4- | G4--- D#4- G4- A#4--- C5- A#4- | A4------- F#4- A4- D5- A4- |
+arp   | G3 A#3 D4 G4 A#4 G4 D4 A#3 G3 A#3 D4 G4 A#4 G4 D4 A#3 | % | D#3 G3 A#3 D#4 G4 D#4 A#3 G3 D#3 G3 A#3 D#4 G4 D#4 A#3 G3 | D3 F#3 A3 D4 F#4 D4 A3 F#3 D3 F#3 A3 D4 F#4 D4 A3 F#3 |
+bass  | G1- G2 G2 G1- G2 G2 G1- G2 G2 G1- G2- | % | D#2- D#3 D#3 D#2- D#3 D#3 D#2- D#3 D#3 D#2- D#3- | D2- D3 D3 D2- D3 D3 D2- D3 D3 D2- D3- |
+rain  | G5--------------- | % | % | % |
+kick  | X... ..X. X... .... | % | % | X... ..X. X..x ..x. |
+snare | .... .... X... .... | % | % | .... .... X... x.xx |
+hat   | x.xx x.xx x.xx x.xx | % | % | % |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern A2 from A
+bell  | G5--- D5- G5- A#5--- A5- G5- | D6------- C6- A#5- A5- F5- | G5--- D#5- G5- A#5--- C6- A#5- | A5--- A#5--- C6--- D6--- |
+brass | G4--- D4- G4- A#4--- A4- G4- | D5------- C5- A#4- A4- F4- | G4--- D#4- G4- A#4--- C5- A#4- | A4--- A#4--- C5--- D5--- |
+crash | _ | _ | _ | _ |
+
+pattern B from A
+bell  | C6--- G5- D#5- C5--- D#5- G5- | A#5------- G5- D#5- A#5- G5- | D6--- C6- A#5- F5--- G5- A#5- | A5------- .--- F#5- A5- |
+brass | C5--- G4- D#4- C4--- D#4- G4- | A#4------- G4- D#4- A#4- G4- | D5--- C5- A#4- F4--- G4- A#4- | A4------- .--- F#4- A4- |
+arp   | C3 D#3 G3 C4 D#4 C4 G3 D#3 C3 D#3 G3 C4 D#4 C4 G3 D#3 | D#3 G3 A#3 D#4 G4 D#4 A#3 G3 D#3 G3 A#3 D#4 G4 D#4 A#3 G3 | A#2 D3 F3 A#3 D4 A#3 F3 D3 A#2 D3 F3 A#3 D4 A#3 F3 D3 | D3 F#3 A3 C4 F#4 C4 A3 F#3 D3 F#3 A3 C4 F#4 C4 A3 F#3 |
+bass  | C2- C3 C3 C2- C3 C3 C2- C3 C3 C2- C3- | D#2- D#3 D#3 D#2- D#3 D#3 D#2- D#3 D#3 D#2- D#3- | A#1- A#2 A#2 A#1- A#2 A#2 A#1- A#2 A#2 A#1- A#2- | D2- D3 D3 D2- D3 D3 D2- D3 D3 D2- D3- |
+siren | _ | _ | D5--------------- | _ |
+crash | _ | _ | _ | _ |
+
+pattern B2 from B
+bell  | C6--- G5- D#5- C5--- D#5- G5- | A#5------- G5- D#5- A#5- G5- | D6--- C6- A#5- F5--- G5- A#5- | A5------- C6- A5- F#5- D5- |
+brass | C5--- G4- D#4- C4--- D#4- G4- | A#4------- G4- D#4- A#4- G4- | D5--- C5- A#4- F4--- G4- A#4- | A4------- C5- A4- F#4- D4- |
+snare | .... .... X... .... | % | % | .... .... X.x. XxXx |
+
+play intro
+loop A A2 B B2 A A2 A+1 A2+1
+
+# Boss section: the police helicopter. The bass chops into rotor sixteenths under a tom rotor, the hook turns
+# G Phrygian (A flat) over Gm / Ab, orchestra hits land in base and the siren wails every other bar; in Y the hook climbs.
+pattern X
+bell  | G5--- D5- G5- A#5--- G#5- G5- | C6------- A#5- G#5- G5- D#5- | G5--- D5- G5- A#5--- C6- D6- | F#5------- A5- C6- D6- F#5- |
+brass | G4--- D4- G4- A#4--- G#4- G4- | C5------- A#4- G#4- G4- D#4- | G4--- D4- G4- A#4--- C5- D5- | F#4------- A4- C5- D5- F#4- |
+arp   | G3 A#3 D4 G4 A#4 G4 D4 A#3 G3 A#3 D4 G4 A#4 G4 D4 A#3 | G#3 C4 D#4 G#4 C5 G#4 D#4 C4 G#3 C4 D#4 G#4 C5 G#4 D#4 C4 | G3 A#3 D4 G4 A#4 G4 D4 A#3 G3 A#3 D4 G4 A#4 G4 D4 A#3 | D3 F#3 A3 D4 F#4 D4 A3 F#3 D3 F#3 A3 D4 F#4 D4 A3 F#3 |
+bass  | G2 G2 G3 G2 G2 G2 G3 G2 G2 G2 G3 G2 G2 G2 G3 G2 | G#2 G#2 G#3 G#2 G#2 G#2 G#3 G#2 G#2 G#2 G#3 G#2 G#2 G#2 G#3 G#2 | G2 G2 G3 G2 G2 G2 G3 G2 G2 G2 G3 G2 G2 G2 G3 G2 | D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 |
+stab  | [Gm]!--- .------- [Gm]!--- | [G#]!--- .----------- | [Gm]!--- .------- [Gm]!--- | [D]!--- [D]!--- [D7]!------- |
+rotor | X.x. X.x. X.x. X.x. | % | % | % |
+rain  | G5--------------- | % | % | % |
+siren | _ | G5--------------- | _ | G5--------------- |
+kick  | X... ..X. X... .... | % | % | X... ..X. X.X. xxxx |
+snare | .... .... X... .... | % | % | .... .... X.X. XXXX |
+hat   | x.xx x.xx x.xx x.xx | % | % | % |
+ohat  | ..x. ..x. ..x. ..x. | % | % | % |
+crash | X... .... .... .... | _ | _ | _ |
+
+pattern Y from X
+bell  | D6--- D#6--- D6--- A#5--- | C6------- A#5--- G#5--- | G5--- A#5--- D6--- G6--- | F#6------- D6- A5- F#5- D5- |
+brass | D5--- D#5--- D5--- A#4--- | C5------- A#4--- G#4--- | G4--- A#4--- D5--- G5--- | F#5------- D5- A4- F#4- D4- |
+crash | _ | _ | _ | _ |
+
+pattern S
+bell  | G5--- B5--- D6--- G6--- | G6------- .------- |
+brass | G4--- B4--- D5--- G5--- | G5------- .------- |
+stab  | [G]!--- .--- [G]!--- [C]!--- | [G]!------- .--- [G]!--- |
+bass  | G2--- G2--- G2--- G2--- | G2- G3- G2- G3- G2- G3- G2- G3- |
+arp   | G3 B3 D4 G4 B4 G4 D4 B3 G3 B3 D4 G4 B4 G4 D4 B3 | G3------- .------- |
+rain  | G5--------------- | G5--------------- |
+kick  | X... X... X... X... | X... X... X... x.xx |
+snare | .... .... xxxx XXXX | .... X... .... xxxx |
+hat   | x.xx x.xx x.xx x.xx | % |
+crash | X... .... .... .... | X... .... .... .... |
+
+boss  X Y
+sting S

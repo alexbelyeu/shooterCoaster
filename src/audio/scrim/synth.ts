@@ -10,7 +10,7 @@
  * access to the instruments and drums are exported for the arcade SFX bake (`audio/arcade/`); a session plays a score's
  * intensity layers (`layers.ts`) by ramping each voice's level gain, plus a low-pass when the score has layers; the game
  * voicing's panners take a mono voice up to stereo first (`upmixPanner`).
- * The original instruments are unchanged. The arcade palette (`fmbass` … `clap909`, marked below) is
+ * The original instruments are unchanged. The arcade palette (`fmbass` … `rain`, `bigkick` … `glitch`, marked below) is
  * ShooterCoaster's own, not from Scrimshaw.
  */
 
@@ -681,7 +681,67 @@ const ARCADE: Record<string, Instrument> = {
   }) },
   riser: { rev: 0.45, level: 2.66, play: ownedNote((S, out, t, d, f, v, p) => { sweep(S, out, t, Math.max(d, .1), f, v, p.bright, true) }) },
   downlifter: { rev: 0.45, level: 2.72, play: ownedNote((S, out, t, d, f, v, p) => { sweep(S, out, t, Math.max(d, .1), f, v, p.bright, false) }) },
+  /** Robot voice: a buzzy saw + square, no vibrato, through four formant band-passes gliding "oo" → "ah" on each note. */
+  vocoder: { rev: 0.18, level: 2.2, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); amp.connect(out)
+    const end = adsr(amp.gain, t, d, { a: p.att || .006, dc: .15, s: .8, r: p.rel || .06, peak: v * .5 })
+    const src = G(S, 1)
+    O(S, 'sawtooth', f, t, end, p).connect(src)
+    const sq = G(S, .5); O(S, 'square', f, t, end, p, 1, 5).connect(sq).connect(src)
+    const glide = t + Math.min(.12, d * .5)
+    for (const [from, to, q, gain] of VOCODER_FORMANTS) {
+      const bp = F(S, 'bandpass', from, q)
+      bp.frequency.setValueAtTime(from, t)
+      bp.frequency.exponentialRampToValueAtTime(to * p.bright, glide)
+      const g = G(S, gain); src.connect(bp).connect(g).connect(amp)
+    }
+    const buzz = F(S, 'highpass', 2800, .7); const bg = G(S, .22 * p.bright); src.connect(buzz).connect(bg).connect(amp)
+  }) },
+  /** Reese bass: two saws ±19 cents beating against each other under a low-pass that bites on the attack, plus a sine sub. */
+  reese: { rev: 0.06, level: 1.33, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); const top = Math.min(2400, f * 6 * p.bright * (.7 + .3 * v)); const lp = F(S, 'lowpass', f * 2, 1.4)
+    lp.connect(amp).connect(out)
+    const end = adsr(amp.gain, t, d, { a: p.att || .004, dc: .3, s: .9, r: p.rel || .07, peak: v * .42 })
+    lp.frequency.setValueAtTime(f * 2, t)
+    lp.frequency.linearRampToValueAtTime(top, t + .03)
+    lp.frequency.setTargetAtTime(Math.max(f * 2, top * .5), t + .03, .25)
+    for (const c of [-19, 19]) { const g = G(S, .5); O(S, 'sawtooth', f, t, end, p, 1, c).connect(g).connect(lp) }
+    const sub = G(S, .5); O(S, 'sine', f, t, end, p).connect(sub).connect(amp)
+  }) },
+  /** Metallic FM bell / ping: a sine carrier, a modulator at the inharmonic 3.5×, the index falling with the ring. */
+  fmbell: { rev: 0.35, level: 1.5, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); amp.connect(out)
+    const tau = clamp(.6 * Math.sqrt(523 / f), .2, 1.1)
+    const end = perc(amp.gain, t, { a: .001, tau, peak: v * .45, damp: t + d + tau, dampTau: .12 })
+    const car = O(S, 'sine', f, t, end, p); car.connect(amp)
+    const mod = O(S, 'sine', f, t, end, p, 3.5)
+    const index = G(S)
+    index.gain.setValueAtTime(f * (1.2 + 2.2 * v) * p.bright, t)
+    index.gain.setTargetAtTime(f * .12, t, tau * .3)
+    mod.connect(index).connect(car.frequency)
+    partial(S, out, t, f * 2.76, { a: .001, tau: tau * .2, peak: v * .06 * p.bright })
+  }) },
+  /** A distant siren held for the note: a triangle wailing from the note up a fourth and back every ~1.7 s, band-limited and wet. */
+  siren: { rev: 0.5, level: 0.7, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); const hp = F(S, 'highpass', 280, .7); const lp = F(S, 'lowpass', 2600 * p.bright, .7)
+    hp.connect(lp).connect(amp).connect(out)
+    const end = adsr(amp.gain, t, d, { a: p.att || Math.min(.6, d * .3), dc: .3, s: 1, r: p.rel || Math.min(.8, d * .3), peak: v * .3 })
+    const o = O(S, 'triangle', f * 1.17, t, end); o.connect(hp)
+    const lfo = O(S, 'sine', 1, t, end); lfo.frequency.setValueAtTime(.6, t)
+    const depth = G(S, f * .17); lfo.connect(depth).connect(o.frequency)
+  }) },
+  /** City rain held for the note: hiss banded at 4–12× the note, with droplets ticking through it. */
+  rain: { rev: 0.4, level: 1.55, play: ownedNote((S, out, t, d, f, v, p) => {
+    const amp = G(S); const hp = F(S, 'highpass', clamp(f * 4, 1500, 9000), .5); const lp = F(S, 'lowpass', clamp(f * 12, 4000, 14000) * p.bright, .5)
+    hp.connect(lp).connect(amp).connect(out)
+    const end = adsr(amp.gain, t, d, { a: p.att || Math.min(.4, d * .25), dc: .2, s: 1, r: p.rel || Math.min(.5, d * .25), peak: v * .25 })
+    noiseSrc(S, t, end).connect(hp)
+    const drops = Math.min(16, Math.floor(d / .15))
+    for (let i = 0; i < drops; i++) noise(S, out, t + Math.random() * d, { f: f * (4 + Math.random() * 4), q: 6, tau: .004, peak: v * .05 })
+  }) },
 }
+/** `vocoder` formants [from Hz, to Hz, Q, gain]: "oo" gliding to "ah", and a fixed 3.4 kHz edge. */
+const VOCODER_FORMANTS: [number, number, number, number][] = [[300, 730, 6, .6], [870, 1090, 8, .6], [2240, 2440, 8, .45], [3300, 3500, 7, .3]]
 function sweep(S: SynthCore, out: AudioNode, t: number, dur: number, f: number, v: number, bright: number, up: boolean) {
   const lo = clamp(f / 2, 40, S.nyq * .4), hi = clamp(f * 8 * bright, 200, S.nyq * .45)
   const amp = G(S); const bp = F(S, 'bandpass', up ? lo : hi, 1.8)
@@ -868,6 +928,38 @@ const ARCADE_DRUMS: Record<string, Drum> = {
     noise(S, out, t + .027, { f: 1250, q: .9, tau: .1, peak: v * .42 })
     noise(S, out, t + .027, { type: 'highpass', f: 3000, q: .5, tau: .035, peak: v * .14 })
   }) },
+  /** 808-style kick: a sine diving 150 → 52 Hz and booming at 48 Hz for ~0.45 s, with a click. Leave the bass room under it. */
+  kick808: { rev: 0.03, level: 0.85, hit: ownedHit((S, out, t, v) => {
+    const g = G(S); g.connect(out)
+    const end = perc(g.gain, t, { a: .002, tau: .2, peak: v, damp: t + .5, dampTau: .05 })
+    const o = O(S, 'sine', 150, t, end)
+    o.frequency.exponentialRampToValueAtTime(52, t + .06)
+    o.frequency.exponentialRampToValueAtTime(48, t + .4)
+    o.connect(g)
+    noise(S, out, t, { type: 'highpass', f: 3000, q: .5, tau: .002, peak: v * .2 })
+  }) },
+  /** Bitcrushed glitch: a square chirp jumping octaves and a noise burst through a 3-bit staircase, ~70 ms. */
+  glitch: { rev: 0.1, level: 1.9, hit: ownedHit((S, out, t, v) => {
+    const g = G(S); const crush = keep(S.ctx.createWaveShaper()); const hp = F(S, 'highpass', 400, .7)
+    crush.curve = crushCurve(S)
+    crush.connect(hp).connect(g).connect(out)
+    const end = perc(g.gain, t, { a: .0005, tau: .03, peak: v * .5, damp: t + .07, dampTau: .006 })
+    const o = O(S, 'square', 1400, t, end)
+    o.frequency.setValueAtTime(700, t + .018)
+    o.frequency.setValueAtTime(2100, t + .036)
+    const og = G(S, .6); o.connect(og).connect(crush)
+    const ng = G(S, .45); noiseSrc(S, t, end).connect(ng).connect(crush)
+  }) },
+}
+/** 3-bit staircase (eight steps across −1…1): the `glitch` drum's bitcrusher. */
+function crushCurve(S: SynthCore) {
+  let c = S.curves.crush
+  if (!c) {
+    const n = 1024
+    c = S.curves.crush = new Float32Array(n)
+    for (let i = 0; i < n; i++) c[i] = Math.round(((i / (n - 1)) * 2 - 1) * 3.5) / 4
+  }
+  return c
 }
 /** More noise than ring; the 13.5 kHz roll-off stands in for the 909's 32 kHz samples. */
 function hat909(S: SynthCore, out: AudioNode, t: number, v: number, tau: number) {
