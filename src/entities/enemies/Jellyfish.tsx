@@ -2,7 +2,7 @@ import { useCallback, useRef } from 'react'
 import type * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
-import { JELLY_BODY_GEO, JELLY_BODY_MATS, JELLY_COLOR_COUNT, JELLY_INNER_GEO, JELLY_INNER_MATS } from './SharedEnemyAssets'
+import { JELLY_COLOR_COUNT, JELLY_GEO, JELLY_MATS } from './SharedEnemyAssets'
 
 /** Translucent jellyfish on the water beside the track: rises until its bell is clear of the surface, then bobs there. */
 export default function Jellyfish(props: EnemyProps) {
@@ -40,8 +40,7 @@ export default function Jellyfish(props: EnemyProps) {
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group ref={bodyRef} scale={[7, 7, 7]}>
-        <mesh geometry={JELLY_BODY_GEO} material={JELLY_BODY_MATS[colorIdx]} />
-        <mesh position={[0, 1, 0]} geometry={JELLY_INNER_GEO} material={JELLY_INNER_MATS[colorIdx]} />
+        <mesh geometry={JELLY_GEO} material={JELLY_MATS[colorIdx]} />
       </group>
     </EnemyBase>
   )

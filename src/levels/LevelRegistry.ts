@@ -1,11 +1,22 @@
 import type { LevelConfig } from '@/types/level'
-import { paceLevel } from './pacing'
+import { paceLevel, type PacedWave } from './pacing'
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS (#863). Every other generated
 // ride is its world chunk's (`World.rides`), out of the startup JS altogether (#960).
 import { PARK_LEVEL_RIDE } from './environments/biomes/themePark/parkLevel'
 
 /** Level 1's lift-hill rings (`formationOrigin`). */
 const LIFT_RINGS = { ahead: 700, side: 250, up: 150 }
+
+/** Nearer the track than a line's default, so one placed straight ahead where the track doubles back is still in view. */
+const JELLYFISH_LINE = { ahead: 600, side: 240, up: 0 }
+
+/**
+ * Level 3's jellyfish (#937): a small line every 2 s, each placed in view where the rider is when it arrives, so one is
+ * coming up as the last is shot (a scattered wave of twenty was cleared in 4 s up the lift, and nothing until the sharks).
+ */
+function jellyfishLine(count: number, waveLabel?: string): PacedWave {
+  return { type: 'jellyfish', count, waveLabel, formation: 'line', formationOrigin: JELLYFISH_LINE, weight: 2 }
+}
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
@@ -76,17 +87,19 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 44 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 1924 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 2624
+    maxScore: 69 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 2374 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3074
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
     ...paceLevel({
       waves: [
-        // "Into the Deep!": the jellyfish arrive as the car dives into the glass tunnel (~14 s).
-        { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 3 },
-        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
-        { type: 'jellyfish', count: 24, waveLabel: 'Jellyfish Bloom!', weight: 2 },
-        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 3 },
+        // Up the lift and down the drop (0–11 s), then the sharks round the glass tunnel (12 s), more jellyfish from the
+        // launch's crest past the sea stacks (16–28 s), the flying fish on to the Kraken (30 s).
+        jellyfishLine(7, 'Into the Deep!'), jellyfishLine(7), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5),
+        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 4 },
+        jellyfishLine(5, 'Jellyfish Bloom!'), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5),
+        jellyfishLine(5),
+        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 15 },
       ],
       boss: 'kraken',
     }),
