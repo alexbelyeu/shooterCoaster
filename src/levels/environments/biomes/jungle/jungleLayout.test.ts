@@ -56,11 +56,10 @@ describe('mistBanks', () => {
   })
 })
 
-// The ride is still the legacy curve1 (#870's first cut): until its storyboard lands, keep the temple and the
-// waterfall in front of the drop, the shot the level is built round.
+// The first drop (`jungleTrack.ts`, #1009) is the shot the level is built round: the temple dead ahead and the waterfall
+// in view, from the crest to the valley floor.
 describe('the drop frames the temple', () => {
-  function bearing(u: number, x: number, z: number): number {
-    const i = Math.round(u * (table.count - 1))
+  function bearing(i: number, x: number, z: number): number {
     const j = Math.min(table.count - 1, i + 3)
     const fx = table.x[j] - table.x[i]
     const fz = table.z[j] - table.z[i]
@@ -72,9 +71,14 @@ describe('the drop frames the temple', () => {
   it('has the temple dead ahead and the waterfall in view from the crest to the valley floor', () => {
     let temple = 0
     let falls = 0
-    for (let u = 0.122; u <= 0.16; u += 0.002) {
-      temple = Math.max(temple, bearing(u, TEMPLE.x, TEMPLE.z))
-      falls = Math.max(falls, bearing(u, FALLS.x, FALLS.z))
+    let crest = 0
+    for (let i = 0; table.s[i] < table.length / 3; i++) if (table.y[i] > table.y[crest]) crest = i
+    let floor = crest
+    while (table.y[floor + 1] < table.y[floor]) floor++
+    expect(table.y[crest] - table.y[floor]).toBeGreaterThan(250)
+    for (let i = crest; i <= floor; i++) {
+      temple = Math.max(temple, bearing(i, TEMPLE.x, TEMPLE.z))
+      falls = Math.max(falls, bearing(i, FALLS.x, FALLS.z))
     }
     expect(temple).toBeLessThan(20)
     expect(falls).toBeLessThan(35)

@@ -142,6 +142,11 @@ frame for the last 16 s); the Tree stays as scenery.
   an avenue, a lift up a street beside the lift tower, a 66° first drop between two towers, the head-chopper under the
   elevated train line (20.5 s), an airtime crest (26 s), a climbing helix round the hero tower to 40 s and a slow run
   south through the west side's streets for the fight. The ride runs down the streets' centre lines, towers on both sides.
+- **Jungle Ruins (8):** first storyboard (#1009, `jungle/jungleTrack.ts`, its storyboard and seconds at the top): a station
+  launch, a lift straight at the temple, a 69° first drop with the temple dead ahead and the waterfall right of it, a valley
+  run east under the temple, an airtime crest in front of the waterfall (26 s), a climbing helix out of the east valley to
+  40 s and a slow run west for the fight. Its valley stretches run in a trench the track carves (`createHeightFunction`),
+  whose walls hide the toucans: the pacing gate does not pass yet.
 
 ## Rules for building rides
 

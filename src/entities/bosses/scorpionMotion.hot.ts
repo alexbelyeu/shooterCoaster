@@ -116,6 +116,8 @@ export interface PerchInput {
   forwardX: number
   forwardZ: number
   avoid: readonly Circle[]
+  /** When set, `pickPerch` prefers a slot the rider can see (the terrain between them clear) over a hidden one. */
+  seen?: (x: number, z: number) => boolean
 }
 
 export function perchClear(input: PerchInput, x: number, z: number, config: PerchConfig = PERCH): boolean {
@@ -133,8 +135,12 @@ function slotAt(input: PerchInput, config: PerchConfig, slot: number, sign: numb
 
 const _at = { x: 0, z: 0 }
 
-/** Keeps `out`'s slot and side while clear, so it doesn't hop about; false (and `out` unchanged) if all are blocked. */
+/** Keeps `out`'s slot and side while clear (and seen, with `input.seen`), so it doesn't hop about; a clear slot the rider can't see only when none is seen; false (and `out` unchanged) if all are blocked. */
 export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = PERCH): boolean {
+  return (input.seen !== undefined && pickFrom(out, input, config, true)) || pickFrom(out, input, config, false)
+}
+
+function pickFrom(out: Perch, input: PerchInput, config: PerchConfig, mustSee: boolean): boolean {
   const n = config.slots.length
   for (let s = 0; s < 2; s++) {
     const sign = s === 0 ? out.sign : (-out.sign as 1 | -1)
@@ -142,6 +148,7 @@ export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = P
       const slot = s === 0 ? (out.slot + k) % n : k
       slotAt(input, config, slot, sign, _at)
       if (!perchClear(input, _at.x, _at.z, config)) continue
+      if (mustSee && !input.seen!(_at.x, _at.z)) continue
       out.x = _at.x
       out.z = _at.z
       out.slot = slot

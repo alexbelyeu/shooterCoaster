@@ -189,6 +189,19 @@ describe('perch (level 2)', () => {
     expect(kept / tries).toBeGreaterThan(0.8)
   })
 
+  it('prefers a slot the rider can see, and falls back to a hidden clear one when none is seen', () => {
+    const clear: PerchInput = { ...view(riders[0]), index: { table, near: () => false }, avoid: [] }
+    const seenSlot = 4
+    const target: Perch = { x: 0, z: 0, slot: seenSlot, sign: -1 }
+    expect(pickPerch(target, clear)).toBe(true)
+    const picked: Perch = { x: 0, z: 0, slot: 0, sign: 1 }
+    expect(pickPerch(picked, { ...clear, seen: (x, z) => x === target.x && z === target.z })).toBe(true)
+    expect([picked.slot, picked.sign]).toEqual([seenSlot, -1])
+    const hidden: Perch = { x: 0, z: 0, slot: 2, sign: 1 }
+    expect(pickPerch(hidden, { ...clear, seen: () => false })).toBe(true)
+    expect([hidden.slot, hidden.sign]).toEqual([2, 1])
+  })
+
   it('leaves the perch untouched when nothing is clear', () => {
     const blocked: PerchInput = { ...view(riders[0]), index: { table, near: () => true } }
     const perch: Perch = { x: 1, z: 2, slot: 3, sign: -1 }
