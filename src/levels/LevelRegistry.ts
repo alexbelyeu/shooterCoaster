@@ -19,8 +19,8 @@ function jellyfishLine(count: number, waveLabel?: string): PacedWave {
 }
 
 /** Level 4's waves (#937): seven snowmen beside the track every ~2 s. */
-function snowmen(type: EnemyType, wave?: Partial<PacedWave>): PacedWave {
-  return { type, count: 7, weight: 2, ...wave }
+function snowmen(type: EnemyType, waveLabel?: string, count = 7): PacedWave {
+  return { type, count, waveLabel, weight: 2 }
 }
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -138,7 +138,7 @@ const LEVELS: LevelConfig[] = [
         // A small wave every ~2 s (#937), so no stretch of the storyboard rides empty: scouts from the station up the
         // lift and down into the ice cave, snowmen out of it, through the blizzard's ridge and over the crest, then
         // brutes down the helix to the Yeti. A snowman falls to one hit: a player meets about two a second.
-        snowmen('snowmanScout', { waveLabel: 'Scout Party' }),
+        snowmen('snowmanScout', 'Scout Party'),
         snowmen('snowmanScout'),
         snowmen('snowmanScout'),
         snowmen('snowmanScout'),
@@ -146,14 +146,14 @@ const LEVELS: LevelConfig[] = [
         snowmen('snowmanScout'),
         snowmen('snowman'),
         snowmen('snowman'),
-        snowmen('snowman', { waveLabel: 'Snowmen Incoming!', weather: 'blizzard' }),
+        { ...snowmen('snowman', 'Snowmen Incoming!'), weather: 'blizzard' },
         snowmen('snowman'),
         snowmen('snowman'),
         snowmen('snowman'),
         snowmen('snowman'),
-        snowmen('snowmanBrute', { count: 6, waveLabel: 'Brutes!' }),
-        snowmen('snowmanBrute', { count: 6 }),
-        snowmen('snowmanBrute', { count: 10, weight: 11 }),
+        snowmen('snowmanBrute', 'Brutes!', 6),
+        snowmen('snowmanBrute', undefined, 6),
+        { ...snowmen('snowmanBrute', undefined, 10), weight: 11 },
       ],
       boss: 'yeti',
     }),
