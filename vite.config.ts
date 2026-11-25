@@ -122,6 +122,10 @@ export default defineConfig(({ mode }) => {
       // class fields (Firefox 78, Safari 14). Mid-2021 browsers ship both natively: ~1.7 KB gz less JS (#834, DECISIONS).
       target: ['es2020', 'chrome91', 'edge91', 'firefox90', 'safari15'],
       sourcemap: false,
+      // Terser over esbuild's minifier: ~24 KB gz less JS in all, ~12 of it at startup, for ~8 s more build (#1026, DECISIONS).
+      // Two passes is where it stops paying (a third saves nothing measurable).
+      minify: 'terser',
+      terserOptions: { ecma: 2020, module: true, compress: { passes: 2 } },
       rollupOptions: {
         ...(turntable && { input: [path.resolve(__dirname, 'turntable.html'), path.resolve(__dirname, 'rides.html')] }),
         output: {
