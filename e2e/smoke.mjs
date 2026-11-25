@@ -2327,6 +2327,8 @@ const WAVE_PAUSE_MS = 2000
 /** From this level time (s) the timer steps a fixed `WAVE_TIMER_STEP` s a frame, so a slow frame can't jump the tell and the wave together. */
 const WAVE_STEP_FROM = 12
 const WAVE_TIMER_STEP = 0.25
+/** How long the tell's banner card may take to commit after the `wave:incoming` event (the level timer is held meanwhile). */
+const TELL_BANNER_WAIT_MS = 1000
 
 /**
  * Spawn choreography (#30): the crow wave's tell must lead it, then its V flies in, frozen for `level2-wave.png`.
@@ -2351,8 +2353,18 @@ async function waveCheck(page) {
   await page.waitForFunction((t) => (window.__SC_TEST__.nextWave()?.levelTime ?? 0) >= t, WAVE_STEP_FROM, { timeout: 90000, polling: 100 }).catch(() => {})
   await page.evaluate((s) => { window.__SC_TEST__.timerStep = s }, WAVE_TIMER_STEP)
   const tell = await event('incoming')
+  // Read every banner card, not the first: an earlier wave's card can still be mounted for its 0.2 s exit
+  // (AnimatePresence) while the tell's own card commits, so wait briefly for the tell's label among them.
   const tellShown = tell
-    ? await page.evaluate(() => ({ pulse: !!document.querySelector('.wave-tell'), text: document.querySelector('.wave-banner-text')?.textContent ?? null }))
+    ? await page
+      .waitForFunction((l) => {
+        const texts = [...document.querySelectorAll('.wave-banner-text')].map((el) => el.textContent)
+        return texts.includes(l) ? { pulse: !!document.querySelector('.wave-tell'), text: l } : null
+      }, label, { timeout: TELL_BANNER_WAIT_MS, polling: 50 })
+      .then((h) => h.jsonValue(), () => page.evaluate(() => ({
+        pulse: !!document.querySelector('.wave-tell'),
+        text: [...document.querySelectorAll('.wave-banner-text')].map((el) => el.textContent).join(' | ') || null,
+      })))
     : null
   // The pause holds the timer from here; the test's own hold is released inside it.
   const atPause = await page.evaluate((l) => {

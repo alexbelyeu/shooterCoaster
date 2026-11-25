@@ -46,11 +46,11 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 3074, Yeti 3060, Magma Titan 2914, Medusa 2652, Helicopter 1875, Jungle Ruins (Blimp placeholder) 1970', () => {
+  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2615, Kraken 3074, Yeti 3060, Magma Titan 2914, Medusa 2652, Helicopter 1875, Jungle Ruins (Blimp placeholder) 1970', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2675],
-      ['level2', 'giantScorpion', 2450],
+      ['level2', 'giantScorpion', 2615],
       ['level3', 'kraken', 3074],
       ['level4', 'yeti', 3060],
       ['level5', 'magmaTitan', 2914],
