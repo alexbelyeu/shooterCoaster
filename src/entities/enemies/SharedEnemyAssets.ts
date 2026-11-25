@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, placedParts, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
-import { withRim } from './enemyRim'
+import { withEmissivePatch, withRim } from './enemyRim'
 import { DRAKE_PARTS, withDrakePose } from './infernoEnemyAssets'
 import { DRAKE_ROAR, poseDrake } from './drakePose.hot'
 import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, FFISH_BODY, FFISH_BELLY, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_LIGHT, DUST_DARK, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY, TOUCAN_BODY as TOUCAN_BODY_HEX, TOUCAN_BIB, TOUCAN_BILL, TOUCAN_TIP } from './enemyPalette'
@@ -246,7 +246,7 @@ function withCrowWings<T extends THREE.Material>(material: T, flap: { value: THR
 
 // Violet-black on the pale sky + a blue-grey rim sheen so crows
 // also read against the hazy horizon and the red mesas.
-const CROW_RIM = { color: '#a8bce0', intensity: 0.4, power: 3.5 }
+export const CROW_RIM = { color: '#a8bce0', intensity: 0.4, power: 3.5 }
 
 /** One bird's feathers (crow or toucan), flapping by `flap` (arm, hand radians); every instance shares one program. */
 export function createBirdFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
@@ -418,27 +418,30 @@ function makeWingGeo(
 // ── Jellyfish: bell + glowing core ───────────────────────────────
 const JELLY_TENTACLES = 5
 /**
- * Bell + five hanging tentacles as one geometry: a whole Ocean wave floats in view beside
- * the track (#316), and at 7 draw calls a jellyfish broke level3's draw budget.
+ * The glowing core, the bell and five hanging tentacles as one geometry and one single-pass material: one draw call
+ * a jellyfish (#937: level3's lines float a dozen or more in view at once). The core comes first, so it draws under
+ * the bell; it is painted black and the material lights it itself, opaque (`JELLY_CORE_APPLY`).
  */
-export const JELLY_BODY_GEO = placedParts([
-  [new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [0, 0, 0]],
-  ...Array.from({ length: JELLY_TENTACLES }, (_, i): [THREE.BufferGeometry, Vec3] => {
-    const a = (i / JELLY_TENTACLES) * Math.PI * 2
-    return [new THREE.CylinderGeometry(0.15, 0.08, 5, 4), [Math.cos(a) * 1.8, -3, Math.sin(a) * 1.8]]
-  }),
+export const JELLY_GEO = mergePainted([
+  painted(new THREE.SphereGeometry(1.5, 6, 6), 0, [0, 1, 0]),
+  painted(placedParts([
+    [new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [0, 0, 0]],
+    ...Array.from({ length: JELLY_TENTACLES }, (_, i): [THREE.BufferGeometry, Vec3] => {
+      const a = (i / JELLY_TENTACLES) * Math.PI * 2
+      return [new THREE.CylinderGeometry(0.15, 0.08, 5, 4), [Math.cos(a) * 1.8, -3, Math.sin(a) * 1.8]]
+    }),
+  ]), '#fff'),
 ])
-export const JELLY_INNER_GEO = new THREE.SphereGeometry(1.5, 6, 6)
+const JELLY_CORE_APPLY = /* glsl */ `{
+  float core = step(vColor.g, 0.5);
+  diffuseColor = mix(diffuseColor, vec4(diffuse, 1.0), core);
+  totalEmissiveRadiance += diffuse * 1.5 * core;
+}`
 
-export const JELLY_BODY_MATS = JELLY_COLORS.map(
-  (c) => withRim(
-    new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.5, flatShading: true, side: THREE.DoubleSide }),
-    { color: c, intensity: 0.8, power: 2 },
-  ),
-)
-export const JELLY_INNER_MATS = JELLY_COLORS.map(
-  (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.5, toneMapped: false }),
-)
+export const JELLY_MATS = JELLY_COLORS.map((c) => withEmissivePatch(withRim(
+  new THREE.MeshPhongMaterial({ color: c, vertexColors: true, transparent: true, opacity: 0.5, flatShading: true, side: THREE.DoubleSide, forceSinglePass: true }),
+  { color: c, intensity: 0.8, power: 2 },
+), 'jelly-core', {}, '', JELLY_CORE_APPLY))
 export const JELLY_COLOR_COUNT = JELLY_COLORS.length
 
 // ── Flying Fish: one painted body, two wing-fins ─────────────────

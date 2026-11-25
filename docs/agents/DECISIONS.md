@@ -2981,3 +2981,168 @@ elevated highway (and its traffic) is still a follow-up.
 **Context:** Four finished PRs were blocked on budgets alone: the desert ride (#892, +0.85 KB gz startup), the ocean ride (#893, +0.9 KB and 95 draws at level 3's ride shot against 89), medals (#904, ~+1.7 KB) and the on-ride photo (#887, ~+2 KB). The #861 diet set `startupJsGzipKB` to 392 the day before and `main` already measures 391.5. Level 1's pacing fix (#956) puts balloon rings up the lift hill, where the 10 s ride shot used to see an empty sky: 169 draws against 101; mid-run level 1 already draws that many.
 **Decision:** `startupJsGzipKB` 392 → 398 and `jsTotalGzipKB` 665 → 672, temporarily: #960 (P1) moves every ride's generated track data except level 1's out of the startup JS (~10 KB gz with the desert and ocean) and lowers the startup budget back to at most 392. `scene.level1.drawCalls` 101 → 200 (169 + ~20%, still under the VISION bar of 250); `scene.level3.drawCalls` 89 → 98 (95 measured, the new pieces are 2 draws). For #937's open question: when the boss falls and nothing is left to shoot or still to come, the run ends after the defeat's sting (#961), with no time bonus, so scores and stars don't change.
 **Consequences:** The next feature that needs startup JS waits for #960, not for another raise. Balloons are a draw call or more each; if level 1's ride shot creeps toward 200, instance them rather than raise again.
+
+## 2026-11-23 — The Desert ride's frame faces the Pyramid; its scorpions come in two packs (Builder, #864)
+
+**Context:** Level 2's v2 ride runs straight at the Pyramid, drops at its foot and rides a passage through tier 1, so the
+ride, the passage and the Pyramid have to share one axis. The Pyramid stood axis-aligned at (2000, −1600), off any line
+from the middle of the level. With the old wandering curve gone, the straight run to the lift also put all thirty
+scorpions of the opening wave in one view: the ride step drew 163 calls against level 2's `scene` budget of 135.
+
+**Decision:** The ride is authored in its own frame, +x from the middle of the level toward the Pyramid
+(`landmarks.ts` `RIDE_FRAME`, `PYRAMID.yaw = atan2(1600, 2000)`), and turned into the world; the Pyramid group, its
+contact shadow and the canyon's mesas turn with it. `desertLevel.ts` ships the points in that frame (straights repeat
+there, so they gzip smaller) and turns them on load. The opening wave is split into two scorpion packs, 12 at GO and 18
+at 11 s on the sand before the door, rather than raising the budget: the ride step (at 10 s, with the crow V below in
+view) then draws 127.
+
+**Consequences:** Anything placed relative to the ride (the passage, the canyon) is written in the ride's frame and
+mapped with `rideFrameToWorld`. Level 2's roster has five waves; `maxScore` is unchanged. The climb's crest (9–10 s) is
+pitched at the sky with no scorpion in view, so nine of the 78 crows come as their own V at 5 s, over the crest
+(#925's line-of-sight pacing gate; `spawnPlacement.test.ts` #494 counts the packs and that V together, every second).
+
+## 2026-11-23 — Level 3's ride: no U-turns after the corkscrew, the whale moved to the first drop (builder, #865)
+
+**Context:** Level 3's v2 ride (`oceanTrack.ts`) first ended in a 1.5-turn helix and a hairpin into the station. With those, only ~81% of its trackside sharks and jellyfish were in front of the rider on their approach (`spawnPlacement.test.ts` wants over 85%). At 30 s the corkscrew runs north into the lagoon's northern mountains, so the whale breach (#793) had land in its sightline whatever its lead or aim.
+**Decision:** The finale is a quarter helix (hand -1) north, passing under the first lift, then west along the north shore and round the station's west end. The lap turns 360° in all. The whale breaches down the south channel as the car crawls south along the first lift's crest (`startSeconds` 11, mid ~12.4 s). `whaleBreach.test.ts` now pins its middle to 10–14 s instead of 29–33 s; the issue asked for it to be re-timed onto the new route.
+**Consequences:** A compact lap's in-front share drops by a few points with each U-turn it makes (a hairpin or a half helix). Ocean's open sightlines run south from the lagoon, so a later re-route has to keep a stretch facing that way. Two budgets need the Director. The generated level data adds ~0.9 KB gz to the startup JS (435.9 → 436.8 KB against 436). Level 3's ride shot at 10 s draws 96 against a `scene.drawCalls` ceiling of 89: the same build on the old route draws 78 with 11 enemies on screen, the new one 95 with 16, as the car climbs the first lift and looks over the whole lagoon (the glass tube is one draw, the arch one). Asked: `startupJsGzipKB` 437 and `scene.level3.drawCalls` 98, or lazy-loaded tracks as #863's entry proposes.
+
+**Addendum (2026-11-24):** The pacing review measured the Kraken shootable only 25% of its fight on that finale (floor 35%): each turn made it sink and rise again behind the rider, and west along the north shore the hills hid it. The crest of the second lift now runs on east for 10 s, slowly down across the open lagoon facing the Kraken and under the first drop's crest, before the quarter helix north. The lap is ~6,000 units (was ~5,100) and ends ~70 s, after the run. The route's spawn and whale tests are sensitive to the exact numbers, because the terrain follows the track: `FINALE.helixFrom` 410 and `fightY` 40 sit where the values either side of them pass too.
+
+**Addendum (2026-11-24, later):** The 11.2 s gap after the fight run (48.8 s on) was the measurement, not the ride: `sight()` raycast against the boss's weak-point meshes, and the Kraken's eye (its pupil and glint stand ~1 unit past its 50-unit hit radius) hid itself, so a player could shoot an eye the gate counted as hidden. `readSight` now skips every weak point's part as an occluder, as it already skipped the body. Level 3's review: longest gap 5.4 s, no-target share 31%, the Kraken shootable 8.6 of its 10 s fight. Other bosses' numbers can only go up (fewer false hides).
+
+## 2026-11-24 — Total JS 672 → 682, startup 389 → 391 KB gz, `scene.level2.drawCalls` 135 → 170 (Director, #992, #1001, #974)
+
+**Context:** Three finished PRs were blocked on budgets alone. `main` (6dacdb1) measures 671.8 KB gz total, 387.7 startup.
+Level 8's slice (#870, PR #959) adds ~6.6 KB gz, nearly all in its own `world-jungle` chunk plus the shared
+`GoldenBlimp` / `FlapBird` chunks, and ~0.75 KB startup (its registry entry, theme, postcard). Remappable controls
+(#998, PR #1002) add ~1.8 KB, ~0.8 of it startup (`bindings.ts` and the call sites that read it). Together they put
+startup at ~389.2 against 389. Level 2's pacing pass (#937, PR #975) puts a second crow V up the lift hill, in the
+ride shard's 10 s frame: 145 draws against 135, set against an empty sky (the level-1 twin was #955).
+**Decision:** `jsTotalGzipKB` 682 (~680 with both, still under VISION's 700 ceiling), `startupJsGzipKB` 391 (still
+under the 392 #960 promised). `scene.level2.drawCalls` 170 (145 + ~20%, as #962 did for level 1; under the 250 bar).
+#990 (level 7's ride) closed unused: #966 landed inside 672.
+**Consequences:** Total JS has ~18 KB left before the 700 ceiling, about one more world. Worlds 9 and 10 need the
+world-chunk diet (shared shaders, packed ride data, `rideData.ts`) before another total raise; per-bird crow cost is
+the next step for level 2's draws, not another raise.
+
+## 2026-11-24 — Production deploys daily, not on every merge (Alex, #1015)
+
+**Context:** Vercel bills Standard build minutes from 8 Dec 2026, and every merge to `main` was a production build
+(~400 in 30 days). Supersedes "Every merge to `main` deploys to production" (2026-10-19).
+**Decision:** Vercel builds no push (`git.deploymentEnabled: false`). `deploy.yml` (`scripts/deploy.cjs`) ships main's
+head at 05:00 UTC, when Alex starts it (Deploy now in the control center), and after every green CI on `main` while an
+`agent:prod-broken` issue is open. It calls a Deploy Hook (secret `VERCEL_DEPLOY_HOOK`): it can only build `main`, so no
+Vercel token lives in this repo.
+**Consequences:** A merge is live by the next morning, not at once; the deploy check covers a day's merges together, so
+a red one names a range, not one PR. Don't turn `main` deploys back on to see a change live: start Deploy instead.
+
+## 2026-11-24 — Jungle Ruins' slice: terraces, toucans on the crow's wings, a borrowed boss (builder, #870)
+
+**Context:** Level 8's first playable cut needed a hero landmark on hill terrain, a new flying enemy and a boss slot,
+without the guardian (#869) or a new shader program.
+
+**Decision:** `NoiseTerrainConfig.terraces` flattens shelves into the noise (blended at their rims) so the temple and the
+waterfall's pool sit on level ground instead of each landmark sinking or floating on its own `safeHeight`. The toucan is a
+second body on the crow's wings: `FlapBird.tsx` flies both from a body and eyes geometry, with the crow's feather
+material, flap shader and flinch, so it costs one draw per bird and no program. Its Vs are one group of 9: on this
+curve a second group sits within reading range of the rider from activation (`spawnPlacement.test.ts` #472). The Golden
+Blimp holds the boss slot until the guardian; level 8's medals leave out a boss medal for that reason.
+
+**Consequences:** A later landmark on any noise terrain can take a terrace. A toucan look that needs its own motion (a
+glide between flaps) means its own pose function, not a new material. Replacing the boss adds its medal.
+
+## 2026-11-24 — Level 6's Shield top is held by late lanternflies, not the Pack (Builder, #957)
+
+**Context:** From the Shield's top (27.9 s) to the bottom of the auto belay's fall (31.5 s) the rider sees no floor, so the
+Pack's rats can't be put in frame there (measured in #957's Blocked comment). The review had 3.6 s with nothing to shoot.
+**Decision:** The lanternfly swarm runs on past its window: `SWARM_LAST_LATE` 1 → 5.5 s and up to 12 groups
+(`SWARM_GROUPS`), with level 6's lanternflies 24 → 36, so groups of three keep landing on the Starr and the Shield the car
+looks at from the stop and on the fall. Level 6's `maxScore` goes 2472 → 2652 (`api/_lib/levelLimits.ts` regenerated).
+**Consequences:** Lowering `SWARM_LAST_LATE` or the count reopens the gap; check `npm run review -- --level level6` for no
+gap over 0.6 s between 20 and 32 s. Level 6's old high scores are now easier to beat by up to 180 points.
+
+## 2026-11-24 — Every generated ride but level 1's lives in its world's chunk (builder, #960)
+
+**Context:** The Director raised `startupJsGzipKB` 392 → 398 on 2026-11-24 so the desert and ocean rides could land: every
+generated ride (`<name>Level.ts`, ~1.2–4.2 KB gz each, the gym's with its walls) was imported by the level registry, which is
+startup JS. The #863 entry named the fix.
+
+**Decision:** A level's ride is a `LevelRide` (`track`, `walls`, `seaArch`), split out of `LevelConfig`. Only level 1's and the
+hand-written trig tracks (level 7, new-world starters: a few hundred bytes) sit in the registry as `LevelConfig.ride`; every
+other generated ride is its world's: `biomes/<biome>/world.ts` `rides`, so it arrives with the chunk the loading screen already
+fetches and `LevelScene` already waits for (no extra request, no new failure path). The game reads a ride only through
+`worlds.ts` `levelRide(id)`: the registry's, else the loaded world's (#980: the registry keeps no load-order state). Tests and dev pages read every level whole from
+`shippedLevels.ts`, which no game module may import (`worlds.test.ts`); `rideLevels.test.ts` holds it to the worlds' chunks.
+The title never reads a level's track, so level 1's ride could move too; it stays because the issue scoped it so and it is
+the first run most players start.
+
+**Consequences:** Startup JS 393 → 386 KB gz; `startupJsGzipKB` lowered 398 → 389 (measured + 2, rounded up; lowering needs no
+Director). A new generated ride goes in its world's `rides.ts` (#980: `shippedLevels.ts` gathers them), never the registry (`docs/LEVEL-KIT.md`).
+Nothing before a run (title, level select, postcards, `maxScore`, stars, `nextLevel`, the HUD's radar) may need a ride.
+Total JS is ~2 KB gz more: each ride now compresses in its own world chunk.
+
+## 2026-11-24 — A boss win with nothing left ends the run (Builder, #961)
+
+**Context:** A fast boss kill left the rider up to 12 s of empty ride before the results (#925's review, #937).
+**Decision:** Once the boss is beaten, the run ends 3 s of game time later (`src/levels/bossWin.ts`) if no enemy is left
+to kill, no wave is still due and no golden balloon is still up; the check runs every frame after the defeat, so a run
+cleared by a later kill ends too. A golden balloon still up counts as something left (it is in `maxScore`'s bonus); one
+that floated off counts as gone. An enemy still alive counts as left even when the rider has passed it, so no scorable
+target is ever cut off; a looser "nothing shootable" rule is a follow-up. The end goes through GameTimer's own path; a clear in the run's
+last 3 s is left to the timer. Golden balloon pops no longer count against the spawner's enemy tally (they never were in
+its total, so a pop read as an enemy kill and could fire the last-kill slow-mo early).
+**Consequences:** Results can show "N seconds to spare". Scores, `maxScore` and stars are unchanged. A level without a
+boss (a `finale` wave) still always runs to the timer.
+
+## 2026-11-24 — The city's ground enemies stand on its pavements (Builder, #963)
+
+**Context:** Trackside ground placement (`placeTracksideWave`) knows only `keepOff` circles, and only on its blind-approach fallback. Neon Metropolis's towers stand 30 units off the rails, so a billboard bot at a trackside slot's 60–400 side offset often landed inside a tower.
+**Decision:** A biome hook `clearGround` (next to `clearAir`) moves every trackside ground spot onto open ground after it is chosen. The city's (`cityLayout.ts` `onPavement`) puts it on the nearest street's kerb, `KERB_OFFSET` (22) off the centre line, past the traffic lanes (11), clear of the rails (44) and every tower; the bot then marches along that street (`streetAxis`).
+**Consequences:** A new ground enemy in the city needs nothing more to stay out of the towers. Other biomes leave `clearGround` unset and place as before. Of the kerb spots on the nearest streets either way, it takes the one the most of the approach's looks have in their cone with no tower across the line to the bot's face (the nearest of equals), so a bot is not placed behind a corner; `GroundClearer` hands the biome `eyesSeeing` for that. The 0.2 KB it costs is paid by one shared clamped `smoothstep` (`src/utils/ease.ts`) in place of eleven copies, keeping the 672 KB total under budget.
+
+## 2026-11-24 — A Night Ride's `lampGlow` is whatever the biome lights after dark, even lights going out (builder, #994)
+
+**Context:** Antarctica, Inferno and the Climbing Gym got Night Rides. Inferno's day sky is already near black, and the gym is an interior with no sky to darken, so a darker dome alone would make neither night different from its day.
+**Decision:** Each biome reads `lampGlow` as its own night light: the arctic aurora burns a little brighter (kept small: the aurora is in the smoke's sky band, which must stay under `NIGHT_CHECK.maxSkyLuma`), Inferno's lava rivers burn hotter while the sky loses its red and the fill comes up off the lava (`hemiGroundColor` brighter than `hemiSkyColor`), and the gym turns its house lights down to its work lights (`grimeShader.ts` `HOUSE_LIGHTS` scales the strip lights' pools, `GymFeatures` dims the fittings' glow) with the Flame still burning. Every change is a uniform or material colour, so a night run compiles no program the day doesn't.
+**Consequences:** A new night prop goes through `lampGlow` in the biome's Features, never a separate night flag; `HOUSE_LIGHTS` is module state like `DARKNESS`, reset to 1 when the gym unmounts.
+
+## 2026-11-24 — A service worker for offline play: network-first page, versioned precache, no update prompt (Builder, #999)
+
+**Context:** Players on a phone should be able to install the game and play it with no signal. A service worker that
+serves a stale page ships an old build to every returning player, and one that caches the 404 page or `/api/*` breaks
+the site or the online board.
+**Decision:** `src/sw/sw.ts` is TypeScript bundled by esbuild in a Vite plugin (`serviceWorker()` in `vite.config.ts`),
+not a hand-maintained `public/sw.js`, so its routing is the tested `src/sw/swRoute.ts` itself, not a mirror. The page is
+always network-first, falling back to the `index.html` this worker precached and never to one fetched since (a page stored at runtime by the last deploy's worker would sit next to the old build's chunks, and every level it didn't load would fail offline; `keepAtRuntime` stores back only this worker's own precached files); hashed bundles and the precached public files are
+cache-first. One cache per build, named after a digest of the precached files' contents: any deploy changes `sw.js`,
+which `vercel.json` serves `no-cache` and the page registers with `updateViaCache: 'none'`; the new worker
+`skipWaiting`s, claims and deletes the old cache, with no "update available" prompt. A page still running the old build
+that then asks for a chunk the new cache lacks falls through to the network, where `app/staleReload.ts` already handles
+a removed chunk. It registers only on the Vercel build without `?e2e` (or with `?sw=1`, for prod-check's `offline` check),
+never in the portal build. `serviceWorkerEnabled` must not call `isLiveSite`: a second caller stops Rollup folding
+`analyticsEnabled` to false in non-Vercel builds and put the analytics code (+3.5 KB gz) back into the startup JS the
+bundle budget measures.
+**Consequences:** Every online load runs the deployed build. To retire the worker, deploy a `sw.js` that deletes the
+`sc-*` caches and calls `self.registration.unregister()`; deleting `sw.js` alone leaves installed workers serving their
+cached shell offline only (online they still fetch the page first).
+
+## 2026-11-25 — Total JS 682 → 684 KB gz for #937's pacing passes (Director, #1021)
+
+**Context:** `main` (cfe99ad) measures 681.99 KB gz total against 682. Two finished #937 pacing PRs are blocked
+on it alone: level 2's dark-ride scorpions (#1019, +0.46 KB, mostly lazy `LevelScene` / `world-desert`) and level 3's
+jellyfish lines (#1025, +0.1 KB, mostly startup `LevelRegistry`). Both were trimmed already. Startup (389 of 391)
+is unaffected.
+**Decision:** `jsTotalGzipKB` 684, not the 683 asked for: with both PRs in, main sits at ~682.55. 683 would block
+#937's next passes (level 4's boss share, level 5) within a day, and every +1 KB round trip costs a blocked
+builder run. Still 16 KB under VISION's 700 ceiling.
+**Consequences:** No more total raises for gameplay tweaks. The world-chunk diet (#1026, target 675 or less, then the
+budget lowered to match) comes before any further raise, and certainly before world 9.
+
+## 2026-11-25 — Terser minifies the build, JS budgets lowered to 659 / 378 KB gz (builder, #1026)
+
+**Context:** `jsTotalGzipKB` had been raised step by step to 682 KB gz, with two more worlds (M4) still to come under VISION's 700. #1026 asked for at least 7 KB gz cut without growing the startup JS.
+**Decision:** `vite.config.ts` minifies with terser (`ecma: 2020`, `module: true`, two compress passes; a dev dependency, nothing ships with it) instead of Vite's default esbuild minifier. Measured on cfe99ad: total JS 681.99 → 658.03 KB gz, startup 389 → 376.61 KB gz, every chunk smaller or level; the build takes ~8 s longer. `budgets.json` is lowered to what it measures + 1: `jsTotalGzipKB` 659, `startupJsGzipKB` 378.
+**Consequences:** Don't switch back to `minify: 'esbuild'` (or drop the option) to speed up the build: it costs ~24 KB gz and breaks both budgets. The source-level diet #1026 listed (shared world helpers, packed ride data, dead exports) is still open and comes on top of this.
+
+This lowers `jsTotalGzipKB` to 659 and supersedes #1027's raise to 684 (measured on this PR merged with #1027: total 658 KB gz, startup 377).

@@ -10,6 +10,7 @@ import { entryPoint, type FormationMotion } from '@/entities/spawning/spawnPlace
 import type { Vec3 } from '@/utils/vec3'
 import type { WallSlot } from '@/entities/spawning/enemyPlacement'
 import type { SwimOrbit } from '@/entities/spawning/swimOrbit'
+import type { EnemyFloor } from '@/entities/spawning/darkFloor'
 import { DEATH_STYLES, type DeathStyle } from '@/effects/deathStyles'
 import { createKillPop, finishKillPop, startKillPop, tickKillPop } from './killPop'
 import { hitBystander } from '@/combat/bystanderHit'
@@ -28,6 +29,8 @@ export interface EnemyProps {
   wall?: WallSlot
   /** A swimmer's circle through `spawnPosition`, placed clear of the world (`spawning/swimOrbit.ts`). */
   orbit?: SwimOrbit
+  /** Stands on this floor (a dark section's, `spawning/darkFloor.ts`) instead of the terrain, facing down it. */
+  floor?: EnemyFloor
   /** It got away unshot (a climber topped out): gone, unscored. */
   onEscape?: (id: string) => void
   /** Not a target (#518): a hit costs the penalty and the combo (`combat/bystanderHit.ts`), never a kill. */

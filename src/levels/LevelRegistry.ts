@@ -1,11 +1,22 @@
 import type { LevelConfig } from '@/types/level'
-import { paceLevel } from './pacing'
+import { paceLevel, type PacedWave } from './pacing'
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS (#863). Every other generated
 // ride is its world chunk's (`World.rides`), out of the startup JS altogether (#960).
 import { PARK_LEVEL_RIDE } from './environments/biomes/themePark/parkLevel'
 
 /** Level 1's lift-hill rings (`formationOrigin`). */
 const LIFT_RINGS = { ahead: 700, side: 250, up: 150 }
+
+/** Nearer the track than a line's default, so one placed straight ahead where the track doubles back is still in view. */
+const JELLYFISH_LINE = { ahead: 600, side: 240, up: 0 }
+
+/**
+ * Level 3's jellyfish (#937): a small line every 2 s, each placed in view where the rider is when it arrives, so one is
+ * coming up as the last is shot (a scattered wave of twenty was cleared in 4 s up the lift, and nothing until the sharks).
+ */
+function jellyfishLine(count: number, waveLabel?: string): PacedWave {
+  return { type: 'jellyfish', count, waveLabel, formation: 'line', formationOrigin: JELLYFISH_LINE, weight: 2 }
+}
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
 const LEVELS: LevelConfig[] = [
@@ -45,22 +56,30 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: 30 * 20 + 78 * 15 + 2 * 60 + 4 * 40 + 400, // 1770 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2450
+    maxScore: 36 * 20 + 81 * 15 + 2 * 60 + 4 * 40 + 400, // 1935 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2615
     message: 'Ready for this one?',
     nextLevel: 'level3',
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
     ...paceLevel({
       // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all
       // thirty in view (#864: draws); two Vs up the lift hill (2 s, 6 s), one group each, so the sky holds crows until the
-      // crest (#937); the second pack on the sand before the door, under the drop (11 s); the sandstorm's V meets the car
-      // out of the Pyramid (16 s); the last V's groups spread from the climb to the airtime crest (25 s) on to the boss.
+      // crest (#937); the second pack on the sand before the door, under the drop (11 s), and its last eight on the
+      // passage's floor in the dark (13 s, #937); the sandstorm's V meets the car out of the Pyramid (16 s); then a V
+      // every 4 s from the climb over the airtime crest (22, 26, 30 s), six scorpions trackside along the crest (27 s: the Vs
+      // that arrive there show up a few seconds late) and a last small V (33 s) cleared before the boss, so something is in view until the Giant
+      // Scorpion (#937: one big V was cleared by 35 s, nothing for 4 s).
       waves: [
         { type: 'scorpion', count: 12, waveLabel: 'Incoming!', weight: 2 },
         { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 4 },
         { type: 'crow', count: 9, formation: 'v', weight: 5 },
-        { type: 'scorpion', count: 18, waveLabel: 'Out of the Sand!', weight: 5 },
-        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 9 },
-        { type: 'crow', count: 30, waveLabel: 'More Crows!', formation: 'v', weight: 20 },
+        { type: 'scorpion', count: 10, waveLabel: 'Out of the Sand!', weight: 2 },
+        { type: 'scorpion', count: 8, waveLabel: 'In the Tomb!', darkFloor: true, weight: 3 },
+        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 6 },
+        { type: 'crow', count: 9, waveLabel: 'More Crows!', formation: 'v', weight: 4 },
+        { type: 'crow', count: 9, formation: 'v', weight: 1 },
+        { type: 'scorpion', count: 6, weight: 3 },
+        { type: 'crow', count: 9, formation: 'v', weight: 3 },
+        { type: 'crow', count: 6, formation: 'v', weight: 12 },
       ],
       boss: 'giantScorpion',
     }),
@@ -74,17 +93,21 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 44 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 1924 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 2624
+    maxScore: 74 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 2464 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3164
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
     ...paceLevel({
       waves: [
-        // "Into the Deep!": the jellyfish arrive as the car dives into the glass tunnel (~14 s).
-        { type: 'jellyfish', count: 20, waveLabel: 'Into the Deep!', weight: 3 },
-        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 2 },
-        { type: 'jellyfish', count: 24, waveLabel: 'Jellyfish Bloom!', weight: 2 },
-        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 3 },
+        // Up the lift and down the drop (0–10 s; lines of 7 up the lift, so one is still up as the next arrives), the sharks
+        // round the glass tunnel (11 s, before the drop's last line is out of view), more jellyfish from the launch's crest
+        // past the sea stacks (16–28 s), the flying fish on to the Kraken (29 s, before the last line is behind the rider).
+        jellyfishLine(7, 'Into the Deep!'), jellyfishLine(7), jellyfishLine(7), jellyfishLine(7), jellyfishLine(6),
+        { ...jellyfishLine(5), weight: 1 },
+        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 5 },
+        jellyfishLine(5, 'Jellyfish Bloom!'), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5),
+        { ...jellyfishLine(5), weight: 1 },
+        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 16 },
       ],
       boss: 'kraken',
     }),
@@ -228,34 +251,21 @@ const LEVELS: LevelConfig[] = [
     maxScore: 83 * 15 + 5 * 65 + 400, // 1245 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 1970
     message: 'You cleared Jungle Ruins!',
     nextLevel: null,
-    // A first cut on the legacy curve1 until the ride kit's storyboard (#1009, `jungleTrack.ts`); `jungleLayout.test.ts`
-    // keeps the temple in front of the drop meanwhile.
-    ride: {
-      track: {
-        varA: 3,
-        varB: 17,
-        varC: 4,
-        scalar: 20,
-        curve: 'curve1',
-        ride: 'v2',
-        mechanics: [{ kind: 'station', from: 0, to: 0.01, speed: 120 }],
-        rideV2: { gravity: 480, crawl: 90, drag: 0.0012, zones: [{ kind: 'lift', from: 0.085, to: 0.122, speed: 60 }] },
-        color1: 0xd8c9a0,
-        color2: 0x3f8a4a,
-      },
-    },
-    // Toucans over the canopy in Vs, rings and spirals ahead of the rider, one wave every few seconds from the
-    // station to the temple, then the boss slot, held by the Golden Blimp until the guardian (#869). Each V is one
+    // The ride kit's storyboard through the valleys (#1009, `jungleTrack.ts`), shipped in the jungle world's chunk.
+    // Toucans over the canopy in Vs, rings and spirals ahead of the rider, one wave per stretch (0 s the station, 3 s
+    // the turn onto the lift, 8 s the lift, 13 s the crest and drop, 19 s the valley run, 24 s the airtime crest, 29 s
+    // the helix), each arriving as the last is shot down, then the boss slot, held by the Golden Blimp until the
+    // guardian (#869). Each V is one
     // group of 9: on this curve a second group would sit within reading range of the rider from the wave's start.
     ...paceLevel({
       waves: [
-        { type: 'toucan', count: 9, waveLabel: 'Toucans!', formation: 'v', weight: 0.75 },
+        { type: 'toucan', count: 9, waveLabel: 'Toucans!', formation: 'v', weight: 0.6 },
         { type: 'toucan', count: 10, waveLabel: 'Over the Canopy!', formation: 'ring' },
         { type: 'toucan', count: 9, waveLabel: 'The Flock!', formation: 'v' },
-        { type: 'toucan', count: 16, waveLabel: 'Temple Run!', formation: 'spiral' },
+        { type: 'toucan', count: 16, waveLabel: 'Temple Run!', formation: 'spiral', weight: 1.2 },
         { type: 'toucan', count: 9, waveLabel: 'Bills Out!', formation: 'v' },
         { type: 'toucan', count: 9, waveLabel: 'Down the Falls!', formation: 'v' },
-        { type: 'toucan', count: 21, waveLabel: 'The Whole Jungle!', formation: 'ring', weight: 2.5 },
+        { type: 'toucan', count: 21, waveLabel: 'The Whole Jungle!', formation: 'ring', weight: 3.2 },
       ],
       boss: 'goldenBlimp',
     }),

@@ -14,7 +14,7 @@ uniform float saturation;
 uniform float vibrance;
 uniform float vignette;
 
-const vec3 GRADE_LUMA = vec3(${LUMA.join(', ')});
+const vec3 GRADE_LUMA = vec3(${LUMA.join()});
 const float MID_GREY = 0.18;
 
 void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {

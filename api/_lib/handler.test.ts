@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { getBoard, postScore, type Deps } from './handler'
 import type { PublicEntry, Submission } from './rules'
-import { DbError, RATE_LIMITED, type ScoresDb } from './scoresDb'
-import { RATE_LIMIT } from './rules'
+import { DbError, RATE_LIMITED, scoresDb, type ScoresDb } from './scoresDb'
+import { MAX_GHOST_CHARS, RATE_LIMIT } from './rules'
 import fs from 'node:fs'
 import path from 'node:path'
 import { LEVEL_LIMITS } from './levelLimits'
 import { DAILY_LEVELS, dayLevel } from './daily'
 
-type Row = Submission & { ipHash: string; createdAt: number; day?: string }
+type Row = Submission & { ipHash: string; createdAt: number; day?: string; ghost?: string }
 
 /**
  * In-memory `scores` with the filters the handler uses. `noDayColumn`: before `0004_daily_board.sql`, where every
@@ -30,6 +30,13 @@ function fakeDb(now: () => number, failing = false, noDayColumn = false, rateTri
         .sort((a, b) => b.score - a.score || a.createdAt - b.createdAt)
         .slice(0, 10)
         .map((r): PublicEntry => ({ initials: r.initials, score: r.score, at: new Date(r.createdAt).toISOString() }))
+    },
+    async ghost(level, maxScore, day) {
+      guard(true)
+      const best = rows
+        .filter((r) => r.level === level && r.score <= maxScore && r.day === day && r.ghost)
+        .sort((a, b) => b.score - a.score || a.createdAt - b.createdAt)[0]
+      return best?.ghost ?? null
     },
     async count(filters) {
       guard(filters.day?.startsWith('eq.'))
@@ -218,5 +225,91 @@ describe('the Daily Run board (#854)', () => {
     expect((await postScore(post(run), deps)).status).toBe(200)
     expect((await getBoard(get('level1'), deps)).status).toBe(200)
     expect(db.rows.map((r) => r.day)).toEqual([undefined])
+  })
+})
+
+describe('the Daily Run ghost (#1042)', () => {
+  const today = '2026-11-05'
+  const daily = { ...run, level: dayLevel(today), daily: today }
+  /** `src/combat/ghost.ts`' format: `samples` samples aiming mid-view, the flag byte `flags`. */
+  const ghostOf = (samples: number, flags = 0, stepMs = 50) => `1;${stepMs};${btoa(String.fromCharCode(0, 2, flags).repeat(samples))}`
+  const getGhost = (day: string) => new Request(`https://scoaster.com/api/leaderboard?daily=${day}&ghost=1`)
+  const ghostAt = async (deps: Deps, day = today) => {
+    const res = await getBoard(getGhost(day), deps)
+    return { status: res.status, cache: res.headers.get('Cache-Control'), ghost: (await res.json()).ghost }
+  }
+
+  it("stores a daily run's ghost and serves the day's best one, CDN-cached like the board", async () => {
+    const { db, deps } = setup()
+    expect(await ghostAt(deps)).toEqual({ status: 200, cache: expect.stringContaining('s-maxage=30'), ghost: null })
+    const second = ghostOf(1200, 16)
+    const best = ghostOf(2400)
+    expect((await postScore(post({ ...daily, score: 2000, ghost: second }, '1.1.1.1'), deps)).status).toBe(200)
+    expect((await postScore(post({ ...daily, score: 2400, ghost: best }, '2.2.2.2'), deps)).status).toBe(200)
+    // The day's #1 without a ghost (a client from before #1042) leaves the best run that has one.
+    expect((await postScore(post({ ...daily, score: 3000 }, '3.3.3.3'), deps)).status).toBe(200)
+    expect(db.rows.map((r) => r.ghost)).toEqual([second, best, undefined])
+    expect((await ghostAt(deps)).ghost).toBe(best)
+    expect((await ghostAt(deps, '2026-11-04')).ghost).toBeNull()
+  })
+
+  it('drops an undecodable or oversize ghost and keeps the score', async () => {
+    const { db, deps } = setup()
+    const bad = [
+      '2;50;AAIA', // another version
+      '1;0;AAIA', // no step
+      '1;60000;AAIA', // a step of a minute
+      '1;050;AAIA', // not how the encoder writes it
+      '1;50;AAI', // not whole samples
+      '1;50;AAIA====',
+      '1;50;AAIg', // a flag byte over 31
+      '1;50;AA IA',
+      ghostOf(2401), // past the cap
+      `${ghostOf(10)};x`,
+      12345,
+      { x: 1 },
+    ]
+    for (const [i, ghost] of bad.entries()) {
+      expect((await postScore(post({ ...daily, score: 1000 + i, ghost }, `9.9.9.${i}`), deps)).status).toBe(200)
+    }
+    expect(db.rows).toHaveLength(bad.length)
+    expect(db.rows.every((r) => r.ghost === undefined)).toBe(true)
+    expect(ghostOf(2400, 0, 59999).length).toBe(MAX_GHOST_CHARS)
+  })
+
+  it("refuses a body past 12 KB, and past 2 KB on a campaign run, whose ghost is never stored", async () => {
+    const { db, deps } = setup()
+    expect((await postScore(post({ ...daily, ghost: ghostOf(2400), pad: 'x'.repeat(3000) }), deps)).status).toBe(413)
+    expect((await postScore(post({ ...run, ghost: ghostOf(2400) }), deps)).status).toBe(413)
+    expect((await postScore(post({ ...run, ghost: ghostOf(10) }), deps)).status).toBe(200)
+    expect(db.rows).toHaveLength(1)
+    expect(db.rows[0].ghost).toBeUndefined()
+    expect((await getBoard(new Request('https://scoaster.com/api/leaderboard?level=level1&ghost=1'), deps)).status).toBe(400)
+  })
+
+  it('before 0006 adds the column: daily scores still post and read, with no ghost stored or served', async () => {
+    // The real scoresDb over a PostgREST that knows no `ghost` column (PGRST204 on a write naming it, 42703 on a read).
+    const stored: Record<string, unknown>[] = []
+    const missing = (code: string) => Response.json({ code }, { status: 400 })
+    const fetchImpl = async (url: string, init: RequestInit) => {
+      if (init.method === 'HEAD') return new Response(null, { headers: { 'Content-Range': `*/${stored.length}` } })
+      if (init.method === 'POST') {
+        const row = JSON.parse(String(init.body))
+        if ('ghost' in row) return missing('PGRST204')
+        stored.push(row)
+        return new Response(null, { status: 201 })
+      }
+      if (url.includes('select=ghost')) return missing('42703')
+      return Response.json(stored.map((r) => ({ initials: r.initials, score: r.score, created_at: '2026-11-05T12:00:00Z' })))
+    }
+    const db = scoresDb({ SUPABASE_URL: 'https://abc.supabase.co', SUPABASE_SECRET_KEY: 'k' }, fetchImpl)
+    const deps: Deps = { db, salt: 'secret', now: () => Date.UTC(2026, 10, 5, 12) }
+    const res = await postScore(post({ ...daily, ghost: ghostOf(100) }), deps)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ rank: 1, top: [{ initials: 'ABC', score: 2400 }] })
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatchObject({ day: today, score: 2400 })
+    expect(await ghostAt(deps)).toMatchObject({ status: 200, ghost: null })
+    expect((await getBoard(getDaily(today), deps)).status).toBe(200)
   })
 })

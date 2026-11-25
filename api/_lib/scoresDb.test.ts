@@ -60,6 +60,26 @@ describe('scoresDb', () => {
     expect(JSON.parse(calls[1].init.body as string).day).toBe('2026-11-05')
   })
 
+  it("stores a daily's ghost and reads the day's best one (#1042); before 0006, drops it on write and reads none", async () => {
+    const run = { level: 'level2', initials: 'XYZ', score: 10, seed: 7, kills: 1, accuracy: 0.5, version: '2.0.0', ipHash: 'ab', day: '2026-11-05', ghost: '1;50;AAIA' }
+    const { calls, fetchImpl } = recorder((url, init) => (init.method === 'POST' ? new Response(null, { status: 201 }) : Response.json([{ ghost: '1;50;AAIA' }])))
+    const db = scoresDb(env, fetchImpl)!
+    await db.insert(run)
+    expect(JSON.parse(calls[0].init.body as string).ghost).toBe('1;50;AAIA')
+    expect(await db.ghost('level2', 12250, '2026-11-05')).toBe('1;50;AAIA')
+    expect(calls[1].url).toBe('https://abc.supabase.co/rest/v1/scores?select=ghost&level_id=eq.level2&score=lte.12250&day=eq.2026-11-05&ghost=not.is.null&order=score.desc,created_at.asc&limit=1')
+
+    const before = recorder((url, init) => {
+      if (init.method === 'POST') return String(init.body).includes('"ghost"') ? Response.json({ code: 'PGRST204' }, { status: 400 }) : new Response(null, { status: 201 })
+      return Response.json({ code: '42703' }, { status: 400 })
+    })
+    const old = scoresDb(env, before.fetchImpl)!
+    await old.insert(run)
+    expect(before.calls).toHaveLength(2)
+    expect(JSON.parse(before.calls[1].init.body as string)).not.toHaveProperty('ghost')
+    expect(await old.ghost('level2', 12250, '2026-11-05')).toBeNull()
+  })
+
   it('throws DbError on an error status (a paused project) or no connection', async () => {
     const paused = recorder(() => new Response('paused', { status: 540 }))
     await expect(scoresDb(env, paused.fetchImpl)!.top('level1', 1, null)).rejects.toBeInstanceOf(DbError)

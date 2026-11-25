@@ -9,6 +9,7 @@ import { emitKill, scoreKill } from '@/entities/enemies/killPop'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { BOSS_DEFEAT_DEATH_STYLE, SNOWBALL_DEATH_STYLE, SNOW_BURST_DEATH_STYLE, YETI_PART_DEATH_STYLE } from '@/effects/deathStyles'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
+import { sightClear, type HeightFunction } from '@/utils/terrainNoise'
 import { AURORA_DEFAULT_INTENSITY, AURORA_INTENSITY_EVENT } from '@/levels/environments/biomes/arctic/aurora'
 import { BOSS_PROJECTILE_PREFIX, e2eBoss, isE2E } from '@/testing/e2eHook'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
@@ -20,11 +21,11 @@ import {
   SNOWBALL_GEO, SNOWBALL_MAT, YETI_BODY_GEO, YETI_CHEST_EXPOSED_MAT, YETI_CHEST_GEO, YETI_CHEST_MAT, YETI_FIST_GEO,
   YETI_FUR_MAT, YETI_HEAD_GEO, YETI_LIMB_GEO, YETI_MOUTH_GEO, YETI_MOUTH_OFFSET,
 } from './bossAssets'
-import { approachAngle, firstSlot, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
-import { aimAtRider } from './bossAim.hot'
+import { approachAngle, firstSlot, pickPerch, pickSeenPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
+import { aimAtRider, flatForward } from './bossAim.hot'
 import { inWindow, needsRelocate, timeToWindow, windowAmount, windowNowEpoch } from './bossCycle.hot'
 import {
-  YETI_BODY, YETI_PERCH, YETI_RISE, YETI_ROAM, YETI_ROAR, YETI_THROW, THROW_S, chestRetracted, elbowPose, fistPose, lopeAt,
+  YETI_BODY, YETI_PERCH, YETI_RISE, YETI_ROAM, YETI_ROAR, YETI_THROW, THROW_S, chestRetracted, elbowPose, fistPose, lopeAt, underFrameTop,
   passedCamera, riseOffset, snowballAt, throwArmAlive, throwSwing, toppleAngle, toppleSink, type Lope, type Point3,
 } from './yetiMotion.hot'
 
@@ -48,6 +49,29 @@ const _to = new THREE.Vector3()
 const _p = new THREE.Vector3()
 const _m = new THREE.Matrix4()
 const _q = new THREE.Quaternion()
+const _look = new THREE.Vector3()
+
+/**
+ * Its chest in sight of the rider's eye and its head at most `top` up the frame (1 is the top edge) for the rider's look
+ * and FOV now: a ridge behind a valley wall, or one up a wall over the rider, is passed over for one in view (#937).
+ */
+function inFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number, top: number): boolean {
+  const ground = groundFn(x, z)
+  camera.getWorldDirection(_look)
+  const tanHalfFov = Math.tan(((camera as THREE.PerspectiveCamera).fov ?? 60) * (Math.PI / 360))
+  return underFrameTop((ground + YETI_BODY.head[1] - _cam.y) / Math.hypot(x - _cam.x, z - _cam.z), Math.asin(_look.y), tanHalfFov * top)
+    && sightClear(groundFn, _cam.x, _cam.y, _cam.z, x, ground + YETI_BODY.chest[1], z)
+}
+
+/** Its spot within `YETI_ROAM.viewAngle` of where the rider looks, and its head at most `top` up the frame. */
+function inSight(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number, top: number): boolean {
+  flatForward(camera, _look)
+  const dx = x - _cam.x
+  const dz = z - _cam.z
+  return Math.abs(Math.atan2(dz * _look.x - dx * _look.z, dx * _look.x + dz * _look.z)) <= YETI_ROAM.viewAngle
+    && inFrame(camera, groundFn, x, z, top)
+}
+
 const _e = new THREE.Euler()
 const _one = new THREE.Vector3(1, 1, 1)
 
@@ -76,11 +100,6 @@ export default function Yeti(props: BossProps) {
   const mouthRef = useRef<THREE.Mesh>(null)
   const ballsRef = useRef<THREE.InstancedMesh>(null)
 
-  const input = useMemo<PerchInput>(
-    () => ({ index: buildTrackIndex(track), avoid: [], camera: { x: 0, z: 0 }, forwardX: 0, forwardZ: -1 }),
-    [track],
-  )
-
   const [tellStep] = useState(gameClockStep)
   const sim = useMemo(
     () => ({
@@ -91,6 +110,10 @@ export default function Yeti(props: BossProps) {
       anchorX: 0,
       anchorZ: 0,
       holdStart: 0,
+      /** Last game age its chest was in the rider's look and sight (or it was on its way to a new ridge). */
+      seenAt: 0,
+      /** How far up the frame `input.seen` lets its head stand (one of `YETI_ROAM.pickTops`): the last ridge's, once picked. */
+      top: 1 as number,
       lopeStart: -1,
       fromX: 0,
       fromZ: 0,
@@ -122,6 +145,18 @@ export default function Yeti(props: BossProps) {
       })),
     }),
     [id],
+  )
+
+  const input = useMemo<PerchInput>(
+    () => ({
+      index: buildTrackIndex(track),
+      avoid: [],
+      camera: { x: 0, z: 0 },
+      forwardX: 0,
+      forwardZ: -1,
+      seen: (x, z) => inFrame(camera, groundFn, x, z, sim.top),
+    }),
+    [track, groundFn, camera, sim],
   )
 
   const layBalls = useCallback(() => {
@@ -189,7 +224,12 @@ export default function Yeti(props: BossProps) {
   const aim = useCallback(
     (dt: number, repick: boolean) => {
       aimAtRider(camera, _cam, sim, input, dt)
-      if (repick && !pickPerch(sim.perch, input, YETI_PERCH)) firstSlot(sim.perch, input, YETI_PERCH)
+      if (!repick) return
+      for (let i = 0; i < YETI_ROAM.pickTops.length; i++) {
+        sim.top = YETI_ROAM.pickTops[i]
+        if (pickSeenPerch(sim.perch, input, YETI_PERCH)) return
+      }
+      if (!pickPerch(sim.perch, input, YETI_PERCH)) firstSlot(sim.perch, input, YETI_PERCH)
     },
     [camera, sim, input],
   )
@@ -235,16 +275,25 @@ export default function Yeti(props: BossProps) {
       retract('chest', chestRetracted(lastPhase, roarT))
 
       if (!sim.placed) {
+        sim.headed = false
         aim(0, true)
         sim.anchorX = sim.perch.x
         sim.anchorZ = sim.perch.z
         sim.holdStart = age
-      } else if (fighting && sim.lopeStart < 0 && !roaring && sim.throwArm < 0 && timeToWindow(YETI_ROAR, roarT) > YETI_ROAM.lopeS) {
+        sim.seenAt = age
+      } else if (sim.lopeStart >= 0 || inSight(camera, groundFn, sim.anchorX, sim.anchorZ, Math.max(YETI_ROAM.holdTop, sim.top))) {
+        sim.seenAt = age
+      }
+      const lost = age - sim.seenAt >= YETI_ROAM.unseenS
+      // A roar the rider can't see is no use: lost, it lopes on even through one.
+      if (sim.placed && fighting && sim.lopeStart < 0 && sim.throwArm < 0 && (lost || (!roaring && timeToWindow(YETI_ROAR, roarT) > YETI_ROAM.lopeS))) {
         const dx = sim.anchorX - _cam.x
         const dz = sim.anchorZ - _cam.z
         const ahead = dx * sim.heading.x + dz * sim.heading.z
         const side = dz * sim.heading.x - dx * sim.heading.z
-        if (needsRelocate(YETI_ROAM, age - sim.holdStart, ahead, side)) {
+        if (lost || needsRelocate(YETI_ROAM, age - sim.holdStart, ahead, side)) {
+          // Lost behind a wall or a turn: the eased heading still points the old way, so take the rider's look as it is now.
+          if (lost) sim.headed = false
           aim(0, true)
           sim.fromX = sim.anchorX
           sim.fromZ = sim.anchorZ

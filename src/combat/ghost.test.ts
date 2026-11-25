@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { GHOST_VERSION, decodeGhost, encodeGhost } from './ghost'
+import { checkGhost, GHOST_MAX_SAMPLES as SERVER_MAX_SAMPLES, MAX_GHOST_CHARS } from '../../api/_lib/rules'
 import {
   GHOST_AXIS_MAX,
   GHOST_MAX_SAMPLES,
@@ -125,6 +126,17 @@ describe('ghost storage', () => {
       `${GHOST_VERSION};${stepMs};${payload}${'AAAA'.repeat(GHOST_MAX_SAMPLES)}`,
     ]) {
       expect(decodeGhost(bad)).toBeNull()
+      // The server's check for a Daily Run's ghost (#1042) refuses all of them too.
+      expect(checkGhost(bad)).toBeNull()
+    }
+  })
+
+  it("passes the server's check on every ghost it encodes, the longest included (#1042)", () => {
+    expect(SERVER_MAX_SAMPLES).toBe(GHOST_MAX_SAMPLES)
+    const full = (n: number, step: number) => encodeGhost(track(Array.from({ length: n }, (_, i): [number, number, number] => [GHOST_AXIS_MAX, i % 1024, i % 2]), step))
+    for (const ghost of [encodeGhost(track([[0, 0, 0]])), full(GHOST_MAX_SAMPLES, GHOST_STEP_S), full(GHOST_MAX_SAMPLES * 4, 59.999 / 4)]) {
+      expect(ghost.length).toBeLessThanOrEqual(MAX_GHOST_CHARS)
+      expect(checkGhost(ghost)).toBe(ghost)
     }
   })
 })

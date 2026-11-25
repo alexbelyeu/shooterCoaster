@@ -55,3 +55,6 @@ e2e-results/
 # Local secrets (names only in .env.example)
 .env
 .env*.local
+
+# Blender (tools/art/, #1040)
+.venv-bpy/
