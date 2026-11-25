@@ -29,7 +29,8 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
    d. If nothing is left, take the top item of the "Idea backlog" in
       `docs/agents/VISION.md`, create a well-formed issue for it per the issue contract
       in PROTOCOL.md (labels `agent:ready`, `P3`, a `type:*`), and use that.
-   If there is still nothing to do, reply "Queue empty" and stop.
+   If there is still nothing to do, post the ledger line with `--ref none` (step 7) and reply
+   "Queue empty": the control center flags a Builders run that never reports.
    Don't pair two assignments that will clearly edit the same functions in the same
    files (their issues' Scope sections say so); take the next candidate instead.
    Rank from the listing's numbers, titles and labels; to compare Scopes, print just that
@@ -41,7 +42,11 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
    returned PRs comment `Builder run <ISO timestamp> is on it`.
 4. **Verify every claim.** Wait about 20 seconds, then re-read each issue's/PR's
    comments. Back off if, for an issue, another run's claim comment is earlier than
-   yours or another run claimed it within the last 6 hours; for a returned PR, only if
+   yours, or another run's claim is still live: the newest `Claimed by builder run` comment
+   before yours is under 6 hours old and no `Handoff:`, `Backing off` or `Blocked:` comment
+   came after it (those end a run's claim: on 25 Nov the 6-hour rule alone held #937, the only
+   ready issue, for hours after its run had handed it back, and four Builders runs did nothing);
+   for a returned PR, only if
    another *live* `Builder run … is on it` claim (runbooks README, "Live claims") is
    earlier than yours (the previous round's claim has ended). To back off,
    comment `Backing off — already claimed by another run`, leave its labels alone, and

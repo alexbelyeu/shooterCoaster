@@ -54,7 +54,9 @@ Rules that apply to every runbook:
   `token-ledger` issue (the status page and the weekly report, through
   `run-usage.cjs --summary`, read it). Run it once, from the
   session that runs the runbook, never from a subagent. Skip it when the run stopped at
-  the pause check or had nothing to do. It never fails the run.
+  the pause check or had nothing to do, except a Builders run with nothing to do: it posts
+  with `--ref none` (`builders.md` step 2), since the control center's train starts Builders
+  and flags one that never reports. It never fails the run.
 - **Pause checkpoints.** Run `scripts/pause-check.sh` again before every wave of
   subagents and before any long step. If it prints PAUSED, start nothing new, leave
   claims and labels as they are, and end with the PAUSED line.
