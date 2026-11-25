@@ -131,6 +131,10 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         ...(turntable && { input: [path.resolve(__dirname, 'turntable.html'), path.resolve(__dirname, 'rides.html')] }),
         output: {
+          // Folds shared chunks under ~1 KB (bossAim, trackScatter, the score layers, the service worker's
+          // registrar) into a chunk that imports them: each costs its own gzip frame and import lines, ~0.6 KB gz in all,
+          // +0.08 KB at startup (the registrar, still run on `load`). Above ~1.6 KB it starts folding into the startup JS (#1030).
+          experimentalMinChunkSize: 1000,
           // A world's chunk (#862, `levels/environments/worlds.ts`) is named after its biome: `world-desert-<hash>.js`.
           chunkFileNames: (chunk) => {
             const biome = /\/biomes\/(\w+)\/world\.ts$/.exec(chunk.facadeModuleId ?? '')?.[1]
