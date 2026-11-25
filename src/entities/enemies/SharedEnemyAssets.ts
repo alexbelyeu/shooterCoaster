@@ -246,7 +246,7 @@ function withCrowWings<T extends THREE.Material>(material: T, flap: { value: THR
 
 // Violet-black on the pale sky + a blue-grey rim sheen so crows
 // also read against the hazy horizon and the red mesas.
-const CROW_RIM = { color: '#a8bce0', intensity: 0.4, power: 3.5 }
+export const CROW_RIM = { color: '#a8bce0', intensity: 0.4, power: 3.5 }
 
 /** One bird's feathers (crow or toucan), flapping by `flap` (arm, hand radians); every instance shares one program. */
 export function createBirdFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
