@@ -91,14 +91,17 @@ export const PERCH: PerchConfig = {
     [860, 760],
     [1300, 680],
     [740, 600],
-    // Far out, for a view pitched up a lift: the nearer sand is under the frame (#937).
-    [1600, 420],
-    [2000, 560],
-    [2400, 700],
   ],
   /** Body and legs; the claws and tail may reach past a tower. */
   footprint: 260,
   clearance: 45,
+}
+
+/** For the scuttle back into the frame (`pickSeenPerch`): `PERCH`'s slots, then farther ones for a view pitched up a lift,
+ * where the nearer sand is under the frame (#937). Never in `pickPerch`'s fallback: a normal fight keeps to the near sand. */
+export const SEEN_PERCH: PerchConfig = {
+  ...PERCH,
+  slots: [...PERCH.slots, [1600, 420], [2000, 560], [2400, 700]],
 }
 
 interface Circle {
@@ -145,7 +148,7 @@ export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = P
 }
 
 /** Like `pickPerch`, but only a slot `input.seen` passes: false (and `out` unchanged) when none does. */
-export function pickSeenPerch(out: Perch, input: PerchInput, config: PerchConfig = PERCH): boolean {
+export function pickSeenPerch(out: Perch, input: PerchInput, config: PerchConfig = SEEN_PERCH): boolean {
   return pickFrom(out, input, config, true)
 }
 

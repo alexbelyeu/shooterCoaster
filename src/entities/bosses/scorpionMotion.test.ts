@@ -9,7 +9,7 @@ import { indexAhead, trackTangent } from '@/entities/spawning/spawnPlacement'
 import { BOSS_SPECS, GIANT_SCORPION } from './bossSpecs'
 import { applyHit, bossMaxScore, createBossState, exposedWeakPoints, isDefeated, type BossState } from './bossModel'
 import {
-  LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
+  LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SEEN_PERCH, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
   lungeAmount, lungeImpactBetween, perchClear, pickPerch, pickSeenPerch, riseOffset, type Perch, type TailPose, type PerchInput,
 } from './scorpionMotion.hot'
 
@@ -149,6 +149,12 @@ describe('perch (level 2)', () => {
     const h = Math.hypot(t.x, t.z) || 1
     return { index, avoid, camera: { x: table.x[at], z: table.z[at] }, forwardX: t.x / h, forwardZ: t.z / h }
   }
+
+  it('SEEN_PERCH is PERCH with farther slots after it, so a normal fight keeps to the near sand', () => {
+    expect(SEEN_PERCH.slots.slice(0, PERCH.slots.length)).toEqual(PERCH.slots)
+    const nearest = Math.max(...PERCH.slots.map(([ahead]) => ahead))
+    for (const [ahead] of SEEN_PERCH.slots.slice(PERCH.slots.length)) expect(ahead).toBeGreaterThan(nearest)
+  })
 
   it('pickSeenPerch takes only a slot the rider sees, and leaves the perch be when none is', () => {
     const at = riders[10]

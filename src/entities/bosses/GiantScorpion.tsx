@@ -11,7 +11,7 @@ import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { desertObstacles, layoutDesert } from '@/levels/environments/biomes/desert/desertLayout'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import { setLimb } from './bossLimbs'
-import { isExposed, type WeakPointSpec } from './bossModel'
+import { isExposed, type BossState, type WeakPointSpec } from './bossModel'
 import { GIANT_SCORPION } from './bossSpecs'
 import {
   SCORPION_BODY_GEO, SCORPION_CLAW_GEO, SCORPION_FINGER_GEO, SCORPION_FINGER_HINGE, SCORPION_GLOW_GEO, SCORPION_GLOW_MAT,
@@ -20,7 +20,7 @@ import {
 } from './bossAssets'
 import {
   SCORPION_BODY, SCORPION_RISE, SCORPION_TAIL, advanceGait, approachAngle, createTailPose, faceYaw, firstSlot, footStep, layTail,
-  lungeAmount, lungeImpactBetween, pickPerch, pickSeenPerch, riseOffset, type FootStep, type Perch, type PerchInput,
+  lungeAmount, lungeImpactBetween, PERCH, pickPerch, pickSeenPerch, riseOffset, type FootStep, type Perch, type PerchInput,
 } from './scorpionMotion.hot'
 import { aimAtRider } from './bossAim.hot'
 
@@ -48,15 +48,35 @@ const _cam = new THREE.Vector3()
 const _p = new THREE.Vector3()
 const _seen = new THREE.Vector3()
 
-/** Its body's middle well inside the rider's frame as it looks now, no dune between (#937: level 2's last lift pitches the view up the chain,
- * and a perch the old heading chose sat under the frame's bottom edge for the rest of the fight). */
+/** A perch it can burst out on: its claws and its raised stinger both well inside the rider's frame as it looks now, no dune
+ * between. Near slots put a tail ~480 tall over the top of the frame, and a lift's pitch puts the near sand under it (#937). */
 const SEEN_NDC = 0.75
-const SEEN_HEIGHT = 150
+const CLAW_HEIGHT = 80
+const STINGER_HEIGHT = 480
+/** No weak point in the frame this long, it burrows and bursts out again in it. */
+const BURROW_AFTER_S = 0.5
+const WEAK_POINT_NDC = 0.9
+
+function pointInFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, y: number, z: number, ndc: number): boolean {
+  _seen.set(x, y, z).project(camera)
+  return _seen.z < 1 && Math.abs(_seen.x) < ndc && Math.abs(_seen.y) < ndc && sightClear(groundFn, _cam.x, _cam.y, _cam.z, x, y, z)
+}
 
 function inFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number): boolean {
-  const y = groundFn(x, z) + SEEN_HEIGHT
-  _seen.set(x, y, z).project(camera)
-  return _seen.z < 1 && Math.abs(_seen.x) < SEEN_NDC && Math.abs(_seen.y) < SEEN_NDC && sightClear(groundFn, _cam.x, _cam.y, _cam.z, x, y, z)
+  const ground = groundFn(x, z)
+  return pointInFrame(camera, groundFn, x, ground + CLAW_HEIGHT, z, SEEN_NDC) && pointInFrame(camera, groundFn, x, ground + STINGER_HEIGHT, z, SEEN_NDC)
+}
+
+const _wp = new THREE.Vector3()
+
+/** One of its exposed weak points inside the rider's frame, no dune between: what the rider can shoot (#937). */
+function weakPointSeen(camera: THREE.Camera, groundFn: HeightFunction, parts: ReadonlyMap<string, THREE.Group>, state: BossState): boolean {
+  for (const [id, part] of parts) {
+    if (!isExposed(state, id)) continue
+    part.getWorldPosition(_wp)
+    if (pointInFrame(camera, groundFn, _wp.x, _wp.y, _wp.z, WEAK_POINT_NDC)) return true
+  }
+  return false
 }
 
 function sandBurst(x: number, y: number, z: number, trauma: readonly [number, number]) {
@@ -95,6 +115,9 @@ export default function GiantScorpion(props: BossProps) {
       perch: { x: 0, z: 0, slot: 0, sign: 1 } as Perch,
       perched: false,
       placed: false,
+      /** Its age when it last burst out of the sand, and how long no weak point has been in the rider's frame. */
+      riseFrom: 0,
+      unseen: 0,
       yaw: 0,
       gait: 0,
       lastX: 0,
@@ -113,23 +136,29 @@ export default function GiantScorpion(props: BossProps) {
     [],
   )
 
-  /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. Once that perch has
-   * left the frame it scuttles to a slot in it, picked against the rider's look as it is now, not the eased heading (#937:
-   * level 2's last lift pitches the view up the chain and turns, and the perch sat under the frame or behind a dune). */
+  /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. True when it should
+   * burrow and burst out again at a new perch: none of its exposed weak points has been in the rider's frame for
+   * `BURROW_AFTER_S` and a slot in the frame, against the rider's look as it is now, is clear (#937: on level 2's final
+   * stretch the view turns faster than it can scuttle after it, and a late fight spent the rest of the run out of sight). */
   const aim = useCallback(
-    (dt: number) => {
-      const lost = sim.perched && !inFrame(camera, groundFn, sim.perch.x, sim.perch.z)
-      if (lost) sim.headed = false
+    (dt: number, frame: BossFrame | null): boolean => {
       aimAtRider(camera, _cam, sim, input, dt)
-      if (lost) {
+      sim.unseen = !frame || !sim.placed || weakPointSeen(camera, groundFn, frame.parts, frame.state) ? 0 : sim.unseen + dt
+      const risen = frame !== null && frame.age - sim.riseFrom > SCORPION_RISE.riseS
+      if (risen && sim.unseen > BURROW_AFTER_S) {
+        sim.headed = false
+        aimAtRider(camera, _cam, sim, input, 0)
         seenInput.camera.x = input.camera.x
         seenInput.camera.z = input.camera.z
         seenInput.forwardX = input.forwardX
         seenInput.forwardZ = input.forwardZ
-        if (pickSeenPerch(sim.perch, seenInput)) return
+        if (pickSeenPerch(sim.perch, seenInput)) return true
       }
+      // A far slot (`SEEN_PERCH` only) is held: `pickPerch` doesn't know it and would pull the perch back under the frame.
+      if (sim.perch.slot >= PERCH.slots.length) return false
       if (pickPerch(sim.perch, input)) sim.perched = true
       else if (!sim.perched) firstSlot(sim.perch, input)
+      return false
     },
     [camera, sim, input, seenInput, groundFn],
   )
@@ -146,7 +175,7 @@ export default function GiantScorpion(props: BossProps) {
         eventBus.emit('scorpion:burrow')
       }
       sim.tell += dt
-      aim(dt)
+      aim(dt, null)
       const ground = groundFn(sim.perch.x, sim.perch.z)
       sim.mound = MOUND_HEIGHT * Math.min(1, sim.tell / 2) * (1 + 0.12 * Math.sin(sim.tell * 11))
       mound.position.set(sim.perch.x, ground - 20, sim.perch.z)
@@ -162,11 +191,16 @@ export default function GiantScorpion(props: BossProps) {
   })
 
   const move = useCallback(
-    ({ root, parts, state, dt, age, sinceDefeat }: BossFrame) => {
+    (frame: BossFrame) => {
+      const { root, parts, state, dt, age, sinceDefeat } = frame
       const limbs = limbsRef.current
       if (!limbs) return
       const fighting = sinceDefeat < 0
-      if (fighting) aim(dt)
+      if (fighting && aim(dt, frame)) {
+        sim.placed = false
+        sim.riseFrom = age
+        sim.unseen = 0
+      }
       const p = sim.perch
       if (!sim.placed) {
         root.position.set(p.x, 0, p.z)
@@ -203,7 +237,7 @@ export default function GiantScorpion(props: BossProps) {
         }
       }
       const ground = Math.max(sum / (2 * B.feet.length + 1), centre - MAX_BELLY_DIP)
-      root.position.y = ground + riseOffset(age, sinceDefeat)
+      root.position.y = ground + riseOffset(age - sim.riseFrom, sinceDefeat)
       if (!sim.placed) {
         sim.placed = true
         sandBurst(x, centre, z, RISE_TRAUMA)
