@@ -140,6 +140,11 @@ export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = P
   return (input.seen !== undefined && pickFrom(out, input, config, true)) || pickFrom(out, input, config, false)
 }
 
+/** Like `pickPerch`, but only a slot `input.seen` passes: false (and `out` unchanged) when none does. */
+export function pickSeenPerch(out: Perch, input: PerchInput, config: PerchConfig = PERCH): boolean {
+  return pickFrom(out, input, config, true)
+}
+
 function pickFrom(out: Perch, input: PerchInput, config: PerchConfig, mustSee: boolean): boolean {
   const n = config.slots.length
   for (let s = 0; s < 2; s++) {

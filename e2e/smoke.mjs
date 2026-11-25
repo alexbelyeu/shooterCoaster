@@ -105,6 +105,7 @@ import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudg
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
 import { BOSS_CHECKS } from './bossChecks.mjs'
 import { runStep } from './runStep.mjs'
+import { createRideDeadline } from './rideDeadline.mjs'
 
 const SECONDS = Number(arg('seconds', 10))
 const OUT = path.resolve(arg('out', 'e2e-results'))
@@ -314,7 +315,8 @@ const NOT_LOADED = (id) => `the ${id} scene never loaded (levelReady)`
 /**
  * Start level `id` and ride it (game time running, `rideRate` RIDE_RATE) in settled steps of RIDE_STEP level seconds
  * (`settledSteps.mjs`, #471) until the level timer reaches `seconds` and `minFrames` have rendered (FRAME_DEADLINE_MS
- * stops it whatever it waits on, even a level that never registers waves: `levelTime` is then undefined), then freeze
+ * with no progress stops it whatever it waits on, `rideDeadline.mjs`, even a level that never registers waves: `levelTime`
+ * is then undefined; stopped short of `seconds`, the ride's `stuck` says so), then freeze
  * game time and hand the ride back to the frame time in that same JS turn.
  * `stopAtLevelTime` stops the level timer, game clock and ride exactly at `seconds` (#487), and the settled steps make
  * it the same moment of the level on any runner: the same track point with the same enemies flown in.
@@ -347,6 +349,8 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false, 
     if (!started) s.startLevel(lid, seed, variant)
     s.setTimeScale(1)
   }, [id, SEED, RIDE_STEP, RIDE_RATE, seconds, minFrames, started, variant])
+  const deadline = createRideDeadline({ target: seconds, deadlineMs: FRAME_DEADLINE_MS, loadMs: LEVEL_READY_MS, now: start })
+  let late = false
   for (;;) {
     await page.waitForTimeout(250)
     const r = await page.evaluate((overdue) => {
@@ -357,8 +361,14 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false, 
       // once one more frame has run; read before that, the ride stats were the frame before the stop's, which a wave
       // mounted on the last held frame isn't in, so the same build sampled 77 or 95 draws in level 8 by the poll's timing.
       return { ...run, sampled: overdue || s.frames > run.stopFrame }
-    }, Date.now() - start >= FRAME_DEADLINE_MS)
-    if (r.done && r.sampled) return { frames: r.frames ?? 0, ms: Date.now() - start, levelTime: r.levelTime }
+    }, late)
+    if (r.done && r.sampled) {
+      const ride = { frames: r.frames ?? 0, ms: Date.now() - start, levelTime: r.levelTime }
+      // Stopped by the deadline short of `seconds`: what follows would probe the wrong moment of the level.
+      if (late && r.levelTime != null && r.levelTime < seconds) ride.stuck = `ride stuck at ${r.levelTime.toFixed(1)} of ${seconds} s of level time: no progress in ${(FRAME_DEADLINE_MS / 1000).toFixed(0)} s`
+      return ride
+    }
+    late ||= deadline.overdue(r, Date.now())
   }
 }
 
@@ -2407,6 +2417,7 @@ async function weatherCheck(page, id) {
   if (!weather) return { id: 'weather', level: id, problems: [`${id} has no weather in levels()`] }
   const ride = await rideToLevelTime(page, id, weather.at + WEATHER_SHOT_AT, MIN_FRAMES)
   if (ride.levelTime == null) return { id: 'weather', level: id, problems: [NOT_LOADED(id)] }
+  if (ride.stuck) problems.push(ride.stuck)
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
   const held = await page.evaluate(() => ({ ...window.__SC_TEST__.weather }))
   const onScreen = await page.evaluate(() => window.__SC_TEST__.enemies().length)
@@ -2767,6 +2778,7 @@ async function nightCheck(page, level) {
   const problems = []
   gatePrograms(problems, programs)
   if (ride.frames < MIN_FRAMES) problems.push(`render loop stalled (${ride.frames} frames)`)
+  else if (ride.stuck) problems.push(ride.stuck)
   if (stats.variant !== 'night') problems.push(`the run is "${stats.variant}", not the Night Ride`)
   if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" on the Night Ride`)
   if (looksBlank(img)) problems.push('night frame looks blank')
@@ -4868,6 +4880,7 @@ async function run() {
 
     if (frames < MIN_FRAMES) problems.push(`render loop stalled (${frames} frames in ${frameSeconds.toFixed(0)}s)`)
     else if (ride.levelTime == null) problems.push(`the level registered no waves: nextWave() still null after ${frameSeconds.toFixed(0)} s`)
+    else if (ride.stuck) problems.push(ride.stuck)
     if (looksBlank(img)) problems.push('frame looks blank')
     if (stats.phase !== 'playing') problems.push(`unexpected phase "${stats.phase}" after ride`)
     if (enemyShot.error) problems.push(`enemy probe failed: ${enemyShot.error}`)

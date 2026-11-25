@@ -10,7 +10,7 @@ import { BOSS_SPECS, GIANT_SCORPION } from './bossSpecs'
 import { applyHit, bossMaxScore, createBossState, exposedWeakPoints, isDefeated, type BossState } from './bossModel'
 import {
   LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
-  lungeAmount, lungeImpactBetween, perchClear, pickPerch, riseOffset, type Perch, type TailPose, type PerchInput,
+  lungeAmount, lungeImpactBetween, perchClear, pickPerch, pickSeenPerch, riseOffset, type Perch, type TailPose, type PerchInput,
 } from './scorpionMotion.hot'
 
 const tailTopY = (pose: TailPose) => pose.y[pose.count]
@@ -149,6 +149,19 @@ describe('perch (level 2)', () => {
     const h = Math.hypot(t.x, t.z) || 1
     return { index, avoid, camera: { x: table.x[at], z: table.z[at] }, forwardX: t.x / h, forwardZ: t.z / h }
   }
+
+  it('pickSeenPerch takes only a slot the rider sees, and leaves the perch be when none is', () => {
+    const at = riders[10]
+    const perch: Perch = { x: 1, z: 2, slot: 0, sign: 1 }
+    expect(pickSeenPerch(perch, { ...view(at), seen: () => false })).toBe(false)
+    expect(perch).toEqual({ x: 1, z: 2, slot: 0, sign: 1 })
+    const left = (x: number, z: number) => {
+      const v = view(at)
+      return (x - v.camera.x) * v.forwardZ - (z - v.camera.z) * v.forwardX > 0
+    }
+    expect(pickSeenPerch(perch, { ...view(at), seen: left })).toBe(true)
+    expect(left(perch.x, perch.z)).toBe(true)
+  })
 
   it('finds a spot ahead of the rider, clear of the rails, towers, landmarks and mesas, almost everywhere on the ride', () => {
     let found = 0
