@@ -10,6 +10,9 @@ const LIFT_RINGS = { ahead: 700, side: 250, up: 150 }
 /** Nearer the track than a line's default, so one placed straight ahead where the track doubles back is still in view. */
 const JELLYFISH_LINE = { ahead: 600, side: 240, up: 0 }
 
+/** Level 5's near ember spirals: at the default 900 ahead, the volcano's flank hid them up the lift (#937). */
+const NEAR_EMBERS = { ahead: 300, side: 120, up: 160 }
+
 /**
  * Level 3's jellyfish (#937): a small line every 2 s, each placed in view where the rider is when it arrives, so one is
  * coming up as the last is shot (a scattered wave of twenty was cleared in 4 s up the lift, and nothing until the sharks).
@@ -157,7 +160,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Descend into the volcanic depths',
     order: 5,
     biome: 'volcanic',
-    maxScore: 52 * 12 + 20 * 18 + 22 * 35 + 8 * 60 + 3 * 60 + 500, // 2234 + the Magma Titan's vents, heart and reward (bossSpecs.ts) = 2914
+    maxScore: 74 * 12 + 21 * 18 + 26 * 35 + 13 * 60 + 3 * 60 + 500, // 2956 + the Magma Titan's vents, heart and reward (bossSpecs.ts) = 3636
     message: 'You conquered the Inferno!',
     nextLevel: 'level6',
     // The ride kit's (#867, `infernoTrack.ts`).
@@ -165,21 +168,24 @@ const LEVELS: LevelConfig[] = [
       waves: [
         // A wave to each stretch of the storyboard (weights in seconds of the 45 s wave span), so no element rides empty
         // (#937): the tube, up the lift, its top at the volcano's flank, the drop tower, out of the cone, the camelbacks,
-        // then the turntable, where what is left stands along the track the car faces once it turns.
-        { type: 'emberWisp', count: 10, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 4 },
-        { type: 'emberWisp', count: 10, formation: 'spiral', weight: 4 },
-        { type: 'emberWisp', count: 10, formation: 'spiral', weight: 4 },
-        { type: 'emberWisp', count: 8, formation: 'spiral', formationOrigin: { ahead: 300, side: 120, up: 160 }, weight: 4 },
-        { type: 'emberWisp', count: 14, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', weight: 5 },
+        // then the turntable, where what is left stands along the track the car faces once it turns. A full group a wave
+        // (12 embers, 7 in a line, 9 in a `v`), so each lasts until the next is in view: a player clears about 3 a second.
+        // The Eruption rises out of the cone over the drop tower, where the default origin was behind its wall.
+        { type: 'emberWisp', count: 12, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 4 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', weight: 4 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationOrigin: NEAR_EMBERS, weight: 4 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationOrigin: NEAR_EMBERS, weight: 3 },
+        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationOrigin: { ahead: 200, side: 0, up: 300 }, weight: 4 },
         { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', weight: 2 },
-        { type: 'fireImp', count: 7, formation: 'line', weight: 2 },
-        { type: 'lavaGolem', count: 6, waveLabel: 'Golems Awaken!', formation: 'line', weight: 2 },
-        { type: 'fireImp', count: 6, formation: 'line', weight: 2 },
+        { type: 'emberWisp', count: 10, formation: 'spiral', formationOrigin: NEAR_EMBERS, weight: 2 },
+        { type: 'fireImp', count: 7, formation: 'line', weight: 1 },
         { type: 'infernalDrake', count: 4, waveLabel: 'Drakes Descend!', weight: 1 },
-        { type: 'lavaGolem', count: 5, waveLabel: 'Golems Return!', formation: 'line', weight: 1 },
-        { type: 'lavaGolem', count: 5, formation: 'line', weight: 1 },
+        { type: 'lavaGolem', count: 7, waveLabel: 'Golems Awaken!', formation: 'line', weight: 2 },
+        { type: 'fireImp', count: 7, formation: 'line', weight: 2 },
+        { type: 'lavaGolem', count: 6, waveLabel: 'Golems Return!', formation: 'line', weight: 1 },
         { type: 'lavaGolem', count: 6, formation: 'line', weight: 1 },
-        { type: 'infernalDrake', count: 4, formation: 'v', weight: 12 },
+        { type: 'lavaGolem', count: 7, formation: 'line', weight: 1 },
+        { type: 'infernalDrake', count: 9, formation: 'v', weight: 13 },
       ],
       boss: 'magmaTitan',
     }),

@@ -52,6 +52,12 @@ const _p = new THREE.Vector3()
 const _view = new THREE.Vector3()
 /** Seconds the risen Titan stays out of the rider's view before it sinks and climbs out ahead of it again. */
 const RESURFACE_AWAY_S = 1
+/**
+ * The rider's view for that: `TITAN_WADE`'s bounds, but no wider than the frame (its 0.95 rad let the turntable and the
+ * curve after it carry the Titan off screen for 2 s, #937). Still wider than every river spot (`RIVER_SPOT.maxOff`) and
+ * perch slot, so a fresh pick is always in view.
+ */
+const RESURFACE_VIEW = { ...TITAN_WADE, maxOffAngle: 0.65 }
 
 function lavaBurst(x: number, y: number, z: number, trauma?: readonly [number, number]) {
   getExplosionPool()?.explode(_p.set(x, y, z), LAVA_BURST_DEATH_STYLE)
@@ -132,14 +138,14 @@ export default function MagmaTitan(props: BossProps) {
     sim.spot.z = sim.perch.z
   }, [camera, sim, input])
 
-  /** Whether a spot is ahead of where the rider looks now, within the Titan's wading bounds. */
+  /** Whether a spot is ahead of where the rider looks now, within `RESURFACE_VIEW`. */
   const inRiderView = useCallback(
     (x: number, z: number) => {
       flatForward(camera, _view)
       const dx = x - _cam.x
       const dz = z - _cam.z
       const ahead = dx * _view.x + dz * _view.z
-      return !needsRelocate(TITAN_WADE, 0, ahead, dz * _view.x - dx * _view.z)
+      return !needsRelocate(RESURFACE_VIEW, 0, ahead, dz * _view.x - dx * _view.z)
     },
     [camera],
   )
