@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as THREE from 'three'
-import { collectOccluders, countSight, judgeTarget, type SightTarget } from './lineOfSight'
+import { collectOccluders, countSight, judgeTarget, largestCluster, type SightTarget } from './lineOfSight'
 
 function setup() {
   const scene = new THREE.Scene()
@@ -67,5 +67,16 @@ describe('lineOfSight', () => {
     wall(scene, -500)
     const c = countSight([target(-200), target(-600), target(-4000), target(300)], camera, collectOccluders(scene, camera, new Set()))
     expect(c).toEqual({ shootable: 1, occluded: 1, tiny: 1, ids: ['t-200'] })
+  })
+})
+
+describe('largestCluster', () => {
+  it('counts the most targets inside one assist circle centred on one of them', () => {
+    expect(largestCluster([], 44)).toBe(0)
+    expect(largestCluster([{ x: 0, y: 0 }], 44)).toBe(1)
+    // Three inside 44 px of the middle one, a fourth far off.
+    const pts = [{ x: 0, y: 0 }, { x: 40, y: 0 }, { x: -30, y: 30 }, { x: 400, y: 0 }]
+    expect(largestCluster(pts, 44)).toBe(3)
+    expect(largestCluster(pts, 20)).toBe(1)
   })
 })

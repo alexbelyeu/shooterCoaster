@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { BOSS_FIGHT_SECONDS, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, bossFraming, bossFramingProblems, challengeBudget, challengeGate, challengeMetrics, challengeSummary, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
 import { RUN_SECONDS, pacingTimes } from '@/levels/pacing'
 
 /** One sample per `step` s from 0 to `end`, `targets(t)` on screen, track = t / end. */
@@ -156,5 +156,30 @@ describe('pacingGate', () => {
     expect(pacingGate({}, ['gap'], ['boss'])).toEqual({ fail: ['gap', 'boss'], warn: [] })
     expect(pacingGate({ knownOver: '#1' }, ['gap'], ['boss'])).toEqual({ fail: [], warn: ['gap', 'boss'] })
     expect(pacingGate({ knownOver: '#1', knownOverOnly: 'boss' }, ['gap'], ['boss'])).toEqual({ fail: ['gap'], warn: ['boss'] })
+  })
+})
+
+describe('challengeMetrics', () => {
+  // Two samples a second for 20 s: a bunch of 5 from 10 s to 13 s, 1 otherwise.
+  const samples = Array.from({ length: 40 }, (_, i) => ({ t: i / 2, bunch: i >= 20 && i < 28 ? 5 : i % 2 }))
+  const run = { score: 900, maxScore: 1000, spawned: 50, killed: 40, basePoints: 700 }
+
+  it('measures score and kill shares, bunching per second and the boss fight', () => {
+    const c = challengeMetrics(samples, run, { arrivedAt: 40, beatenAt: 47.5 })
+    expect(c).toMatchObject({ scoreShare: 0.9, baseScoreShare: 0.7, killShare: 0.8, bunchingMax: 5, longestBunch: { start: 10, seconds: 4 }, bossSeconds: 7.5 })
+    // 16 of 20 seconds peak at 1: the 90th percentile second is in the bunch.
+    expect(c.bunchingP90).toBe(5)
+    expect(challengeMetrics(samples.slice(0, 20), run, null)).toMatchObject({ bunchingP90: 1, longestBunch: null, bossSeconds: null })
+    expect(challengeMetrics(samples, run, { arrivedAt: 40, beatenAt: null }).bossSeconds).toBeNull()
+  })
+
+  it('gates on the level limits over the defaults, warning while knownOver', () => {
+    const budgets = { challenge: { _default: { baseScoreShareMax: 0.6, bunchingP90Max: 2, bossSecondsMin: 12 }, level2: { knownOver: '#1059' }, level3: { baseScoreShareMax: 0.95 } } }
+    const c = challengeMetrics(samples, run, { arrivedAt: 40, beatenAt: 47.5 })
+    const { fail } = challengeGate(c, challengeBudget(budgets, 'level1'))
+    expect(fail).toEqual(['base score 70% of max over 60%', 'bunching p90 5 in one aim-assist circle over 2', 'boss down in 7.5 s, under 12 s'])
+    expect(challengeGate(c, challengeBudget(budgets, 'level2'))).toEqual({ fail: [], warn: fail })
+    expect(challengeGate(c, challengeBudget(budgets, 'level3')).fail).toHaveLength(2)
+    expect(challengeSummary(c)).toBe('score 90% of max (base 70%), killed 80% (40 of 50), bunching p90 5 (4+ for 4 s from 10 s), boss down in 7.5 s')
   })
 })

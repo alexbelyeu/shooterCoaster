@@ -218,6 +218,14 @@ its `budgets.json` `pacing` ceilings (`longestGapSeconds`, `noTargetShare`) fail
 prints a WARN line until that issue lands; with `knownOverOnly: "boss"` only its boss floor warns and its gap and share still fail (`pacingGate`). A level whose entry has `bossFramedShare` also fails when its boss, from its arrival
 to the end of the run (at most `BOSS_FIGHT_SECONDS`), has a shootable weak point less than that share of the time
 (`bossFraming`: `the boss was shootable 2.0 s of its 20 s fight (10%, floor 60%), longest out of sight 16.1 s from 43.0 s`).
+**Challenge** (#1058, `challengeMetrics`, `docs/RIDE-KIT.md` rule 9): the same run also measures how hard it was for the model player and
+appends it to the line (`score 186% of max (base 72%), killed 92% (120 of 130), bunching p90 3 (4+ for 6 s from 12 s), boss down in 7.5 s`), in
+`pacing.json` as each level's `challenge`: `scoreShare` (final score over `maxScore`, the stars' ratio: the combo multiplier takes it past 1) and `baseScoreShare` (the kills' points before the multiplier, `runTally().basePoints`), `killShare` (`__SC_TEST__.runTally()`: enemies
+killed over enemies that came into play, golden balloons, bystanders and weak points apart), `bunchingP90` (per level second the most
+shootable enemies in one aim-assist circle, `sight().bunch`: 44 px of a 720 px view; the seconds' 90th percentile) with `longestBunch`
+(the longest stretch with 4 or more), and `bossSeconds` (arrival to defeat; null when not beaten). `budgets.json` `challenge` holds the
+limits: `_default` (`baseScoreShareMax`: the final score's combo multiplier takes it to 1.7–4.3 times `maxScore`, so the ceiling is on the base share; `bunchingP90Max`, `bossSecondsMin`) under each level's own entry; a level over them fails, unless its
+entry names `knownOver: "#<open issue>"` (a WARN `too easy` line; its own key, so it never excuses a `pacing` ceiling) (`challengeGate`).
 The ride review (`npm run review`, `scripts/rideReview.mjs`) is the same count with screenshots, autofiring: look there for
 why. Besides the nightly, CI runs this step on a PR for every level the PR can change
 (`pacing (<level>)` jobs, which `verify` requires; `scripts/ciPlan.cjs` `pacingLevels`: the level's biome folder, or every level for
@@ -295,7 +303,7 @@ ridden on the PR, that the nightly job runs the full smoke, and that the shards,
 | `boss` | `bossModel.test.ts`, `krakenMotion.test.ts`, `scorpionMotion.test.ts` (the `turntable` workflow draws every boss on PRs touching `src/entities/`) | the full fights |
 | `pickup` | `weaponTypes.test.ts`, `pickupPlacement.test.ts`, `useGameStore.test.ts` (a run starts with the blaster) | the shot pickup, fan and badge |
 | `audio` | `src/audio/scrim/*.test.ts` (layers, scheduler, score), `arcade.test.ts`, `AudioEngine.test.ts` | the score engine and arcade SFX in a page |
-| `pacing` | `pacingMetric.test.ts` (share, longest gap, the GO grace and boss tell left out, the budget lines) | the whole run of every level, sampled |
+| `pacing` | `pacingMetric.test.ts` (share, longest gap, the GO grace and boss tell left out, the budget lines, the challenge measures and their gate) | the whole run of every level, sampled |
 | `share` | `share.test.ts`, `scoreCard.test.ts`, `popoverPlacement.test.ts` | the menu, clipboard, download |
 | `mobileMenus` | `pauseMenu.test.ts`, `initialsEntry.test.ts`, `share.test.ts` | phone layouts of the menus |
 
