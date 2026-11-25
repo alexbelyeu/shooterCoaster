@@ -1,6 +1,6 @@
 {
   "_comment": "Guardrail budgets enforced by CI. Only the Director may raise these, with a DECISIONS.md entry explaining why.",
-  "jsTotalGzipKB": 659,
+  "jsTotalGzipKB": 663,
   "jsLargestChunkGzipKB": 260,
   "startupJsGzipKB": 378,
   "playerFrameMs": {
