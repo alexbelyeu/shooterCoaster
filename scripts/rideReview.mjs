@@ -9,7 +9,8 @@
  * reads what the rider can actually shoot (`__SC_TEST__.sight()`: in view, big enough, not behind the world) and whether the
  * boss is framed. Writes to e2e-results/review/<level>/:
  *   - `review.json`: the timeline (a row per step: level time, track, shootable (and `byType`) / occluded / tiny, boss), the gaps with
- *     nothing shootable (`pacingMetrics`), the boss's framing (`bossFraming`), and the flicker spikes (a screen region that
+ *     nothing shootable (`pacingMetrics`), the boss's framing (`bossFraming`), how hard the run was for the player
+ *     (`challengeMetrics`, #1058: score and kill shares, bunching, the boss's time to kill), and the flicker spikes (a screen region that
  *     jumps in brightness for one step and comes back, the next step);
  *   - `sheet.jpg`: a contact sheet, a frame every `--every` seconds, each labelled with its time, track and counts (a red
  *     label: nothing shootable), the first thing to look at;
@@ -22,7 +23,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from './headless.mjs'
 import { virtualFrames } from './virtualTime.mjs'
-import { PLAYER_HITS_PER_SECOND, bossFraming, pacingMetrics } from '../e2e/pacingMetric.mjs'
+import { PLAYER_HITS_PER_SECOND, bossFraming, challengeMetrics, challengeSummary, pacingMetrics } from '../e2e/pacingMetric.mjs'
 import { flickerSpikes, pngLuma } from './flicker.mjs'
 
 const LEVEL = arg('level', 'level6')
@@ -122,6 +123,7 @@ async function run(browser, url) {
         kills: st.kills,
         bossStage: sight.bossStage,
         bossFramed: sight.bossFramed,
+        bunch: sight.bunch,
         bossOnScreen: boss.exposed.filter((e) => e.onScreen).length,
         bossTell: boss.stage === 'incoming',
       }
@@ -156,7 +158,12 @@ async function run(browser, url) {
   }
   const end = samples.at(-1).t + STEP_MS / 1000
   const errors = await hook(() => window.__SC_TEST__.errors)
-  return { samples, probes, sheet, end, errors: [...errors, ...pageErrors], renderSeconds: Math.round((Date.now() - started) / 1000) }
+  // The run's end (#1058): its final score and enemies for the challenge measures.
+  const result = await hook((id) => {
+    const t = window.__SC_TEST__
+    return { score: t.stats().score, maxScore: t.levels().find((l) => l.id === id)?.maxScore ?? 0, ...t.runTally() }
+  }, LEVEL)
+  return { samples, probes, sheet, end, result, errors: [...errors, ...pageErrors], renderSeconds: Math.round((Date.now() - started) / 1000) }
 }
 
 function contactSheet(sheet) {
@@ -182,10 +189,11 @@ try {
   const r = await run(browser, given ?? preview.url)
   const pacing = pacingMetrics(r.samples, r.end)
   const boss = bossFraming(r.samples, r.end)
+  const challenge = challengeMetrics(r.samples, r.result, boss)
   const flicker = flickerSpikes(r.probes)
   const report = {
     level: LEVEL, seed: SEED, size: SIZE, stepMs: STEP_MS, fired: FIRE, quality: QUALITY, renderSeconds: r.renderSeconds,
-    pacing, boss, flicker,
+    pacing, boss, challenge, flicker,
     timeline: r.samples.map((s) => ({ ...s, t: round(s.t), track: round(s.track, 3) })),
     sheet: r.sheet.map((f) => ({ t: round(f.t), file: path.relative(OUT, f.file) })),
     errors: r.errors,
@@ -199,6 +207,7 @@ try {
     console.log(`  boss: arrives ${boss.arrivedAt.toFixed(1)} s, shootable ${boss.framedSeconds.toFixed(1)} of ${boss.fightSeconds.toFixed(0)} s, ` +
       `longest out of sight ${boss.longestUnframed.seconds.toFixed(1)} s from ${boss.longestUnframed.start.toFixed(1)} s`)
   } else console.log('  boss: never reached its fight')
+  console.log(`  challenge: ${challengeSummary(challenge)}`)
   for (const f of flicker.slice(0, 5)) console.log(`  flicker: ${f.region} ${f.count} spikes, first at ${f.first.toFixed(1)} s (Δ${f.peak.toFixed(0)})`)
   if (r.errors.length) console.log(`  page errors:\n    ${r.errors.join('\n    ')}`)
   console.log(`  ${path.relative('.', sheetFile)}, ${path.relative('.', path.join(OUT, 'review.json'))}`)
