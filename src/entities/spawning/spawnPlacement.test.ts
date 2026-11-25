@@ -161,14 +161,16 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
       let ahead = 0
       placed.forEach((p, i) => {
         const ground = groundFn(p.position.x, p.position.z)
-        if (surface === 'air') expect(p.position.y).toBeGreaterThanOrEqual(ground + AIR_CLEARANCE - 1e-6)
+        // A column rides the rails' line, under the ground where the rails are (a tunnel), never below them.
+        if (formation === 'column') expect(p.position.y).toBeGreaterThan(Math.min(ground, trackPoint(table, nearestIndex(table, p.position)).y))
+        else if (surface === 'air') expect(p.position.y).toBeGreaterThanOrEqual(ground + AIR_CLEARANCE - 1e-6)
         else if (surface === 'water') expect(p.position.y).toBeGreaterThanOrEqual(WATER_Y)
         else expect(p.position.y).toBeGreaterThan(ground)
         expect(dist(p.position, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
         expect(dist(p.from, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
         expect(p.entrySeconds).toBeGreaterThanOrEqual(1)
         expect(p.entrySeconds).toBeLessThanOrEqual(2)
-        if (formation === 'ring') expect(p.motion).toEqual({ kind: 'hold' })
+        if (formation === 'ring' || formation === 'column') expect(p.motion).toEqual({ kind: 'hold' })
         else if (formation === 'spiral') expect(p.motion).toBeUndefined()
         else {
           // One heading per group, so its shape holds.
