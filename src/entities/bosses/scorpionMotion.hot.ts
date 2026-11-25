@@ -97,6 +97,13 @@ export const PERCH: PerchConfig = {
   clearance: 45,
 }
 
+/** For the scuttle back into the frame (`pickSeenPerch`): `PERCH`'s slots, then farther ones for a view pitched up a lift,
+ * where the nearer sand is under the frame (#937). Never in `pickPerch`'s fallback: a normal fight keeps to the near sand. */
+export const SEEN_PERCH: PerchConfig = {
+  ...PERCH,
+  slots: [...PERCH.slots, [1600, 420], [2000, 560], [2400, 700]],
+}
+
 interface Circle {
   x: number
   z: number
@@ -120,6 +127,11 @@ export interface PerchInput {
   seen?: (x: number, z: number) => boolean
 }
 
+/** The perch is behind the rider's look (#937: a held far slot the ride has passed gives way to `pickPerch`). */
+export function perchBehind(perch: Perch, input: PerchInput): boolean {
+  return (perch.x - input.camera.x) * input.forwardX + (perch.z - input.camera.z) * input.forwardZ < 0
+}
+
 export function perchClear(input: PerchInput, x: number, z: number, config: PerchConfig = PERCH): boolean {
   if (input.index.near(x, z, config.clearance + config.footprint)) return false
   for (const a of input.avoid) if (Math.hypot(a.x - x, a.z - z) < a.r + config.footprint) return false
@@ -141,7 +153,7 @@ export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = P
 }
 
 /** Like `pickPerch`, but only a slot `input.seen` passes: false (and `out` unchanged) when none does. */
-export function pickSeenPerch(out: Perch, input: PerchInput, config: PerchConfig = PERCH): boolean {
+export function pickSeenPerch(out: Perch, input: PerchInput, config: PerchConfig = SEEN_PERCH): boolean {
   return pickFrom(out, input, config, true)
 }
 
