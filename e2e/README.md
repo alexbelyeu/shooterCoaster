@@ -221,7 +221,7 @@ to the end of the run (at most `BOSS_FIGHT_SECONDS`), has a shootable weak point
 The ride review (`npm run review`, `scripts/rideReview.mjs`) is the same count with screenshots, autofiring: look there for
 why. Besides the nightly, CI runs this step on a PR for every level the PR can change
 (`pacing (<level>)` jobs, which `verify` requires; `scripts/ciPlan.cjs` `pacingLevels`: the level's biome folder, or every level for
-`src/track/`, `src/levels/LevelRegistry.ts`, `src/levels/pacing.ts`, `src/entities/spawning/`, `src/entities/bosses/` (the boss framing, #925), `src/testing/lineOfSight.ts` or this metric, #761). A level takes 120 steps plus about one held frame each
+`src/track/`, `src/levels/LevelRegistry.ts`, `src/levels/pacing.ts`, `src/entities/` (spawning, the bosses' framing, #925, and how every enemy moves, #1023), `src/testing/lineOfSight.ts` or this metric, #761). A level takes 120 steps plus about one held frame each
 (~260 frames; ~4.5 min in a 2-core session; its summary line prints both), so run one at a time: `--steps pacing --levels level4`.
 `drawCalls`/`triangles` depend on where the camera happens to be (frustum culling,
 spawned enemies) and vary run to run; for before/after comparisons use the

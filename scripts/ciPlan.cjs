@@ -11,8 +11,11 @@ const SW_INPUT = /^(src\/sw\/|scripts\/swPrecache\.mjs$|vite\.config\.ts$|vercel
 
 /** Each level's biome folder (`src/levels/environments/biomes/<biome>/`); `ciPlan.test.ts` holds it to the registry. */
 const BIOME_LEVEL = { themePark: 'level1', desert: 'level2', ocean: 'level3', arctic: 'level4', volcanic: 'level5', gym: 'level6', city: 'level7', jungle: 'level8' }
-/** Code every level's pacing runs through: the ride, the level configs and their spawns, and the metric itself. */
-const SHARED_PACING = /^(src\/track\/|src\/levels\/(LevelRegistry|pacing)\.ts$|src\/entities\/(spawning|bosses)\/|src\/testing\/lineOfSight\.ts$|e2e\/pacingMetric\.mjs$)/
+/**
+ * Code every level's pacing runs through: the ride, the level configs, their spawns, the enemies and bosses (how an enemy
+ * moves decides whether the rider can see it: #1023, a crow change failed level2's pacing with no job run), and the metric itself.
+ */
+const SHARED_PACING = /^(src\/track\/|src\/levels\/(LevelRegistry|pacing)\.ts$|src\/entities\/|src\/testing\/lineOfSight\.ts$|e2e\/pacingMetric\.mjs$)/
 const isTest = (f) => /\.test\.[cm]?[jt]sx?$/.test(f)
 
 /**
