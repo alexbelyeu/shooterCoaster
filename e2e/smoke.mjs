@@ -2585,9 +2585,6 @@ async function stepBoss(page, seconds, ready) {
   })
 }
 
-/** How far (px) past an enemy's half-size the boss step's real bullet keeps from it, so the bullet meets the weak point first. */
-const BULLET_CLEARANCE_PX = 12
-
 /**
  * Boss, summoned: large with its bar (<level>-boss.png), hit in phase order by a real bullet and
  * `bossHit` (<level>-<midShot>.png), then defeated into its burst + the big popup (<level>-boss-down.png).
@@ -2644,13 +2641,11 @@ async function bossCheck(page, check) {
     projectiles.hpMoved = (await boss()).hpFraction !== before.hpFraction
   }
 
-  // One real bullet at an exposed weak point no other enemy covers on screen (#1046: on the nightly the shots at the Golden
-  // Blimp and the volcano each killed an enemy in their way instead, most likely a bird flown back round in front of the
-  // rider, #1020): time frozen, bullets stepping 0.25 s a frame.
-  const others = await page.evaluate(() => window.__SC_TEST__.enemies())
-  const covered = (e) => others.some((o) => Math.hypot(o.x - e.x, o.y - e.y) < o.px / 2 + BULLET_CLEARANCE_PX)
-  const shootable = before.exposed.filter((e) => e.onScreen)
-  const target = shootable.find((e) => !covered(e)) ?? shootable[0]
+  // One real bullet at an exposed weak point, which only the boss's weak points can take (`bulletsHitOnly`): on the
+  // nightly (#1046) the shots at the Golden Blimp and the volcano each killed an enemy crossing the bullet's path from
+  // the muzzle instead, most likely a bird flown back round in front of the rider (#1020). Time frozen, bullets stepping
+  // 0.25 s a frame.
+  const target = before.exposed.find((e) => e.onScreen)
   let bulletHit = false
   let bulletKills = 0
   if (target) {
@@ -2658,10 +2653,14 @@ async function bossCheck(page, check) {
     await page.waitForTimeout(100) // past the pool's fire delay
     await page.evaluate(({ x, y }) => {
       window.__SC_TEST__.bulletStep = 0.25
+      window.__SC_TEST__.bulletsHitOnly = 'boss:'
       window.__SC_TEST__.fireShot(x, y)
     }, { x: target.ndcX, y: target.ndcY })
     bulletHit = await pollUntil(page, async () => (await events()).hit > 0, { ms: 8000, frames: 8, pollMs: 200 })
-    await page.evaluate(() => { window.__SC_TEST__.bulletStep = null })
+    await page.evaluate(() => {
+      window.__SC_TEST__.bulletStep = null
+      window.__SC_TEST__.bulletsHitOnly = null
+    })
     bulletKills = (await getStats(page)).kills - killsBefore
   }
 
