@@ -140,12 +140,23 @@ const LEVELS: LevelConfig[] = [
     // The ride kit's (#867, `infernoTrack.ts`).
     ...paceLevel({
       waves: [
-        { type: 'emberWisp', count: 26, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 2 },
-        { type: 'fireImp', count: 20, waveLabel: 'Imps Attack!', weight: 2 },
-        { type: 'lavaGolem', count: 12, waveLabel: 'Golems Awaken!', weight: 2 },
-        { type: 'emberWisp', count: 26, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', weight: 2 },
-        { type: 'infernalDrake', count: 8, waveLabel: 'Drakes Descend!', weight: 2 },
-        { type: 'lavaGolem', count: 10, waveLabel: 'Golems Return!', weight: 4 },
+        // A wave to each stretch of the storyboard (weights in seconds of the 45 s wave span), so no element rides empty
+        // (#937): the tube, up the lift, its top at the volcano's flank, the drop tower, out of the cone, the camelbacks,
+        // then the turntable, where what is left stands along the track the car faces once it turns.
+        { type: 'emberWisp', count: 10, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 4 },
+        { type: 'emberWisp', count: 10, formation: 'spiral', weight: 4 },
+        { type: 'emberWisp', count: 10, formation: 'spiral', weight: 4 },
+        { type: 'emberWisp', count: 8, formation: 'spiral', formationOrigin: { ahead: 300, side: 120, up: 160 }, weight: 4 },
+        { type: 'emberWisp', count: 14, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', weight: 5 },
+        { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', weight: 2 },
+        { type: 'fireImp', count: 7, formation: 'line', weight: 2 },
+        { type: 'lavaGolem', count: 6, waveLabel: 'Golems Awaken!', formation: 'line', weight: 2 },
+        { type: 'fireImp', count: 6, formation: 'line', weight: 2 },
+        { type: 'infernalDrake', count: 4, waveLabel: 'Drakes Descend!', weight: 1 },
+        { type: 'lavaGolem', count: 5, waveLabel: 'Golems Return!', formation: 'line', weight: 1 },
+        { type: 'lavaGolem', count: 5, formation: 'line', weight: 1 },
+        { type: 'lavaGolem', count: 6, formation: 'line', weight: 1 },
+        { type: 'infernalDrake', count: 4, formation: 'v', weight: 12 },
       ],
       boss: 'magmaTitan',
     }),
