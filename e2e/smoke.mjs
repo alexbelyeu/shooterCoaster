@@ -777,6 +777,36 @@ async function freshShotProblems(page, id, { fresh }) {
 /** Right of the centre and a little high: clear of the player's reticle, which the smoke leaves mid-screen. */
 const GHOST_AT = { x: 0.62, y: 0.45 }
 
+/** A ghost aiming at `at` for 60 s, in src/combat/ghost.ts's format: `1;stepMs;base64`, three bytes a sample (x 10 bits, y 10, flags 2). */
+function ghostAimingAt(at) {
+  const x = Math.round(at.x * 1023)
+  const y = Math.round(at.y * 1023)
+  return `1;50;${btoa(String.fromCharCode(x & 255, (x >> 8) | ((y & 63) << 2), y >> 6).repeat(1200))}`
+}
+
+/** Where the ghost crosshair is, 0..1 of the view, and its opacity. */
+const readGhost = (page) => page.evaluate(() => {
+  const el = document.querySelector('.ghost-crosshair')
+  const r = el?.getBoundingClientRect()
+  return {
+    shown: !!el && !el.hidden,
+    x: r ? r.left / window.innerWidth : null,
+    y: r ? r.top / window.innerHeight : null,
+    opacity: el ? Number(getComputedStyle(el).opacity) : null,
+  }
+})
+
+/** What's wrong with a ghost crosshair `seen` that should be drawn at `GHOST_AT`, translucent. */
+function ghostSeenProblems(seen, what) {
+  if (!seen.shown) return [`ghost: ${what} drew no ghost crosshair`]
+  const problems = []
+  if (Math.abs(seen.x - GHOST_AT.x) > 0.01 || Math.abs(seen.y - GHOST_AT.y) > 0.01) {
+    problems.push(`ghost: drawn at (${seen.x.toFixed(2)}, ${seen.y.toFixed(2)}) of the view, not its recorded aim (${GHOST_AT.x}, ${GHOST_AT.y})`)
+  }
+  if (!(seen.opacity > 0.2 && seen.opacity < 0.9)) problems.push(`ghost: opacity ${seen.opacity}, not translucent`)
+  return problems
+}
+
 /**
  * Ghost replay (#844): a ghost stored for the level as a best run's would be, aiming at `GHOST_AT` throughout, then a
  * pause and back (the ghost loads as play starts), game time frozen. Its ring must show there, translucent;
@@ -786,41 +816,22 @@ const GHOST_AT = { x: 0.62, y: 0.45 }
 async function ghostProblems(page, id) {
   const problems = []
   if ((await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return { problems, result: { skipped: true } }
-  await page.evaluate(([lid, at]) => {
-    // src/combat/ghost.ts's format: `1;stepMs;base64`, three bytes a sample (x 10 bits, y 10, flags 2).
-    const x = Math.round(at.x * 1023)
-    const y = Math.round(at.y * 1023)
-    const sample = String.fromCharCode(x & 255, (x >> 8) | ((y & 63) << 2), y >> 6)
-    localStorage.setItem(`shootercoaster-ghost:${lid}`, `1;50;${btoa(sample.repeat(1200))}`)
+  await page.evaluate(([lid, ghost]) => {
+    localStorage.setItem(`shootercoaster-ghost:${lid}`, ghost)
     const s = window.__SC_TEST__
     s.setTimeScale(0)
     s.setPhase('paused')
-  }, [id, GHOST_AT])
+  }, [id, ghostAimingAt(GHOST_AT)])
   await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
   await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   await waitFrames(page, 3, { maxMs: 8000, pollMs: 40 })
-  const seen = await page.evaluate(() => {
-    const el = document.querySelector('.ghost-crosshair')
-    const r = el?.getBoundingClientRect()
-    return {
-      shown: !!el && !el.hidden,
-      x: r ? r.left / window.innerWidth : null,
-      y: r ? r.top / window.innerHeight : null,
-      opacity: el ? Number(getComputedStyle(el).opacity) : null,
-    }
-  })
+  const seen = await readGhost(page)
   await page.screenshot({ path: path.join(OUT, `${id}-ghost.png`), timeout: SHOT_TIMEOUT })
   await page.evaluate((lid) => {
     localStorage.removeItem(`shootercoaster-ghost:${lid}`)
     window.__SC_TEST__.setTimeScale(1)
   }, id)
-  if (!seen.shown) problems.push('ghost: a seeded ghost drew no ghost crosshair')
-  else {
-    if (Math.abs(seen.x - GHOST_AT.x) > 0.01 || Math.abs(seen.y - GHOST_AT.y) > 0.01) {
-      problems.push(`ghost: drawn at (${seen.x.toFixed(2)}, ${seen.y.toFixed(2)}) of the view, not its recorded aim (${GHOST_AT.x}, ${GHOST_AT.y})`)
-    }
-    if (!(seen.opacity > 0.2 && seen.opacity < 0.9)) problems.push(`ghost: opacity ${seen.opacity}, not translucent`)
-  }
+  problems.push(...ghostSeenProblems(seen, 'a seeded ghost'))
   return { problems, result: seen }
 }
 
@@ -1045,25 +1056,28 @@ const ONLINE_TOP = Array.from({ length: 10 }, (_, i) => ({ initials: 'WEB', scor
 
 /**
  * The online board's API (#365), stubbed: the smoke never calls the real one. GET answers ONLINE_TOP; POST records the
- * run and places it 2nd; `down` answers everything 503, as before the daily board's migration (#854).
+ * run and places it 2nd; `down` answers everything 503, as before the daily board's migration (#854). A Daily Run's
+ * ghost request (`?ghost=1`, #1042) answers `ghost` (none by default) and is counted apart, in `ghostGets`.
  * The results screen uses it only while `__SC_TEST__.onlineBoard(ONLINE_ENDPOINT)` is set.
  */
-async function stubOnlineBoard(page, { down = false } = {}) {
+async function stubOnlineBoard(page, { down = false, ghost = null } = {}) {
   const posts = []
   const gets = []
+  const ghostGets = []
   await page.route((url) => url.pathname === ONLINE_ENDPOINT, (route) => {
     const req = route.request()
-    if (req.method() !== 'POST') {
-      const q = new URL(req.url()).searchParams
-      gets.push(q.get('level') ?? `daily=${q.get('daily')}`)
-    } else posts.push(req.postDataJSON())
+    const q = new URL(req.url()).searchParams
+    if (req.method() === 'POST') posts.push(req.postDataJSON())
+    else if (q.get('ghost') === '1') ghostGets.push(q.get('daily'))
+    else gets.push(q.get('level') ?? `daily=${q.get('daily')}`)
     if (down) return route.fulfill({ status: 503, json: { error: 'unavailable' } })
+    if (q.get('ghost') === '1') return route.fulfill({ json: { ghost } })
     if (req.method() !== 'POST') return route.fulfill({ json: { top: ONLINE_TOP } })
     const run = posts.at(-1)
     const mine = { initials: run.initials, score: run.score, at: new Date().toISOString() }
     return route.fulfill({ json: { rank: 2, top: [ONLINE_TOP[0], mine, ...ONLINE_TOP.slice(1, 9)] } })
   })
-  return { posts, gets }
+  return { posts, gets, ghostGets }
 }
 
 const readBoard = (page) => page.evaluate(() => {
@@ -3248,6 +3262,9 @@ async function dailyCheck(newPage) {
   const problems = []
   const campaign = { level1: { level: 'level1', score: 1000, maxScore: 0, stars: 3, timestamp: 0 } }
   const first = await newPage()
+  // #1042: the run starts by fetching the day's World best ghost from the (stubbed) board, which then rides with it.
+  const online = await stubOnlineBoard(first.page, { ghost: ghostAimingAt(GHOST_AT) })
+  await first.page.evaluate((endpoint) => window.__SC_TEST__.onlineBoard(endpoint), ONLINE_ENDPOINT)
   const a = await startDailyFromCard(first.page, campaign)
   const { run } = a
   if (!run) problems.push('no Daily card on the level select')
@@ -3258,15 +3275,19 @@ async function dailyCheck(newPage) {
     if (run.currentLevel !== run.level) problems.push(`daily started ${run.currentLevel}, expected ${run.level}`)
   }
   if (!a.digest) problems.push('spawnDigest() never reported the daily spawns')
+  await first.page.waitForFunction(() => document.querySelector('.ghost-crosshair')?.hidden === false, null, { timeout: 8000, polling: 50 }).catch(() => {})
+  const worldGhost = await readGhost(first.page)
+  await first.page.screenshot({ path: path.join(OUT, 'daily-ghost.png'), timeout: SHOT_TIMEOUT })
+  problems.push(...ghostSeenProblems(worldGhost, "the day's World best ghost"))
+  if (online.ghostGets.length !== 1 || online.ghostGets[0] !== run?.dateKey)
+    problems.push(`daily ghost: fetched for ${JSON.stringify(online.ghostGets)}, expected once for ${run?.dateKey}`)
 
   // Score something so the day's first result is a new best, then end the run: it goes on the (stubbed) day's World board (#854).
-  const online = await stubOnlineBoard(first.page)
-  await first.page.evaluate((endpoint) => {
+  await first.page.evaluate(() => {
     const s = window.__SC_TEST__
-    s.onlineBoard(endpoint)
     s.setLeaderboards({}, 'DAY')
     s.killNearest(3)
-  }, ONLINE_ENDPOINT)
+  })
   await waitFrames(first.page, 2, { maxMs: 20000 })
   await first.page.evaluate(() => window.__SC_TEST__.endLevel())
   const resultsShown = await first.page
@@ -3304,6 +3325,7 @@ async function dailyCheck(newPage) {
   if (!sent || extraPosts.length || online.gets.length) problems.push(`daily World board: ${online.posts.length} submission(s) and ${online.gets.length} fetch(es), expected 1 submission`)
   else if (sent.daily !== run?.dateKey || sent.level !== run?.level || sent.initials !== 'DAY' || sent.score !== Math.round(results.score))
     problems.push(`daily World board: submitted ${JSON.stringify(sent)}, expected ${run?.level} DAY ${Math.round(results.score)} daily ${run?.dateKey}`)
+  else if (typeof sent.ghost !== 'string' || !/^1;\d+;[A-Za-z0-9+/]{4,}$/.test(sent.ghost)) problems.push(`daily World board: submitted no ghost with the run (${String(sent.ghost).slice(0, 40)})`)
   if (world.source !== 'today' || world.rows !== 10 || world.rank !== '1' || world.label !== "The world's top 10 today")
     problems.push(`daily World board not shown from the stub: ${JSON.stringify(world)}`)
   if (Object.keys(results.boards).length) problems.push(`a daily run entered the campaign leaderboards: ${JSON.stringify(results.boards)}`)
@@ -3326,6 +3348,9 @@ async function dailyCheck(newPage) {
   const down = await stubOnlineBoard(second.page, { down: true })
   await second.page.evaluate((endpoint) => window.__SC_TEST__.onlineBoard(endpoint), ONLINE_ENDPOINT)
   const b = await startDailyFromCard(second.page, {})
+  // No ghost from a board that's down, and nothing errors.
+  const noGhost = await readGhost(second.page)
+  if (noGhost.shown || down.ghostGets.length !== 1) problems.push(`daily ghost with the board's API down: ${down.ghostGets.length} fetch(es), ring ${noGhost.shown ? 'shown' : 'hidden'}; expected 1, hidden`)
   await second.page.evaluate(() => window.__SC_TEST__.killNearest(3))
   await waitFrames(second.page, 2, { maxMs: 20000 })
   await second.page.evaluate(() => window.__SC_TEST__.endLevel())
@@ -3352,7 +3377,7 @@ async function dailyCheck(newPage) {
     ok: problems.length === 0,
     problems,
     errors,
-    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed, world, offline },
+    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed, world, offline, worldGhost },
   }
 }
 

@@ -69,6 +69,18 @@ describe('onlineLeaderboard', () => {
     expect(urls).toEqual(['/api?level=level1', '/api?daily=2026-11-23'])
   })
 
+  it("reads the day's World best ghost (#1042), null when there is none", async () => {
+    const urls: string[] = []
+    const fetchImpl: Fetch = async (url) => {
+      urls.push(url)
+      return new Response(JSON.stringify({ ghost: '1;50;AAIA' }), { status: 200 })
+    }
+    expect(await onlineLeaderboard('/api', fetchImpl).ghost('2026-11-23')).toBe('1;50;AAIA')
+    expect(urls).toEqual(['/api?daily=2026-11-23&ghost=1'])
+    expect(await onlineLeaderboard('/api', respond(200, { ghost: null })).ghost('2026-11-23')).toBeNull()
+    expect(await onlineLeaderboard('/api', respond(200, { ghost: 7 })).ghost('2026-11-23')).toBeNull()
+  })
+
   it('submits and turns the 1-based rank into the board index', async () => {
     let sent: RequestInit | undefined
     const fetchImpl: Fetch = async (_url, init) => {
@@ -94,6 +106,7 @@ describe('onlineLeaderboard', () => {
     for (const board of boards) {
       expect(await board.top({ level: 'level1' })).toBeNull()
       expect(await board.submit(run)).toBeNull()
+      expect(await board.ghost('2026-11-23')).toBeNull()
     }
   })
 })
