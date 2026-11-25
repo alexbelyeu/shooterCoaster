@@ -93,19 +93,21 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 69 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 2374 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3074
+    maxScore: 74 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 2464 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3164
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
     ...paceLevel({
       waves: [
-        // Up the lift and down the drop (0–11 s), then the sharks round the glass tunnel (12 s), more jellyfish from the
-        // launch's crest past the sea stacks (16–28 s), the flying fish on to the Kraken (30 s).
-        jellyfishLine(7, 'Into the Deep!'), jellyfishLine(7), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5),
-        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 4 },
+        // Up the lift and down the drop (0–10 s; lines of 7 up the lift, so one is still up as the next arrives), the sharks
+        // round the glass tunnel (11 s, before the drop's last line is out of view), more jellyfish from the launch's crest
+        // past the sea stacks (16–28 s), the flying fish on to the Kraken (29 s, before the last line is behind the rider).
+        jellyfishLine(7, 'Into the Deep!'), jellyfishLine(7), jellyfishLine(7), jellyfishLine(7), jellyfishLine(6),
+        { ...jellyfishLine(5), weight: 1 },
+        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 5 },
         jellyfishLine(5, 'Jellyfish Bloom!'), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5),
-        jellyfishLine(5),
-        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 15 },
+        { ...jellyfishLine(5), weight: 1 },
+        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 16 },
       ],
       boss: 'kraken',
     }),
