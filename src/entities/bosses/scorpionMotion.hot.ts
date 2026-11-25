@@ -91,6 +91,10 @@ export const PERCH: PerchConfig = {
     [860, 760],
     [1300, 680],
     [740, 600],
+    // Far out, for a view pitched up a lift: the nearer sand is under the frame (#937).
+    [1600, 420],
+    [2000, 560],
+    [2400, 700],
   ],
   /** Body and legs; the claws and tail may reach past a tower. */
   footprint: 260,

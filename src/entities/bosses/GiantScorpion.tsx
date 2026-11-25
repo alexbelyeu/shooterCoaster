@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
 import { gameClockStep } from '@/core/gameClock'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
+import { sightClear, type HeightFunction } from '@/utils/terrainNoise'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { BOSS_DEFEAT_DEATH_STYLE, SAND_BURST_DEATH_STYLE, SCORPION_SHARD_DEATH_STYLE } from '@/effects/deathStyles'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
@@ -45,6 +46,18 @@ const EXIT_SECONDS = SCORPION_RISE.sinkS + 0.6
 
 const _cam = new THREE.Vector3()
 const _p = new THREE.Vector3()
+const _seen = new THREE.Vector3()
+
+/** Its body's middle well inside the rider's frame as it looks now, no dune between (#937: level 2's last lift pitches the view up the chain,
+ * and a perch the old heading chose sat under the frame's bottom edge for the rest of the fight). */
+const SEEN_NDC = 0.75
+const SEEN_HEIGHT = 150
+
+function inFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number): boolean {
+  const y = groundFn(x, z) + SEEN_HEIGHT
+  _seen.set(x, y, z).project(camera)
+  return _seen.z < 1 && Math.abs(_seen.x) < SEEN_NDC && Math.abs(_seen.y) < SEEN_NDC && sightClear(groundFn, _cam.x, _cam.y, _cam.z, x, y, z)
+}
 
 function sandBurst(x: number, y: number, z: number, trauma: readonly [number, number]) {
   getExplosionPool()?.explode(_p.set(x, y, z), SAND_BURST_DEATH_STYLE)
@@ -65,8 +78,9 @@ export default function GiantScorpion(props: BossProps) {
       camera: { x: 0, z: 0 },
       forwardX: 0,
       forwardZ: -1,
+      seen: (x, z) => inFrame(camera, groundFn, x, z),
     }),
-    [track, groundFn],
+    [track, groundFn, camera],
   )
 
   const [tellStep] = useState(gameClockStep)
@@ -95,9 +109,11 @@ export default function GiantScorpion(props: BossProps) {
     [],
   )
 
-  /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. */
+  /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. Out of the frame,
+   * it picks against the rider's look as it is now, not the eased heading (#937: level 2's last lift turns under it). */
   const aim = useCallback(
     (dt: number) => {
+      if (sim.perched && !input.seen!(sim.perch.x, sim.perch.z)) sim.headed = false
       aimAtRider(camera, _cam, sim, input, dt)
       if (pickPerch(sim.perch, input)) sim.perched = true
       else if (!sim.perched) firstSlot(sim.perch, input)
