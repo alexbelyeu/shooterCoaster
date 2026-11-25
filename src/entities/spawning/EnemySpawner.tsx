@@ -34,7 +34,7 @@ import { enemiesLeft, enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWa
 import type { HardRoute } from '@/track/mechanics'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { ORBITS, placeOrbit, type SwimOrbit } from './swimOrbit'
-import { darkFloorSlots, FLOOR_WALKERS, placeOnDarkFloor, type EnemyFloor, type FloorSlot } from './darkFloor'
+import { darkFloorSlots, placeOnDarkFloor, type EnemyFloor, type FloorSlot } from './darkFloor'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -145,7 +145,6 @@ function generateEnemies(
       }
     }
     if (wave.darkFloor) {
-      if (!FLOOR_WALKERS.has(wave.type) || (wave.formation && wave.formation !== 'scatter')) throw new Error(`${wave.type} can't stand on a dark floor`)
       for (const floorSlot of darkFloorSlots(wave.count, rng)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside: null, floorSlot, ...base })
       }

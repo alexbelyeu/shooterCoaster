@@ -5,7 +5,9 @@ import { createRng } from '@/utils/rng'
 import { PYRAMID_BASE_SIZE, PYRAMID_SHRINK } from '@/levels/environments/landmarkDimensions'
 import { DESERT_TRACK, PYRAMID_BASE_Y } from '@/levels/environments/biomes/desert/desertTrack'
 import { PYRAMID_PASSAGE, PYRAMID_PASSAGE_FLOOR, RIDE_FRAME } from '@/levels/environments/biomes/desert/landmarks'
-import { darkFloorSlots, placeOnDarkFloor } from './darkFloor'
+import { getAllLevels } from '@/levels/LevelRegistry'
+import { levelRide, loadWorld } from '@/levels/environments/worlds'
+import { darkFloorSlots, FLOOR_RAIL_CLEAR, FLOOR_WALL_CLEAR, placeOnDarkFloor } from './darkFloor'
 import { indexAhead } from './spawnPlacement'
 
 const table = buildArcTable(createTrackCurve(DESERT_TRACK))
@@ -57,7 +59,23 @@ describe('placeOnDarkFloor (#937: level 2’s scorpions in the Pyramid’s passa
     expect(ahead).toEqual([...ahead].sort((a, b) => a - b))
   })
 
-  it('needs a dark section with a floor', () => {
-    expect(() => placeOnDarkFloor(table, 0, [{ ...passage, floor: undefined }], slots)).toThrow(/floor/)
+})
+
+// What `placeOnDarkFloor` and the spawner take as given, checked here rather than at run time (the JS budget).
+describe('every level’s darkFloor waves', () => {
+  it('are scorpions (the one walker `Scorpion.tsx` stands on a floor) with no formation, on a ride whose floors have room beside the rails', async () => {
+    const wrong: string[] = []
+    for (const level of getAllLevels()) {
+      const waves = level.enemies.filter((w) => w.darkFloor)
+      if (!waves.length) continue
+      for (const w of waves) {
+        if (w.type !== 'scorpion' || (w.formation && w.formation !== 'scatter')) wrong.push(`${level.id}: ${w.type} ${w.formation ?? ''}`)
+      }
+      await loadWorld(level.biome)
+      const floors = (levelRide(level.id)?.track.darkSections ?? []).flatMap((s) => (s.floor ? [s.floor] : []))
+      if (!floors.length) wrong.push(`${level.id}: no dark section with a floor`)
+      for (const f of floors) if (f.halfWidth - FLOOR_WALL_CLEAR < FLOOR_RAIL_CLEAR) wrong.push(`${level.id}: floor ${2 * f.halfWidth} wide has no room`)
+    }
+    expect(wrong).toEqual([])
   })
 })

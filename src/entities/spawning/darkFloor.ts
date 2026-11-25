@@ -1,4 +1,4 @@
-import type { DarkSectionSpec, EnemyType } from '@/types/level'
+import type { DarkSectionSpec } from '@/types/level'
 import { distanceAtT, type ArcTable } from '@/track/arcLength'
 import type { Rng } from '@/utils/rng'
 import type { Vec3 } from '@/utils/vec3'
@@ -15,9 +15,6 @@ export interface EnemyFloor {
   heading: number
 }
 
-/** The walkers that stand on a floor (`EnemyProps.floor`) rather than the terrain. */
-export const FLOOR_WALKERS: ReadonlySet<EnemyType> = new Set<EnemyType>(['scorpion'])
-
 /** Seeded at load: `along` the floor's stretch ahead, 0..1; `side` of the rails, its sign the side and its size how far out. */
 export interface FloorSlot {
   along: number
@@ -26,9 +23,10 @@ export interface FloorSlot {
 
 /** Arc units past the rider the first walker stands at least: inside the flash's reach, out of the near field. */
 const FLOOR_LEAD = 120
-/** Clear of the rails (the car rides over them) and of the walls (a walker's half width and its sway). */
-const FLOOR_RAIL_CLEAR = 10
-const FLOOR_WALL_CLEAR = 17
+/** Clear of the rails (the car rides over them) and of the walls (a walker's half width and its sway). A level's floors and
+ *  `darkFloor` waves are checked in `darkFloor.test.ts`, not here at run time. */
+export const FLOOR_RAIL_CLEAR = 10
+export const FLOOR_WALL_CLEAR = 17
 /** Above the floor, as `spawnPlacement.ts` stands a ground enemy on the terrain. */
 const FLOOR_OFFSET = 5
 
@@ -47,13 +45,11 @@ export function placeOnDarkFloor(
   const floored = sections.filter((s) => s.floor)
   const riderT = table.t[riderIndex]
   const section = floored.find((s) => s.to - s.ramp > riderT) ?? floored[floored.length - 1]
-  if (!section?.floor) throw new Error('a darkFloor wave needs a dark section with a floor (DarkSectionSpec.floor)')
-  const { below, halfWidth } = section.floor
+  const { below, halfWidth } = section.floor!
   const rider = table.s[riderIndex]
   const start = Math.max(distanceAtT(table, section.from + section.ramp), rider + FLOOR_LEAD)
   const end = Math.max(start, distanceAtT(table, section.to - section.ramp))
   const outMax = halfWidth - FLOOR_WALL_CLEAR
-  if (outMax < FLOOR_RAIL_CLEAR) throw new Error(`a dark floor ${2 * halfWidth} wide has no room beside the rails`)
   return slots.map(({ along, side }) => {
     const i = indexAhead(table, riderIndex, start + along * (end - start) - rider)
     const t = trackTangent(table, i)
