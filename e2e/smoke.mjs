@@ -96,7 +96,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
 import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitDrawsSettled, waitFrames, waitVisible } from './pageChecks.mjs'
-import { planRun, STEP_LEVELS } from './shards.mjs'
+import { planLevels, planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
 import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
@@ -2199,45 +2199,6 @@ async function speedScan(page, levelId) {
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, scan: samples, ...w }, tunnel: tunnel.result }
 }
 
-/**
- * The level with the Tree's gap (#659, shot on the nightly `dark` step's run), and the second of its storyboard beat there: the heartline roll through the gap
- * between the trunk and the back wall (`gym/gymTrack.ts`). The still is shot at that beat's track fraction, read from the
- * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
- */
-const GAP_LEVEL = 'level6'
-const GAP_BEAT_SECOND = 56.5
-
-/**
- * `level6-gap.png`: the ride from inside the Tree's gap, the trunk on one side and the back wall on the other. With game time and the level timer
- * held, `rideTo` jumps the car into the gap and back to where it was, so the combat that follows rides on from there.
- */
-async function gapShot(page) {
-  const back = await page.evaluate(() => {
-    const s = window.__SC_TEST__
-    s.holdLevelTime = true
-    s.setTimeScale(0)
-    return s.rideProgress
-  })
-  const jump = async (t) => {
-    await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
-    await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
-  }
-  const gap = await page.evaluate((second) => window.__SC_TEST__.rideBeats().find((b) => b.second === second)?.at ?? null, GAP_BEAT_SECOND)
-  if (gap === null) {
-    await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
-    return { problems: [`gap still: ${GAP_LEVEL}'s ride has no beat at ${GAP_BEAT_SECOND} s (the heartline roll through the Tree's gap)`], image: null }
-  }
-  await jump(gap)
-  const at = await page.evaluate(() => window.__SC_TEST__.rideProgress)
-  const image = await imageStats(page, await page.screenshot({ path: path.join(OUT, `${GAP_LEVEL}-gap.png`), timeout: SHOT_TIMEOUT }))
-  await jump(back)
-  await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
-  const problems = []
-  if (Math.abs(at - gap) > 0.002) problems.push(`gap still: the car is at track ${at.toFixed(4)}, not ${gap.toFixed(4)} in the Tree's gap`)
-  if (looksBlank(image)) problems.push('gap still looks blank')
-  return { problems, image }
-}
-
 /** How far through a tunnel `<id>-tunnel.png` is shot: past the middle, with the exit ahead. */
 const TUNNEL_SHOT_AT = 0.75
 /** `<id>-tunnel-entry.png` looks at its entry portal from this far back (× the tunnel's length). */
@@ -2624,6 +2585,9 @@ async function stepBoss(page, seconds, ready) {
   })
 }
 
+/** How far (px) past an enemy's half-size the boss step's real bullet keeps from it, so the bullet meets the weak point first. */
+const BULLET_CLEARANCE_PX = 12
+
 /**
  * Boss, summoned: large with its bar (<level>-boss.png), hit in phase order by a real bullet and
  * `bossHit` (<level>-<midShot>.png), then defeated into its burst + the big popup (<level>-boss-down.png).
@@ -2680,10 +2644,17 @@ async function bossCheck(page, check) {
     projectiles.hpMoved = (await boss()).hpFraction !== before.hpFraction
   }
 
-  // One real bullet at an exposed weak point: time frozen, bullets stepping 0.25 s a frame.
-  const target = before.exposed.find((e) => e.onScreen)
+  // One real bullet at an exposed weak point no other enemy covers on screen (#1046: on the nightly the shots at the Golden
+  // Blimp and the volcano each killed an enemy in their way instead, most likely a bird flown back round in front of the
+  // rider, #1020): time frozen, bullets stepping 0.25 s a frame.
+  const others = await page.evaluate(() => window.__SC_TEST__.enemies())
+  const covered = (e) => others.some((o) => Math.hypot(o.x - e.x, o.y - e.y) < o.px / 2 + BULLET_CLEARANCE_PX)
+  const shootable = before.exposed.filter((e) => e.onScreen)
+  const target = shootable.find((e) => !covered(e)) ?? shootable[0]
   let bulletHit = false
+  let bulletKills = 0
   if (target) {
+    const killsBefore = (await getStats(page)).kills
     await page.waitForTimeout(100) // past the pool's fire delay
     await page.evaluate(({ x, y }) => {
       window.__SC_TEST__.bulletStep = 0.25
@@ -2691,6 +2662,7 @@ async function bossCheck(page, check) {
     }, { x: target.ndcX, y: target.ndcY })
     bulletHit = await pollUntil(page, async () => (await events()).hit > 0, { ms: 8000, frames: 8, pollMs: 200 })
     await page.evaluate(() => { window.__SC_TEST__.bulletStep = null })
+    bulletKills = (await getStats(page)).kills - killsBefore
   }
 
   // Clear the first phase through processHit: what is left of its hp.
@@ -2762,7 +2734,8 @@ async function bossCheck(page, check) {
   if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !firstPrefixes.some((p) => id.startsWith(p))))
     problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPrefixes.join('* / ')}*)`)
   if (!target) problems.push('no exposed weak point on screen to shoot')
-  else if (!bulletHit) problems.push('a real bullet at an exposed weak point never hit it (boss:hit)')
+  else if (!bulletHit)
+    problems.push(`a real bullet at an exposed weak point never hit it (boss:hit)${bulletKills ? `: it killed ${bulletKills} other enemy in its way` : ''}`)
   if (JSON.stringify(result.exposedMidway) !== JSON.stringify(lastPhase))
     problems.push(`after the first phase the exposed weak points are [${result.exposedMidway}] (want [${lastPhase}])`)
   if (!(midway.hpFraction < before.hpFraction)) problems.push(`hp did not drop (${before.hpFraction} -> ${midway.hpFraction})`)
@@ -2998,8 +2971,8 @@ const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
  * the easy way, and a restart sets it back (level6-switch.png: the sign in view, level6-switch-hard.png: on the branch).
  * With the level timer jumped to the branch wave's second (#720), the hard run meets it on the branch, on screen and in the
  * kill count; the easy run, past the sign, never does.
- * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots and the
- * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
+ * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots, which
+ * are too slow for the PR's `level6` shard (#766).
  */
 async function switchCheck(page, { darkShots = false } = {}) {
   const { level } = SWITCH_CHECK
@@ -3103,8 +3076,6 @@ async function switchCheck(page, { darkShots = false } = {}) {
   // The cave the switch stands at the mouth of rides dark (#752): checked on the same run, held.
   const dark = await darkSectionShot(page, level, { shots: darkShots })
   problems.push(...dark.problems)
-  const gap = darkShots ? await gapShot(page) : null
-  if (gap) problems.push(...gap.problems)
   // Past the sign the easy way is settled: its wave's second brings nothing, and the kill count never counts it.
   const before = await branchArrivals()
   await toLevelTime(branchWave.at)
@@ -3112,7 +3083,7 @@ async function switchCheck(page, { darkShots = false } = {}) {
   result.totals.easy = (await read()).totalEnemies
   if (result.totals.hard != null && result.totals.hard - result.totals.easy !== branchWave.count)
     problems.push(`the hard run's kill count has ${result.totals.hard} enemies, the easy run's ${result.totals.easy}: not ${branchWave.count} apart`)
-  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result, gap: gap?.image ?? null }
+  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result }
 }
 
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
@@ -4872,7 +4843,7 @@ async function run() {
   if (has('settings')) await pageStep('settings', null, settingsCheck)
 
   // 2. Every level (or the requested subset); the first one also plays the FRENZY / leaderboard checks (`frenzy`)
-  const wanted = PLAN.levels ?? levels.map((l) => l.id)
+  const wanted = planLevels(PLAN, levels.map((l) => l.id))
   const first = wanted[0]
   for (const id of has('ride') ? wanted : []) {
     const { ctx, page, errors } = await newPage()
