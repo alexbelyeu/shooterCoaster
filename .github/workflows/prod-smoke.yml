@@ -2,7 +2,7 @@ name: Production smoke
 
 # Watches the live site (#352; e2e/README.md "Production"): after every deploy, the deploy health check
 # (e2e/prod-check.mjs, ~3 min); nightly, the full smoke: every step, so also the deep checks the PR shards leave
-# out (#372), as three parallel parts (e2e/shards.mjs NIGHTLY_PARTS, #570: one run outgrew its 60 min cap; e2e/shards.test.ts
+# out (#372), as four parallel parts (e2e/shards.mjs NIGHTLY_PARTS, #570 and #1046: a run outgrew its 60 min cap; e2e/shards.test.ts
 # holds the matrix to the parts and the parts to the full run), plus `slow`, level1 and level3 again under cpu 4x (#539: the
 # long-frame trend in its artifact's throttle.json; it and `pacing` fail a shader compiled after the warm-up), that the `nightly` job folds into one verdict. scripts/prod-alert.cjs reports each on its own
 # agent:prod-broken issue, on green → red and red → green only. `timeout` turns a slow run into a reported timeout.
@@ -91,7 +91,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [main, deep, pacing, slow]
+        part: [main, rides, deep, pacing, slow]
     runs-on: ubuntu-24.04
     timeout-minutes: 80
     env:
@@ -136,7 +136,7 @@ jobs:
           path: parts
       - name: Combine the parts
         id: check
-        run: node scripts/nightlyParts.cjs parts e2e-results main,deep,pacing,slow >> "$GITHUB_OUTPUT"
+        run: node scripts/nightlyParts.cjs parts e2e-results main,rides,deep,pacing,slow >> "$GITHUB_OUTPUT"
       - name: Report
         if: ${{ !cancelled() && steps.check.outcome == 'success' && !inputs.dry_run }}
         uses: actions/github-script@v7
