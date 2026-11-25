@@ -10,7 +10,7 @@ import { BOSS_SPECS, GIANT_SCORPION } from './bossSpecs'
 import { applyHit, bossMaxScore, createBossState, exposedWeakPoints, isDefeated, type BossState } from './bossModel'
 import {
   LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SEEN_PERCH, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
-  lungeAmount, lungeImpactBetween, perchClear, pickPerch, pickSeenPerch, riseOffset, type Perch, type TailPose, type PerchInput,
+  lungeAmount, lungeImpactBetween, perchBehind, perchClear, pickPerch, pickSeenPerch, riseOffset, type Perch, type TailPose, type PerchInput,
 } from './scorpionMotion.hot'
 
 const tailTopY = (pose: TailPose) => pose.y[pose.count]
@@ -226,5 +226,13 @@ describe('perch (level 2)', () => {
     const perch: Perch = { x: 1, z: 2, slot: 3, sign: -1 }
     expect(pickPerch(perch, blocked)).toBe(false)
     expect(perch).toEqual({ x: 1, z: 2, slot: 3, sign: -1 })
+  })
+})
+
+describe('perchBehind', () => {
+  const input = { camera: { x: 10, z: 0 }, forwardX: 0, forwardZ: -1 } as PerchInput
+  it('is true only for a perch the rider has passed', () => {
+    expect(perchBehind({ x: 10, z: -500, slot: 9, sign: 1 }, input)).toBe(false)
+    expect(perchBehind({ x: 400, z: 300, slot: 9, sign: 1 }, input)).toBe(true)
   })
 })

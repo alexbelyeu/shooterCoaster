@@ -20,7 +20,7 @@ import {
 } from './bossAssets'
 import {
   SCORPION_BODY, SCORPION_RISE, SCORPION_TAIL, advanceGait, approachAngle, createTailPose, faceYaw, firstSlot, footStep, layTail,
-  lungeAmount, lungeImpactBetween, PERCH, pickPerch, pickSeenPerch, riseOffset, type FootStep, type Perch, type PerchInput,
+  lungeAmount, lungeImpactBetween, PERCH, perchBehind, pickPerch, pickSeenPerch, riseOffset, type FootStep, type Perch, type PerchInput,
 } from './scorpionMotion.hot'
 import { aimAtRider } from './bossAim.hot'
 
@@ -71,8 +71,13 @@ const _wp = new THREE.Vector3()
 
 /** One of its exposed weak points inside the rider's frame, no dune between: what the rider can shoot (#937). */
 function weakPointSeen(camera: THREE.Camera, groundFn: HeightFunction, parts: ReadonlyMap<string, THREE.Group>, state: BossState): boolean {
-  for (const [id, part] of parts) {
+  // By index, not `for…of parts`: that allocates an iterator and an entry array per weak point every frame (hard rule 8).
+  const wps = state.spec.weakPoints
+  for (let i = 0; i < wps.length; i++) {
+    const id = wps[i].id
     if (!isExposed(state, id)) continue
+    const part = parts.get(id)
+    if (!part) continue
     part.getWorldPosition(_wp)
     if (pointInFrame(camera, groundFn, _wp.x, _wp.y, _wp.z, WEAK_POINT_NDC)) return true
   }
@@ -155,7 +160,8 @@ export default function GiantScorpion(props: BossProps) {
         if (pickSeenPerch(sim.perch, seenInput)) return true
       }
       // A far slot (`SEEN_PERCH` only) is held: `pickPerch` doesn't know it and would pull the perch back under the frame.
-      if (sim.perch.slot >= PERCH.slots.length) return false
+      // Once the ride has passed it, it gives way to `pickPerch` rather than waiting on a seen slot that may not come.
+      if (sim.perch.slot >= PERCH.slots.length && !perchBehind(sim.perch, input)) return false
       if (pickPerch(sim.perch, input)) sim.perched = true
       else if (!sim.perched) firstSlot(sim.perch, input)
       return false

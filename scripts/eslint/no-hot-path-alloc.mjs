@@ -48,6 +48,10 @@ export default {
       FunctionExpression: closure,
       ArrowFunctionExpression: closure,
       FunctionDeclaration: closure,
+      ForOfStatement(node) {
+        const left = node.left.type === 'VariableDeclaration' ? node.left.declarations[0].id : node.left
+        if (left.type === 'ArrayPattern') report(node, 'A destructuring `for…of` (an iterator and an entry array per item)')
+      },
       TemplateLiteral(node) {
         if (node.expressions.length > 0) report(node, 'A template string')
       },

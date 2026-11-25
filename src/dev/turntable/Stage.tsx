@@ -175,6 +175,7 @@ export function Stage({
 
   // After every subject's own frame (priority 0): cancel its travel, then draw if a cell is due.
   useFrame(() => {
+    // eslint-disable-next-line sc/no-hot-path-alloc -- the turntable dev page (never in the game's build), a few subjects
     for (const [id, turntable] of turntables) settle(turntable, byId.get(id)!)
     drawCell.current?.()
   }, 1)

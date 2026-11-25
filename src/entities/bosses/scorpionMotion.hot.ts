@@ -127,6 +127,11 @@ export interface PerchInput {
   seen?: (x: number, z: number) => boolean
 }
 
+/** The perch is behind the rider's look (#937: a held far slot the ride has passed gives way to `pickPerch`). */
+export function perchBehind(perch: Perch, input: PerchInput): boolean {
+  return (perch.x - input.camera.x) * input.forwardX + (perch.z - input.camera.z) * input.forwardZ < 0
+}
+
 export function perchClear(input: PerchInput, x: number, z: number, config: PerchConfig = PERCH): boolean {
   if (input.index.near(x, z, config.clearance + config.footprint)) return false
   for (const a of input.avoid) if (Math.hypot(a.x - x, a.z - z) < a.r + config.footprint) return false
