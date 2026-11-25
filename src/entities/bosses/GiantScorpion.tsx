@@ -20,7 +20,7 @@ import {
 } from './bossAssets'
 import {
   SCORPION_BODY, SCORPION_RISE, SCORPION_TAIL, advanceGait, approachAngle, createTailPose, faceYaw, firstSlot, footStep, layTail,
-  lungeAmount, lungeImpactBetween, pickPerch, riseOffset, type FootStep, type Perch, type PerchInput,
+  lungeAmount, lungeImpactBetween, pickPerch, pickSeenPerch, riseOffset, type FootStep, type Perch, type PerchInput,
 } from './scorpionMotion.hot'
 import { aimAtRider } from './bossAim.hot'
 
@@ -78,9 +78,13 @@ export default function GiantScorpion(props: BossProps) {
       camera: { x: 0, z: 0 },
       forwardX: 0,
       forwardZ: -1,
-      seen: (x, z) => inFrame(camera, groundFn, x, z),
     }),
-    [track, groundFn, camera],
+    [track, groundFn],
+  )
+  /** The same slots, only those in the frame: for when its perch has left the frame. */
+  const seenInput = useMemo<PerchInput>(
+    () => ({ ...input, camera: { x: 0, z: 0 }, seen: (x, z) => inFrame(camera, groundFn, x, z) }),
+    [input, camera, groundFn],
   )
 
   const [tellStep] = useState(gameClockStep)
@@ -109,16 +113,25 @@ export default function GiantScorpion(props: BossProps) {
     [],
   )
 
-  /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. Out of the frame,
-   * it picks against the rider's look as it is now, not the eased heading (#937: level 2's last lift turns under it). */
+  /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. Once that perch has
+   * left the frame it scuttles to a slot in it, picked against the rider's look as it is now, not the eased heading (#937:
+   * level 2's last lift pitches the view up the chain and turns, and the perch sat under the frame or behind a dune). */
   const aim = useCallback(
     (dt: number) => {
-      if (sim.perched && !input.seen!(sim.perch.x, sim.perch.z)) sim.headed = false
+      const lost = sim.perched && !inFrame(camera, groundFn, sim.perch.x, sim.perch.z)
+      if (lost) sim.headed = false
       aimAtRider(camera, _cam, sim, input, dt)
+      if (lost) {
+        seenInput.camera.x = input.camera.x
+        seenInput.camera.z = input.camera.z
+        seenInput.forwardX = input.forwardX
+        seenInput.forwardZ = input.forwardZ
+        if (pickSeenPerch(sim.perch, seenInput)) return
+      }
       if (pickPerch(sim.perch, input)) sim.perched = true
       else if (!sim.perched) firstSlot(sim.perch, input)
     },
-    [camera, sim, input],
+    [camera, sim, input, seenInput, groundFn],
   )
 
   // The tell runs before BossBase's frame does: the dune heaves where it will burst out.
