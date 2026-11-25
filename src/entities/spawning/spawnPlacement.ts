@@ -658,15 +658,18 @@ export interface TracksideSlot {
   side: number
 }
 
-/** A spread band's slots are one per even step of it (jittered within the step), so the stretch has no empty run. */
-export function tracksideSlots(count: number, surface: Surface, rng: Rng): TracksideSlot[] {
+/**
+ * A spread band's slots are one per even step of it (jittered within the step), so the stretch has no empty run. `wide`
+ * (`EnemyWave.tracksideSide`) stands them that far out instead of the band's sides.
+ */
+export function tracksideSlots(count: number, surface: Surface, rng: Rng, wide?: number): TracksideSlot[] {
   const { aheadMin, aheadMax, sideMin, sideMax, near, spread } = tracksideBand(surface)
   const nearCount = near ? Math.ceil(count * near.share) : 0
   return Array.from({ length: count }, (_, i) => {
     const ahead = spread
       ? aheadMin + ((i + rng()) / count) * (aheadMax - aheadMin)
       : rng.range(aheadMin, i < nearCount ? near!.max : aheadMax)
-    const side = rng.range(sideMin, sideMax) * (rng() < 0.5 ? -1 : 1)
+    const side = (wide ?? rng.range(sideMin, sideMax)) * (rng() < 0.5 ? -1 : 1)
     return { ahead, side }
   })
 }
@@ -745,14 +748,20 @@ function dryTracksidePoint(
   table: ArcTable, riderIndex: number, slot: TracksideSlot, surface: Surface, groundFn: HeightFunction, reach: number, trackScale: number,
   bounds: PlacementBounds | undefined, keepOff: readonly KeepOff[], roam: number,
 ): Vec3 {
-  const { sideMin } = TRACKSIDE.ground
+  const { sideMin, sideMax } = TRACKSIDE.ground
   for (const scale of bounds ? SIDE_SCALES : [1]) {
     const offset = Math.max(sideMin, Math.abs(slot.side) * scale) * Math.sign(slot.side)
     for (const side of [offset, -offset]) {
       const p = tracksidePoint(table, riderIndex, { ahead: slot.ahead, side })
       if (bounds && !insideBounds(p, bounds)) continue
+      // Out past the band (`tracksideSide`), the spot can be on another stretch of the lap; none in view, the band's edge.
+      if (Math.abs(side) > sideMax && !clearOfTrack(table, p, sideMin)) continue
       if (inViewOnApproach(table, riderIndex, slot.ahead, settle(p, surface, groundFn), reach, trackScale, groundFn)) return p
     }
+  }
+  if (Math.abs(slot.side) > sideMax) {
+    const inBand = { ahead: slot.ahead, side: Math.sign(slot.side) * sideMax }
+    return dryTracksidePoint(table, riderIndex, inBand, surface, groundFn, reach, trackScale, bounds, keepOff, roam)
   }
   const around = bestFacingAround(table, riderIndex, slot, surface, groundFn, reach, trackScale, bounds)
   if (around && inViewOnApproach(table, riderIndex, slot.ahead, settle(around, surface, groundFn), reach, trackScale, groundFn)) return around

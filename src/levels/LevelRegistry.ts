@@ -140,11 +140,12 @@ const LEVELS: LevelConfig[] = [
       waves: [
         // A small wave every ~2 s (#937), so no stretch of the storyboard rides empty: scouts from the station up the
         // lift and down into the ice cave, snowmen out of it, through the blizzard's ridge and over the crest, then
-        // brutes down the helix to the Yeti. A snowman falls to one hit: a player meets about two a second.
+        // brutes down the helix to the Yeti. A snowman falls to one hit: a player meets about two a second. The lift's
+        // scouts stand out on the slopes its look clears (`tracksideSide`), not under the frame beside the rails.
         snowmen('snowmanScout', 'Scout Party'),
-        snowmen('snowmanScout'),
-        snowmen('snowmanScout'),
-        snowmen('snowmanScout'),
+        { ...snowmen('snowmanScout'), tracksideSide: 800 },
+        { ...snowmen('snowmanScout'), tracksideSide: 800 },
+        { ...snowmen('snowmanScout'), tracksideSide: 800 },
         snowmen('snowmanScout'),
         snowmen('snowmanScout'),
         snowmen('snowman'),

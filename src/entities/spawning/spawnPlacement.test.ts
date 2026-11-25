@@ -283,6 +283,14 @@ describe('tracksideSlots', () => {
       expect(slots.slice(nearCount).some((s) => s.ahead > band.near!.max)).toBe(true)
     }
   })
+
+  it("stands a wave's slots `tracksideSide` out either side, over the same stretch", () => {
+    const slots = tracksideSlots(50, 'ground', createRng(5), 800)
+    expect(slots.every((s) => Math.abs(s.side) === 800)).toBe(true)
+    expect(slots.some((s) => s.side < 0) && slots.some((s) => s.side > 0)).toBe(true)
+    const band = tracksideBand('ground')
+    expect(slots.every((s) => s.ahead >= band.aheadMin && s.ahead <= band.aheadMax)).toBe(true)
+  })
 })
 
 /** Arc distance before its slot at which a trackside enemy must be in front of the rider. */
@@ -297,7 +305,7 @@ describe.each(groundWorlds.map((w) => [w.level.id, w] as const))('%s ground trac
     const table = tableFor(wave)
     const band = tracksideBand('ground')
     const ride = rideFor(wave)
-    const aheads = tracksideSlots(wave.count, 'ground', createRng(1337))
+    const aheads = tracksideSlots(wave.count, 'ground', createRng(1337), wave.tracksideSide)
       .map((s) => tracksideAhead(table, 'ground', s, ride))
       .sort((a, b) => a - b)
     const end = band.aheadMin + Math.min(ride.window, 0.75 * table.length - band.aheadMin)
@@ -317,7 +325,7 @@ describe.each(tracksideWorlds.map((w) => [w.level.id, w] as const))('%s tracksid
     const table = tableFor(wave)
     const { surface } = ENEMY_PLACEMENT[wave.type]
     const band = tracksideBand(surface)
-    const slots = tracksideSlots(wave.count, surface, createRng(1337))
+    const slots = tracksideSlots(wave.count, surface, createRng(1337), wave.tracksideSide)
     const ride = rideFor(wave)
     let inFront = 0
     let total = 0
@@ -423,7 +431,7 @@ describe.each(shippedLevels().filter((l) => l.enemies.some((w) => w.route)).map(
       (_name, wave) => {
         expect(junction).toBeDefined()
         const { surface } = ENEMY_PLACEMENT[wave.type]
-        const slots = tracksideSlots(wave.count, surface, createRng(1337))
+        const slots = tracksideSlots(wave.count, surface, createRng(1337), wave.tracksideSide)
         const signT = hardRouteFor(createTrackCurve(level.track), level.track.mechanics)!.signT
         let arrivals = 0
         let off = 0

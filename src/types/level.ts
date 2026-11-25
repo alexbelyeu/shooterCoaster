@@ -201,6 +201,11 @@ export interface EnemyWave {
   /** A weather pulse that blows in with the wave (#798): the spawner emits `weather:start`, the look and its rise / hold / fade
    *  are `WEATHER_LOOKS` (`levels/environments/shared/weatherPulse.ts`). A level's waves use one kind. */
   weather?: WeatherKind
+  /**
+   * A trackside wave's slots stand this far out either side of the track, in place of the band's (`TRACKSIDE`): level 4's
+   * lift and crest look over the near ground at the slopes beyond it (#937).
+   */
+  tracksideSide?: number
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
