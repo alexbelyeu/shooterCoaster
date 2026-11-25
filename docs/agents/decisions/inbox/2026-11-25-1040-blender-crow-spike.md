@@ -26,7 +26,8 @@ three.js geometry can give at a tenth of the triangles; the costs are real: `jsT
 programs ShaderWarmup doesn't cover yet, and an art step outside CI. The spike stays behind a build-time gate
 (`__BLENDER_CROW__`: `npm run dev` and `SC_BLENDER_CROW=1` builds only, then `?blenderCrow=1`), so production builds
 carry none of it. Worth reconsidering for a one-off hero model (a boss), where one GLB and loader amortise over a single
-large, close-up subject.
+large, close-up subject; that boss would first need its skinned material and skinned hit-flash programs in
+ShaderWarmup (the spike's aren't).
 
 **Consequences:** the game's default builds are unchanged (no chunk, no GLB, the same bundle). Deleting the spike is
 `Crow.tsx`'s two lines, `BlenderCrow.tsx`, `models/`, `tools/art/`, the turntable's `blenderCrow` subject and the
