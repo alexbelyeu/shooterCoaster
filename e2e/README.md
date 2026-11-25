@@ -89,7 +89,9 @@ the phone run checks its cards fit 390 px and every open card shows its medal ti
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in
 daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no initials entry (the campaign boards stay empty),
 send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
-run, with the stub answering 503, must show no board, New best and save the local record (`daily-results-offline.png`)
+run, with the stub answering 503, must show no board, New best and save the local record (`daily-results-offline.png`), and no ghost crosshair
+(#1042). The first load's run fetches the day's ghost from the stub (`?ghost=1`, once, for today), which aims at the shot step's
+`GHOST_AT`: its ring must show there, translucent (`daily-ghost.png`), and the new best must go up with a ghost of its own
 ( its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 A `bossRush` step (#1011, nightly) saves 3 stars on every level, opens the Boss Rush ticket on level select, checks the first stage shows no wave enemies, beats its boss (`summonBoss` + `bossHit`), must move on to the next level's stage with the time carried and the HUD's "Boss 2 of N", then runs the timer out (`timerStep` 1): the rush's results (`bossrush-results.png`) must read 1 boss beaten and offer Replay, with the campaign saves, boards and the Boss Rush best untouched.
 `?e2e=1` skips the loading screen, the intro and the Ready / Set / GO countdown (runs start in `playing`); a `countdown` step
