@@ -81,6 +81,13 @@ describe('the throttled nightly pass (#539)', () => {
     expect(planRun({ nightlyPart: 'main' })).toMatchObject({ cpuThrottle: 1, gatePrograms: false })
   })
 
+  it('splits the rides between `main` and `rides`, a level added later going to `rides` (#1046)', () => {
+    const withNew = [...levels, 'level99']
+    const ridden = (p: string) => (stepLevelPairs(planRun({ nightlyPart: p }) as Plan, withNew) as Pair[]).filter(([s]) => s === 'ride').map(([, l]) => l)
+    expect(ridden('main')).toEqual(['level1', 'level2', 'level3', 'level4'])
+    expect([...ridden('main'), ...ridden('rides')]).toEqual(withNew)
+  })
+
   it('leaves the PR shards ungated and unthrottled', () => {
     for (const s of shardNames) {
       const plan = planRun({ shard: s })

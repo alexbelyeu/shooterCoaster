@@ -33,7 +33,7 @@ const NEEDS = {
   frenzy: ['ride', 'results'],
   seed: ['ride'],
   mobileMenus: ['mobile'],
-  // The dark section's shots and the Tree's gap still (#766): taken on the `switch` step's run.
+  // The dark section's shots (#766): taken on the `switch` step's run.
   dark: ['switch'],
 }
 
@@ -43,10 +43,15 @@ const PHONE_STEPS = ['mobile', 'mobileMenus']
  * The nightly production run of the full smoke, split into parallel jobs (prod-smoke.yml's `nightly-part` matrix, #570):
  * one run outgrew the job's 60 min cap once level 6 joined every deep step. Together the parts not marked `extra` make
  * every step of the full run once. `gatePrograms` fails a level whose run compiled a shader after its warm-up (#539).
+ * `main` rides the first `MAIN_LEVELS` and `rides` every later level, new ones included (`exceptLevels`): with 8 levels and
+ * Boss Rush, one part reached level 6 45 min in, its Share clicks stalled 30 s each and it stopped at the cap on level 8 (#1046).
  * `slow` is an extra pass (#539): level1 and level3's ride under `--cpu-throttle 4`, for the long-frame trend (throttle.json).
  */
+const MAIN_LEVELS = ['level1', 'level2', 'level3', 'level4']
+const RIDE_STEPS = ['ride', 'tour', 'shot', 'results', 'share']
 export const NIGHTLY_PARTS = {
-  main: { steps: [...UI_STEPS, ...FIRST_LEVEL_STEPS, 'ride', 'tour', 'shot', 'results', 'share'] },
+  main: { steps: [...UI_STEPS, ...FIRST_LEVEL_STEPS, ...RIDE_STEPS], levels: MAIN_LEVELS },
+  rides: { steps: RIDE_STEPS, exceptLevels: MAIN_LEVELS },
   deep: { steps: ['wave', 'weather', 'boss', 'pickup', 'switch', 'dark', 'audio', 'night'] },
   pacing: { steps: ['pacing'], gatePrograms: true },
   slow: { steps: ['ride', 'results'], levels: ['level1', 'level3'], cpuThrottle: 4, gatePrograms: true, extra: true },
@@ -76,7 +81,12 @@ export function planRun({ shard, nightlyPart, steps, levels, mobile, skipDesktop
     const spec = NIGHTLY_PARTS[nightlyPart]
     if (!spec) throw new Error(`unknown nightly part "${nightlyPart}" (parts: ${Object.keys(NIGHTLY_PARTS).join(', ')})`)
     if (shard !== undefined || steps !== undefined || levels !== undefined) throw new Error('--nightly-part sets the steps; drop --shard / --steps / --levels')
-    return { ...checked(new Set(spec.steps), spec.levels ?? null), cpuThrottle: spec.cpuThrottle ?? 1, gatePrograms: !!spec.gatePrograms }
+    return {
+      ...checked(new Set(spec.steps), spec.levels ?? null),
+      exceptLevels: spec.exceptLevels ?? [],
+      cpuThrottle: spec.cpuThrottle ?? 1,
+      gatePrograms: !!spec.gatePrograms,
+    }
   }
   if (shard !== undefined) {
     const spec = SHARDS[shard]
@@ -100,9 +110,14 @@ function checked(steps, levels) {
   return { steps, levels }
 }
 
+/** The level ids a plan runs, in the registry's order: its `levels` (null = all) less a nightly part's `exceptLevels`. */
+export function planLevels(plan, allLevels) {
+  return (plan.levels ?? allLevels).filter((id) => !plan.exceptLevels?.includes(id))
+}
+
 /** [step, level] pairs a plan runs (level null for UI steps). */
 export function stepLevelPairs(plan, allLevels) {
-  const wanted = plan.levels ?? allLevels
+  const wanted = planLevels(plan, allLevels)
   const pairs = []
   for (const s of plan.steps) {
     if (UI_STEPS.includes(s)) pairs.push([s, null])
