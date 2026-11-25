@@ -337,6 +337,7 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false, 
       if (levelTime == null && !run.overdue) return 'hold'
       run.levelTime = levelTime
       if (!run.overdue && (levelTime < target || run.frames < minFrames)) return
+      run.stopFrame = s.frames
       s.setTimeScale(0)
       s.rideRate = null
       s.stopAtLevelTime = null
@@ -349,11 +350,15 @@ async function rideToLevelTime(page, id, seconds, minFrames, { started = false, 
   for (;;) {
     await page.waitForTimeout(250)
     const r = await page.evaluate((overdue) => {
-      const run = window.__SC_TEST__.rideRun
+      const s = window.__SC_TEST__
+      const run = s.rideRun
       run.overdue ||= overdue
-      return run
+      // The hook reads a frame's draw calls and triangles on the frame after it (#1014): the stopped frame's are in
+      // once one more frame has run; read before that, the ride stats were the frame before the stop's, which a wave
+      // mounted on the last held frame isn't in, so the same build sampled 77 or 95 draws in level 8 by the poll's timing.
+      return { ...run, sampled: overdue || s.frames > run.stopFrame }
     }, Date.now() - start >= FRAME_DEADLINE_MS)
-    if (r.done) return { frames: r.frames ?? 0, ms: Date.now() - start, levelTime: r.levelTime }
+    if (r.done && r.sampled) return { frames: r.frames ?? 0, ms: Date.now() - start, levelTime: r.levelTime }
   }
 }
 
