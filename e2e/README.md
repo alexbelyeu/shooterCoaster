@@ -112,7 +112,7 @@ tunnel (#332, the hook's `tunnel.spans`), it then freezes game time, rides to th
 (`<id>-tunnel-entry.png`, not blank) and 75% of the way through it (`<id>-tunnel.png`): the car must be inside (`tunnel.index`),
 at least 35% of the frame dark and some of it near white (its lights).
 When level2 is in the run, a `wave` step rides it to the crow wave: its `wave:incoming` tell (screen-edge pulse +
-label) must come before the wave, on time by the level timer (`waveTellSeconds` ahead; the timer steps a fixed 0.25 s a frame
+label, looked for among every banner card: an earlier wave's can still be exiting) must come before the wave, on time by the level timer (`waveTellSeconds` ahead; the timer steps a fixed 0.25 s a frame
 around it, `timerStep`, so a slow frame can't land both together), the run is paused and resumed in between (the level timer is held on the tick the tell fires, so the pause lands in the gap on any runner, and the step fails if the wave came before the pause; no tell or wave may fire twice), then the V flies in and is frozen for `level2-wave.png` (≥ 5 crows on screen, none within 40 units).
 When level2 or level4 is in the run, a `weather` step rides it to its weather pulse (#798, `EnemyWave.weather`: the
 sandstorm with level2's first crows, the blizzard with level4's snowmen; when and how long from `levels()`'s `weather`),
