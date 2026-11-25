@@ -43,6 +43,7 @@ and in the 3D world. Tokens live in `src/app/global.css` `:root` (`--fair-*`).
 | `--fair-sky` | `#63b7e6` | Fairground sky blue | Information that isn't score: a hint, a new-best line |
 | `--fair-cream` | `#f6e7c1` | Lettering ink | Text and numbers on boards and over the ride |
 | `--fair-tar` | `#1b110d` | Warm near-black | Shadows, plate edges, text on gilt |
+| `--fair-night` | `#1c2147` | The board after dark | A level-select board flipped to its Night Ride, the moon's tile on its switch (#1057) |
 
 Contrast (WCAG): cream on oxblood 11:1, cream on oxblood-deep 13.9:1, tar on gilt 9.8:1, gilt on oxblood 7.2:1, sky on
 oxblood 6.1:1. Cream on vermilion is only 3.9:1, so vermilion carries no text under 24 px.

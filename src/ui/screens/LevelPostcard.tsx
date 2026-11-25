@@ -186,10 +186,29 @@ function Planks() {
   )
 }
 
-/** Tiny inline-SVG "postcard" of a biome's hero landmark on its sky; `boarded`: planked up, a ride not open yet. */
-export default function LevelPostcard({ biome, boarded = false }: { biome: BiomeType; boarded?: boolean }) {
+/** Stars pricked into a night postcard's sky, behind the landmark. */
+function NightStars() {
   return (
-    <span className="level-postcard" style={{ background: biomeTheme(biome).bg }} aria-hidden="true">
+    <svg className="level-postcard-stars" viewBox="0 0 200 100" preserveAspectRatio="xMidYMax slice">
+      {STARS.map(([x, y]) => (
+        <circle key={x} cx={x} cy={y} r="1.1" />
+      ))}
+    </svg>
+  )
+}
+
+/**
+ * Tiny inline-SVG "postcard" of a biome's hero landmark on its sky; `boarded`: planked up, a ride not open yet;
+ * `nightSky`: the Night Ride's sky (`nightPostcardSky`), under stars with the landmark dimmed to the dark (#1057).
+ */
+export default function LevelPostcard({ biome, boarded = false, nightSky = null }: { biome: BiomeType; boarded?: boolean; nightSky?: string | null }) {
+  return (
+    <span
+      className={`level-postcard${nightSky ? ' is-night' : ''}`}
+      style={{ background: nightSky ?? biomeTheme(biome).bg }}
+      aria-hidden="true"
+    >
+      {nightSky && <NightStars />}
       <PostcardArt biome={biome} />
       {boarded && <Planks />}
     </span>
