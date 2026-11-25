@@ -56,22 +56,30 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: 30 * 20 + 78 * 15 + 2 * 60 + 4 * 40 + 400, // 1770 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2450
+    maxScore: 36 * 20 + 81 * 15 + 2 * 60 + 4 * 40 + 400, // 1935 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2615
     message: 'Ready for this one?',
     nextLevel: 'level3',
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
     ...paceLevel({
       // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all
       // thirty in view (#864: draws); two Vs up the lift hill (2 s, 6 s), one group each, so the sky holds crows until the
-      // crest (#937); the second pack on the sand before the door, under the drop (11 s); the sandstorm's V meets the car
-      // out of the Pyramid (16 s); the last V's groups spread from the climb to the airtime crest (25 s) on to the boss.
+      // crest (#937); the second pack on the sand before the door, under the drop (11 s), and its last eight on the
+      // passage's floor in the dark (13 s, #937); the sandstorm's V meets the car out of the Pyramid (16 s); then a V
+      // every 4 s from the climb over the airtime crest (22, 26, 30 s), six scorpions trackside along the crest (27 s: the Vs
+      // that arrive there show up a few seconds late) and a last small V (33 s) cleared before the boss, so something is in view until the Giant
+      // Scorpion (#937: one big V was cleared by 35 s, nothing for 4 s).
       waves: [
         { type: 'scorpion', count: 12, waveLabel: 'Incoming!', weight: 2 },
         { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 4 },
         { type: 'crow', count: 9, formation: 'v', weight: 5 },
-        { type: 'scorpion', count: 18, waveLabel: 'Out of the Sand!', weight: 5 },
-        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 9 },
-        { type: 'crow', count: 30, waveLabel: 'More Crows!', formation: 'v', weight: 20 },
+        { type: 'scorpion', count: 10, waveLabel: 'Out of the Sand!', weight: 2 },
+        { type: 'scorpion', count: 8, waveLabel: 'In the Tomb!', darkFloor: true, weight: 3 },
+        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 6 },
+        { type: 'crow', count: 9, waveLabel: 'More Crows!', formation: 'v', weight: 4 },
+        { type: 'crow', count: 9, formation: 'v', weight: 1 },
+        { type: 'scorpion', count: 6, weight: 3 },
+        { type: 'crow', count: 9, formation: 'v', weight: 3 },
+        { type: 'crow', count: 6, formation: 'v', weight: 12 },
       ],
       boss: 'giantScorpion',
     }),
@@ -85,19 +93,21 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 69 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 2374 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3074
+    maxScore: 74 * 18 + 28 * 25 + 36 * 12 + 5 * 60 + 400, // 2464 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3164
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
     ...paceLevel({
       waves: [
-        // Up the lift and down the drop (0–11 s), then the sharks round the glass tunnel (12 s), more jellyfish from the
-        // launch's crest past the sea stacks (16–28 s), the flying fish on to the Kraken (30 s).
-        jellyfishLine(7, 'Into the Deep!'), jellyfishLine(7), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5),
-        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 4 },
+        // Up the lift and down the drop (0–10 s; lines of 7 up the lift, so one is still up as the next arrives), the sharks
+        // round the glass tunnel (11 s, before the drop's last line is out of view), more jellyfish from the launch's crest
+        // past the sea stacks (16–28 s), the flying fish on to the Kraken (29 s, before the last line is behind the rider).
+        jellyfishLine(7, 'Into the Deep!'), jellyfishLine(7), jellyfishLine(7), jellyfishLine(7), jellyfishLine(6),
+        { ...jellyfishLine(5), weight: 1 },
+        { type: 'shark', count: 28, waveLabel: 'Sharks!', weight: 5 },
         jellyfishLine(5, 'Jellyfish Bloom!'), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5), jellyfishLine(5),
-        jellyfishLine(5),
-        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 15 },
+        { ...jellyfishLine(5), weight: 1 },
+        { type: 'flyingFish', count: 36, waveLabel: 'Flying Fish!', formation: 'school', weight: 16 },
       ],
       boss: 'kraken',
     }),

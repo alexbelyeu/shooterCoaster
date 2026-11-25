@@ -199,6 +199,7 @@ function LevelWorld({ levelId, config, ride, world }: { levelId: string; config:
           clearAir={clearAir}
           clearGround={clearGround}
           hardRoute={hardRoute}
+          darkSections={track.darkSections}
         />
         <ShootingController />
         <GameTimer />

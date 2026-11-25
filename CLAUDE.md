@@ -39,6 +39,7 @@ npm run turntable         # enemy turntable (#380): every enemy + boss up close 
 npm run audio:render -- --music <title|level1..5> | --sfx-sheet [--level id] | --mix <level> [--boss] | --ride <level> | --launch <level> | --resume <level> [--unpaused]   # offline render of the game's sound → docs/audio/renders/<name>.{mp3,json,png} (needs a build + ffmpeg, ~20 s); (--music also takes `results-win` / `results-lose`, the results screen's two cuts, and a theme option `<slot>.<name>`; `--seam` starts 10 s before the loop seam; `--layers 0..3|ramp` plays the score's intensity layers); a --mix also renders its music alone to measure each kill against (and its seams on); `--boss` adds the boss's arrival and defeat, the score's boss section and sting, 30 s; `--ride` is the ride's own sounds (GO's launch whoosh, a chain lift, the drop's wind and rail rumble to top speed); `--launch` is level select's launch blip with the level's bank and room landing under it, checked for a click at the swap; `--resume` is a paused run's resume Ready / GO with the pause gate opening at GO (`--unpaused`: the same without the pause, which it should match)
 npm run audio:render -- --score <file.scrim|vendored:1..6> [--engine port|original]          # one score alone through the port or the original Scrimshaw page (parity renders); --chain game plays a score file through the game's music chain
 npm run audio:check -- <file.wav|mp3> [--kind music|mix|sfx] [--seam s] [--click s] [--music stem.wav] [--strict]  # loudness, true peak, clipping, bands, seams, clicks at a cut, gun tail, kill over music vs the sound bible's targets
+.venv-bpy/bin/python tools/art/crow.py   # rebuild the Blender crow spike's GLB (#1040, not adopted; setup in its docstring): only `npm run dev` and `SC_BLENDER_CROW=1` builds include it, with `?blenderCrow=1`
 ```
 
 Unit tests live next to the code as `src/**/*.test.ts` (and `scripts/**/*.test.ts` / `e2e/**/*.test.ts` for agent tooling and the smoke) and run in plain Node
@@ -84,7 +85,7 @@ Web Audio (procedural music and SFX, no audio library), zustand (state),
 framer-motion (UI), Vite 6, TypeScript strict. Fonts (Ultra, Big Shoulders; Lobster for the logo) are self-hosted from `public/fonts/` (OFL, Ultra Apache 2.0); the game makes no
 third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it).
 A merge to `main` is **not** live at once: `deploy.yml` ships main's head daily at 05:00 UTC, when Alex starts it (Deploy now in the
-control center), and after every green CI on `main` while an `agent:prod-broken` issue is open (`scripts/deploy.cjs`). Vercel builds no
+control center), and after every green CI on `main` while the deploy check's `agent:prod-broken` issue is open (`scripts/deploy.cjs`; a red nightly or red `main` waits for the daily deploy). Vercel builds no
 push itself (`git.deploymentEnabled` in `vercel.json`: Standard build minutes are billed) — verification happens in CI. `vercel.json` rewrites only
 the `/go/<campaign>` landing paths to the game; any other unknown path gets `public/404.html` with a real 404,
 and it sets the security headers, a year's `immutable` cache on Vite's hashed `/assets/*` (so nothing unhashed goes in
@@ -114,7 +115,7 @@ never redirect them, the page view's path is the attribution).
 
 **`docs/CODEMAP.md`** has one row per area: what lives where, which pure module holds each
 rule, which test pins it. Grep it for the paths you touch (`grep -n "src/combat" docs/CODEMAP.md`)
-and read those rows before changing code there; don't read it whole. Areas: `src/app/App.tsx`, `src/canvas/`, `src/levels/LevelRegistry.ts`, `src/levels/scoring.ts`, `src/levels/daily.ts`, `src/levels/environments/`, `src/track/`, `src/entities/enemies/`, `src/entities/bosses/`, `src/utils/rng.ts`, `src/input/`, `src/combat/`, `src/effects/`, `src/audio/`, `src/perf/`, `src/telemetry/`, `src/store/`, `src/ui/`, `api/`, `supabase/migrations/`, `src/dev/turntable/`, `src/testing/`, `e2e/`, `scripts/`, `.claude/agents/`, `.claude/commands/`, `.claude/scripts/`, `docs/`.
+and read those rows before changing code there; don't read it whole. Areas: `src/app/App.tsx`, `src/canvas/`, `src/levels/LevelRegistry.ts`, `src/levels/scoring.ts`, `src/levels/daily.ts`, `src/levels/environments/`, `src/track/`, `src/entities/enemies/`, `src/entities/bosses/`, `src/utils/rng.ts`, `src/input/`, `src/combat/`, `src/effects/`, `src/audio/`, `src/perf/`, `src/telemetry/`, `src/store/`, `src/ui/`, `api/`, `supabase/migrations/`, `src/dev/turntable/`, `tools/art/`, `src/testing/`, `e2e/`, `scripts/`, `.claude/agents/`, `.claude/commands/`, `.claude/scripts/`, `docs/`.
 
 ## Skills in this repo
 

@@ -7,6 +7,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { ENEMY_COMPONENTS } from '@/entities/enemies/enemyComponents'
 import { WALL_STANDOFF } from '@/entities/spawning/enemyPlacement'
 import GoldenBalloon from '@/entities/enemies/GoldenBalloon'
+import BlenderCrow from '@/entities/enemies/BlenderCrow'
 import { BOSS_COMPONENTS } from '@/entities/bosses/bossComponents'
 import { shippedLevels } from '@/levels/shippedLevels'
 import { ATMOSPHERES } from '@/levels/environments/atmosphere'
@@ -58,9 +59,9 @@ function bossTrack(type: BossType): ArcTable {
 function Model({ subject }: { subject: Subject }) {
   const { id } = subject
   if (subject.kind === 'enemy') {
-    const Enemy = id === 'goldenBalloon' ? GoldenBalloon : ENEMY_COMPONENTS[id as EnemyType]
-    // The spawner mounts golden balloons as type 'balloon' too.
-    const type = id === 'goldenBalloon' ? 'balloon' : (id as EnemyType)
+    const Enemy = id === 'goldenBalloon' ? GoldenBalloon : id === 'blenderCrow' ? BlenderCrow : ENEMY_COMPONENTS[id as EnemyType]
+    // The spawner mounts golden balloons as type 'balloon' too, and the Blender crow is a crow.
+    const type = id === 'goldenBalloon' ? 'balloon' : id === 'blenderCrow' ? 'crow' : (id as EnemyType)
     const enemy = <Enemy id={id} type={type} spawnPosition={ORIGIN} scoreValue={0} radius={1} onKill={noop} />
     return subject.stage === 'wall' ? <>{enemy}<ClimbingWall gap={subject.wallGap ?? WALL_STANDOFF} /></> : enemy
   }

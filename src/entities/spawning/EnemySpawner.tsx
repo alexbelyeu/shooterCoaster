@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useContext } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { EnemyType, EnemyWave, LevelConfig, WallSurface } from '@/types/level'
+import type { DarkSectionSpec, EnemyType, EnemyWave, LevelConfig, WallSurface } from '@/types/level'
 import { indexAtT, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress.hot'
 import type { RideSpeeds } from '@/track/ridePhysics'
@@ -34,6 +34,7 @@ import { enemiesLeft, enemyCounts, newWaveProgress, nextWaveDue, onRoute, tickWa
 import type { HardRoute } from '@/track/mechanics'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { ORBITS, placeOrbit, type SwimOrbit } from './swimOrbit'
+import { darkFloorSlots, placeOnDarkFloor, type EnemyFloor, type FloorSlot } from './darkFloor'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -57,6 +58,8 @@ interface EnemySpawnerProps {
   clearGround?: SpotClearer
   /** The track's hard route (#720), where a hard-route wave arrives; null without a junction. */
   hardRoute?: HardRoute | null
+  /** The track's dark sections: a `darkFloor` wave stands on one's floor. */
+  darkSections?: readonly DarkSectionSpec[]
 }
 
 interface SpawnedEnemy {
@@ -69,6 +72,8 @@ interface SpawnedEnemy {
   wall?: WallSlot
   /** A swarm member or a bystander: its wall is picked when the wave activates. */
   swarm?: SwarmSlot
+  /** A `darkFloor` wave's member: its spot on the floor is picked when the wave activates. */
+  floorSlot?: FloorSlot
   scoreValue: number
   radius: number
   waveIndex: number
@@ -82,6 +87,7 @@ interface Placed {
   motion?: FormationMotion
   wall?: WallSlot
   orbit?: SwimOrbit
+  floor?: EnemyFloor
 }
 
 const RADII: Record<EnemyType, number> = {
@@ -108,6 +114,7 @@ const RADII: Record<EnemyType, number> = {
 }
 
 const NO_WALLS: readonly WallSurface[] = []
+const NO_DARK_SECTIONS: readonly DarkSectionSpec[] = []
 
 const toVector3 = (p: Vec3) => new THREE.Vector3(p.x, p.y, p.z)
 
@@ -136,6 +143,12 @@ function generateEnemies(
           id: `bystander-${id++}`, type, position: null, slot: null, trackside: null, swarm, scoreValue: 0, radius: RADII[type], waveIndex: waveIdx, bystander: true,
         })
       }
+    }
+    if (wave.darkFloor) {
+      for (const floorSlot of darkFloorSlots(wave.count, rng)) {
+        enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside: null, floorSlot, ...base })
+      }
+      continue
     }
     if (scatter === 'wall') {
       if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} climbs a wall: no formation`)
@@ -212,6 +225,7 @@ export default function EnemySpawner({
   clearAir,
   clearGround,
   hardRoute,
+  darkSections = NO_DARK_SECTIONS,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const components = useWorld().enemies
@@ -227,7 +241,7 @@ export default function EnemySpawner({
   }, [runSeed, waves, goldenBalloonCount, heightFn, trackTable, walls])
   useEffect(() => {
     // Formation and trackside members digest their seeded slots: their world positions depend on where the rider is at activation.
-    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot?.local ?? (e.swarm && { x: e.swarm.du, y: e.swarm.dv, z: 0 }) ?? { x: e.trackside!.ahead, y: 0, z: e.trackside!.side }))
+    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot?.local ?? (e.swarm && { x: e.swarm.du, y: e.swarm.dv, z: 0 }) ?? (e.floorSlot && { x: e.floorSlot.along, y: 0, z: e.floorSlot.side }) ?? { x: e.trackside!.ahead, y: 0, z: e.trackside!.side }))
   }, [enemies, goldenBalloons])
   const phase = useGameStore((s) => s.phase)
 
@@ -240,6 +254,10 @@ export default function EnemySpawner({
 
   const placeMembers = useCallback(
     (table: ArcTable, wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
+      if (members[0]?.floorSlot) {
+        const placed = placeOnDarkFloor(table, riderIndex, darkSections, members.map((e) => e.floorSlot!))
+        return members.map((e, i) => [e.id, { position: toVector3(placed[i].position), floor: placed[i].floor }])
+      }
       if (members[0]?.trackside) {
         const placed = placeTracksideWave({
           table, riderIndex, camera, type: wave.type, groundFn, slots: members.map((e) => e.trackside!), ride, bounds, keepOff, clearGround,
@@ -284,7 +302,7 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [groundFn, bounds, keepOff, clearAir, clearGround, walls, runSeed],
+    [groundFn, bounds, keepOff, clearAir, clearGround, walls, runSeed, darkSections],
   )
 
   const placeWave = useCallback(
@@ -519,6 +537,7 @@ export default function EnemySpawner({
             onKill={onKill}
             wall={placed.wall}
             orbit={placed.orbit}
+            floor={placed.floor}
             onEscape={enemy.bystander ? undefined : onEscape}
             bystander={enemy.bystander}
           />

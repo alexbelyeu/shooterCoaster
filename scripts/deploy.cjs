@@ -1,11 +1,13 @@
 // Production deploys (deploy.yml). Vercel no longer builds every merge to main (vercel.json `git.deploymentEnabled`;
 // Standard build minutes are billed from 8 Dec 2026): this deploys main's head once a day, on demand, and after every
-// green CI on main while an `agent:prod-broken` issue is open, so a revert or fix still ships at once. It calls the project's
+// green CI on main while the deploy check's `agent:prod-broken` issue is open (the live site is broken), so a revert or
+// fix ships at once. A red nightly or a red main waits for the daily deploy, which runs just before the nightly. It calls the project's
 // Deploy Hook (secret VERCEL_DEPLOY_HOOK), which can only build main, rather than holding a Vercel token here, then
 // waits for the GitHub deployment Vercel posts for the commit: its deployment_status starts prod-smoke.yml's check.
 
 const ENV = 'Production'
 const PROD_BROKEN = 'agent:prod-broken'
+const { ownIssue } = require('./prod-alert.cjs')
 const APPEAR_MS = 5 * 60e3
 const FINISH_MS = 20 * 60e3
 const POLL_MS = 15e3
@@ -26,9 +28,9 @@ function outcome(statuses) {
  */
 const isLive = (statusesPerDeployment) => statusesPerDeployment.some((s) => outcome(s) === 'success')
 
-/** Why to deploy now, or null to wait for the daily run. */
-function reason({ event, force, prodBroken }) {
-  if (event === 'workflow_run') return prodBroken.length ? `production is broken (${prodBroken.map((i) => `#${i.number}`).join(', ')})` : null
+/** Why to deploy now, or null to wait for the daily run. `deployCheckRed`: the deploy check's open alert, if any. */
+function reason({ event, force, deployCheckRed }) {
+  if (event === 'workflow_run') return deployCheckRed ? `the deploy check is red (#${deployCheckRed.number})` : null
   if (event === 'schedule') return 'the daily deploy'
   return force ? 'started by hand, forced' : 'started by hand'
 }
@@ -44,10 +46,10 @@ async function run({ github, context, core }) {
   const short = sha.slice(0, 7)
   const force = context.eventName === 'workflow_dispatch' && String(context.payload.inputs?.force) === 'true'
 
-  const prodBroken = context.eventName === 'workflow_run'
-    ? (await github.rest.issues.listForRepo({ ...repo, state: 'open', labels: PROD_BROKEN, per_page: 20 })).data.filter((i) => !i.pull_request)
-    : []
-  const why = reason({ event: context.eventName, force, prodBroken })
+  const deployCheckRed = context.eventName === 'workflow_run'
+    ? ownIssue((await github.rest.issues.listForRepo({ ...repo, state: 'open', labels: PROD_BROKEN, per_page: 30 })).data, 'deploy')
+    : undefined
+  const why = reason({ event: context.eventName, force, deployCheckRed })
   if (!why) {
     core.notice(`${context.sha.slice(0, 7)} waits for the daily deploy (05:00 UTC) or Deploy now in the control center.`)
     return

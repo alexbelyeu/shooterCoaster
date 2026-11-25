@@ -12,8 +12,11 @@ export const ONLINE_TIMEOUT_MS = 3000
 
 export type OnlineEntry = PublicEntry
 
-/** The server's `Submission`, plus a daily run's UTC day (`dailyKey`): it goes on that day's board, not the level's. */
-export type OnlineSubmission = Submission & { daily?: string }
+/**
+ * The server's `Submission`, plus a daily run's UTC day (`dailyKey`): it goes on that day's board, not the level's,
+ * with its ghost (`encodeGhost`, #1042).
+ */
+export type OnlineSubmission = Submission & { daily?: string; ghost?: string }
 
 export interface SubmitResult {
   /** 0-based, like the local board's; null when the run missed the online top 10. */
@@ -78,6 +81,12 @@ export function onlineLeaderboard(endpoint: string, fetchImpl: Fetch = (url, ini
       const query = 'daily' in board ? `daily=${encodeURIComponent(board.daily)}` : `level=${encodeURIComponent(board.level)}`
       const body = await request(fetchImpl, `${endpoint}?${query}`, { method: 'GET' }, timeoutMs)
       return parseTop((body as { top?: unknown } | null)?.top)
+    },
+    /** The day's World best ghost (`encodeGhost`'s string, unchecked: `decodeGhost` it), or null. */
+    async ghost(daily: string): Promise<string | null> {
+      const body = await request(fetchImpl, `${endpoint}?daily=${encodeURIComponent(daily)}&ghost=1`, { method: 'GET' }, timeoutMs)
+      const ghost = (body as { ghost?: unknown } | null)?.ghost
+      return typeof ghost === 'string' ? ghost : null
     },
     async submit(run: OnlineSubmission): Promise<SubmitResult | null> {
       // keepalive: a reload as results closes (`app/staleReload.ts`) must not cancel it.

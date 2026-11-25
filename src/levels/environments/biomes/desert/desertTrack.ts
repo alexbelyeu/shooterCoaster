@@ -152,9 +152,11 @@ export function buildDesertTrack(): SplineTrackParams {
     return { at: share(at === 'end' ? m.to : at === 'middle' ? Math.round((m.from + m.to) / 2) : m.from), second }
   })
   const rideV2: RideV2Spec = { zones, beats, drag: RIDE_V2_DEFAULTS.drag / 2 }
-  // The passage rides dark (#752): the light goes over the doorway's run in and comes back over as long out.
+  // The passage rides dark (#752): the light goes over the doorway's run in and comes back over as long out. Its floor
+  // holds a scorpion wave (#937).
   const ramp = share(ride.passage.from + 2) - share(ride.passage.from)
-  const darkSections = [{ from: share(ride.passage.from), to: share(ride.passage.to) + ramp, ramp, flashReach: 400 }]
+  const floor = { below: PASSAGE_RAIL, halfWidth: PYRAMID_PASSAGE.width / 2 }
+  const darkSections = [{ from: share(ride.passage.from), to: share(ride.passage.to) + ramp, ramp, flashReach: 400, floor }]
   return {
     curve: 'spline',
     controlPoints: points,
