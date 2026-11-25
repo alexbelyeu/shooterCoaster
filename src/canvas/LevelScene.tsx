@@ -35,6 +35,11 @@ import GameTimer from './GameTimer'
 import ShaderWarmup from './ShaderWarmup'
 import LevelAudio from './LevelAudio'
 import { levelWeather } from '@/levels/environments/shared/weatherPulse'
+import { useGameStore } from '@/store/useGameStore'
+import type { EnemyWave } from '@/types/level'
+
+/** A Boss Rush stage (#1011) is its boss alone: no waves, no golden balloons. */
+const NO_WAVES: EnemyWave[] = []
 
 /** Projects 'enemy:killed' and bystander-hit 3D events to screen coords for HTML score popups */
 function KillProjector() {
@@ -96,6 +101,7 @@ function LevelWorld({ levelId, config, ride, world }: { levelId: string; config:
   const { environment, biome, enemies, combat, boss, pickups, goldenBalloons } = config
   const { track, walls, seaArch } = ride
   const def = world.biome
+  const bossOnly = useGameStore((s) => s.runMode.mode === 'bossRush')
   useEffect(() => {
     if (!isE2E) return
     e2eRide.beats = track.rideV2?.beats ?? []
@@ -180,8 +186,8 @@ function LevelWorld({ levelId, config, ride, world }: { levelId: string; config:
             stinger listener must already be subscribed. */}
         <LevelAudio />
         <EnemySpawner
-          waves={enemies}
-          goldenBalloonCount={goldenBalloons}
+          waves={bossOnly ? NO_WAVES : enemies}
+          goldenBalloonCount={bossOnly ? 0 : goldenBalloons}
           trackTable={trackTable}
           groundFn={groundFn}
           boss={boss}
@@ -193,6 +199,7 @@ function LevelWorld({ levelId, config, ride, world }: { levelId: string; config:
           clearAir={clearAir}
           clearGround={clearGround}
           hardRoute={hardRoute}
+          darkSections={track.darkSections}
         />
         <ShootingController />
         <GameTimer />

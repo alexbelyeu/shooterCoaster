@@ -5,7 +5,7 @@
 
 import { BOSS_CHECKS } from './bossChecks.mjs'
 
-export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'settings', 'mobile', 'mobileMenus']
+export const UI_STEPS = ['title', 'landing', 'levelSelect', 'daily', 'bossRush', 'settings', 'mobile', 'mobileMenus']
 /** On the run's first level; `frenzy` happens inside its ride and `seed` compares against that ride's spawns. */
 export const FIRST_LEVEL_STEPS = ['frenzy', 'seed', 'quality', 'pause', 'countdown', 'speed', 'chunkRetry']
 /** `tour`, `shot`, `results` and `share` check the ride's own page (`tour` before the ride, the others after its combat). */
@@ -21,7 +21,7 @@ export const STEP_LEVELS = {
   switch: ['level6'],
   dark: ['level6'], // on the `switch` step's run (NEEDS)
   audio: ['level1'],
-  night: ['level1', 'level2', 'level3'],
+  night: ['level1', 'level2', 'level3', 'level4', 'level5', 'level6'],
 }
 
 /** Steps that run on another step's page: what they need in the same run. */
@@ -64,6 +64,7 @@ export const SHARDS = {
   level5: { levels: ['level5'], steps: ['ride'] },
   level6: { levels: ['level6'], steps: ['ride', 'switch'] },
   level7: { levels: ['level7'], steps: ['ride'] },
+  level8: { levels: ['level8'], steps: ['ride'] },
   mobile: { steps: ['mobile'] },
 }
 

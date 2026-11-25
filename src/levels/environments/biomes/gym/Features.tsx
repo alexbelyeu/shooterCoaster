@@ -2,16 +2,20 @@ import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { useContactShadows } from '../../shared/ContactShadows'
 import StaticInstances from '../../shared/StaticInstances'
+import type { BiomeFeaturesProps } from '../../shared/types'
 import FlameFire from './FlameFire'
-import { withHallGrime, withHoldChalk } from './grimeShader'
+import { HOUSE_LIGHTS, withHallGrime, withHoldChalk } from './grimeShader'
 import { buildHall, holdGeometry } from './hallGeometry'
 import { gymShadowCasters } from './shadows'
 
 /** Light fittings and daylit windows: unlit and over 1, so Bloom picks them up. */
 const LIGHT_BOOST = 1.6
+/** After hours (a Night Ride's `lampGlow`): the house lights off, what is left of the strip lights' pools and the fittings' glow is the work lights; the Flame still burns. */
+const AFTER_HOURS = { pools: 0.15, fittings: 0.2 }
 
 /** The Climbing Gym's hall from Alex's blockout: walls, boulders, the Starr, the building, the holds on every climbing face, the Flame's fire, and the contact shadows of everything standing on the floor. */
-export default function GymFeatures() {
+export default function GymFeatures({ atmosphere }: BiomeFeaturesProps) {
+  const afterHours = Math.min(1, atmosphere.lampGlow ?? 0)
   const hall = useMemo(() => buildHall(), [])
   useContactShadows(useMemo(() => gymShadowCasters(), []))
   const materials = useMemo(
@@ -34,6 +38,13 @@ export default function GymFeatures() {
   )
   useEffect(() => () => Object.values(materials).forEach((m) => m.dispose()), [materials])
   useEffect(() => () => holdShape.dispose(), [holdShape])
+  useEffect(() => {
+    HOUSE_LIGHTS.value = 1 + (AFTER_HOURS.pools - 1) * afterHours
+    materials.light.color.setScalar(LIGHT_BOOST * (1 + (AFTER_HOURS.fittings - 1) * afterHours))
+    return () => {
+      HOUSE_LIGHTS.value = 1
+    }
+  }, [materials, afterHours])
 
   return (
     <>

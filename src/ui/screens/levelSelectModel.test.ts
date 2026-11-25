@@ -5,6 +5,7 @@ import { dailyLevel } from '@/levels/daily'
 import { levelMedals } from '@/levels/medals'
 import {
   buildDailyCard,
+  buildRushCard,
   buildLevelCards,
   medalsLine,
   navigateCards,
@@ -16,7 +17,7 @@ import {
 
 const levels: LevelSelectSource[] = [
   { id: 'a', name: 'Alpha', description: '', biome: 'themePark', nextLevel: 'b' },
-  { id: 'b', name: 'Bravo', description: '', biome: 'arctic', nextLevel: 'c' },
+  { id: 'b', name: 'Bravo', description: '', biome: 'city', nextLevel: 'c' },
   { id: 'c', name: 'Charlie', description: '', biome: 'ocean', nextLevel: null },
 ]
 
@@ -162,6 +163,21 @@ describe('navigateCards', () => {
     const row = [rect(0, 0), rect(110, 0)]
     expect(navigateCards(row, 0, 'ArrowDown')).toBe(0)
     expect(navigateCards([], 0, 'ArrowRight')).toBe(0)
+  })
+})
+
+describe('buildRushCard', () => {
+  const all = getAllLevels()
+  const bossLevels = all.filter((l) => l.boss)
+
+  it('starts on the first boss level, wears the last one\'s biome and opens at 3 stars everywhere', () => {
+    const open = buildRushCard(all, () => 3)
+    expect(open).toEqual({ first: bossLevels[0].id, biome: bossLevels[bossLevels.length - 1].biome, bosses: bossLevels.length, unlocked: true })
+    expect(buildRushCard(all, (id) => (id === all[0].id ? 2 : 3)).unlocked).toBe(false)
+  })
+
+  it('stays locked with no boss level', () => {
+    expect(buildRushCard([{ id: 'a', name: 'A', description: '', biome: 'ocean', nextLevel: null }], () => 3)).toMatchObject({ bosses: 0, unlocked: false })
   })
 })
 

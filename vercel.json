@@ -3,10 +3,7 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "git": {
-    "deploymentEnabled": {
-      "**": false,
-      "main": true
-    }
+    "deploymentEnabled": false
   },
   "functions": {
     "api/leaderboard.ts": { "maxDuration": 10 },
@@ -24,6 +21,10 @@
         { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
         { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" }
       ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
     },
     {
       "source": "/assets/(.*)",

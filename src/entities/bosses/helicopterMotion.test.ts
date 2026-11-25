@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { bossMaxScore, currentPhase, applyHit, createBossState, exposedWeakPoints } from './bossModel'
 import { HELICOPTER } from './bossSpecs'
 import {
-  BEAM, HELI, HELI_FALL, TAIL_LOST_WOBBLE, anchorAt, beamSpot, dropInHeight, fallDrop, fallSpin, heliPose, spotAt, type BeamSpot,
+  BEAM, HELI, HELI_FALL, TAIL_LOST_WOBBLE, anchorAt, beamSpot, dropInHeight, fallDrop, fallSpin, heliPose, lookSlope, spotAt, type BeamSpot,
   type HeliPose,
 } from './helicopterMotion.hot'
 
@@ -133,6 +133,19 @@ describe('the Helicopter motion', () => {
     expect(minClear).toBeGreaterThanOrEqual(0)
     // Over high ground it climbs to keep its clearance.
     expect(anchorAt(out, cam, { x: 0, z: -1 }, 0, () => 500).y).toBe(500 + HELI.minClearance)
+  })
+
+  it('follows the camera down a descent so it stays in frame, never under its street clearance (#966)', () => {
+    const out = new THREE.Vector3()
+    const cam = new THREE.Vector3(0, 300, 0)
+    const level = anchorAt(out, cam, { x: 0, z: -1 }, 0, () => 0).y
+    // Looking down a 1-in-5 descent: the point it hovers over drops with the view centre 560 ahead.
+    const down = anchorAt(out, cam, { x: 0, z: -1 }, 0, () => 0, lookSlope({ x: 0, y: -0.2, z: -1 })).y
+    expect(level - down).toBeCloseTo(0.2 * HELI.ahead, 6)
+    // A steep look is held to `maxLookSlope`, and the street floor still holds.
+    expect(anchorAt(out, cam, { x: 0, z: -1 }, 0, () => 0, -5).y).toBe(Math.max(300 - HELI.maxLookSlope * HELI.ahead + HELI.above, HELI.minClearance))
+    expect(anchorAt(out, new THREE.Vector3(0, 30, 0), { x: 0, z: -1 }, 0, () => 0, -0.4).y).toBe(HELI.minClearance)
+    expect(lookSlope({ x: 0, y: -1, z: 0 })).toBe(0)
   })
 
   it('lands the searchlight\'s spot on the street, `ahead` along the heading and `side` to its right', () => {

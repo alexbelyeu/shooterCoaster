@@ -8,7 +8,7 @@ import { YETI, YETI_SNOWBALL } from './bossSpecs'
 import { inWindow, windowNowEpoch } from './bossCycle.hot'
 import {
   THROW_S, YETI_ROAM, YETI_ROAR, YETI_THROW, chestRetracted, elbowPose, fistPose, lopeAt, passedCamera, riseOffset, snowballAt,
-  throwArmAlive, throwSwing, toppleAngle, type Point3,
+  throwArmAlive, throwSwing, toppleAngle, underFrameTop, type Point3,
 } from './yetiMotion.hot'
 
 const ids = (s: BossState) => exposedWeakPoints(s).map((w) => w.id)
@@ -122,5 +122,15 @@ describe('yetiMotion', () => {
       prev = s
     }
     expect(passes).toBe(1)
+  })
+
+  it('holds its head under the frame top for the rider\'s pitch', () => {
+    const top = 0.5 * Math.tan(Math.PI / 4)
+    expect(underFrameTop(0, 0, top)).toBe(true)
+    expect(underFrameTop(0.49, 0, top)).toBe(true)
+    expect(underFrameTop(0.51, 0, top)).toBe(false)
+    // Looking up a lift, the same ridge sits lower in the frame; looking down a drop, higher.
+    expect(underFrameTop(0.7, 0.3, top)).toBe(true)
+    expect(underFrameTop(0.3, -0.3, top)).toBe(false)
   })
 })

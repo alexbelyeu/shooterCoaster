@@ -53,7 +53,7 @@ export const YETI_RISE = {
   sinkDepth: 260,
 } as const
 
-/** Holds a ridge until the rider is about to pass it (or `holdS`), then lopes to the next. */
+/** Holds a ridge until the rider is about to pass it, loses sight of it (`unseenS`) or `holdS` is up, then lopes to the next. */
 export const YETI_ROAM = {
   holdS: 10,
   lopeS: 1.6,
@@ -61,7 +61,21 @@ export const YETI_ROAM = {
   hopHeight: 70,
   minAhead: 520,
   maxOffAngle: 1.05,
+  /** Out of the rider's look (`viewAngle` either side) or hidden by the snow this long, it lopes to a ridge in sight (#937). 2 s is the one value the pacing gate passed on level 4 (1 / 1.5 / 2.5 / 3 s: 51–58% with nothing to shoot). */
+  unseenS: 2,
+  viewAngle: 0.7,
+  /** How far up the frame from its middle (1 is the top edge) its head may stand on the ridge it picks: the first of these
+   * any slot meets. Its raised fists stand ~0.3 of the frame above its head, and the rider closes in on it (#937). */
+  pickTops: [0.6, 0.8, 1],
+  /** … and while it holds one (or as high as it picked): past it the rider closing in has its fists over the top of
+   * the frame, and once it has been there `unseenS` it lopes on. */
+  holdTop: 0.75,
 } as const
+
+/** Whether a point `rise` above the eye per unit away sits at most `topTan` (tan of the angle to the frame's top edge × how far up it) up a frame looking `pitch` up (radians). */
+export function underFrameTop(rise: number, pitch: number, topTan: number): boolean {
+  return Math.tan(Math.atan(rise) - pitch) <= topTan
+}
 
 export const YETI_PERCH: PerchConfig = {
   slots: [
@@ -73,6 +87,10 @@ export const YETI_PERCH: PerchConfig = {
     [1250, 760],
     [1600, 480],
     [1100, 860],
+    // Down the valley floor ahead, for when the walls hide every ridge (level 4 from 40 s, #937).
+    [1400, 300],
+    [1600, 320],
+    [1750, 330],
   ],
   footprint: 230,
   clearance: 45,

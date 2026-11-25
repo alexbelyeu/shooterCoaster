@@ -5,9 +5,9 @@ import { STREET_GRID } from './config'
 
 /**
  * Neon Metropolis's elevated highway (#921), pure: a straight deck on pylons from `from` to `to`, ramping down to the
- * street at both ends. The route is fitted to level7's ride (`highwayLayout.test.ts` holds it to the fit): GO drops the
- * car under the deck, and the climb out of the canyons carries it back over. A new track re-fits the route by moving
- * its two ends or its deck height until that test passes; nothing else here depends on the track's shape.
+ * street at both ends. The route is fitted to level7's ride (`highwayLayout.test.ts` holds it to the fit): the street out
+ * of the first drop runs under the deck, the ride's near miss (`cityTrack.ts` builds its head-chopper from `HIGHWAY` and
+ * `DECK`). A new track re-fits the route by moving its two ends or its deck height until that test passes.
  */
 
 export interface HighwayRoute {
@@ -18,10 +18,10 @@ export interface HighwayRoute {
 }
 
 /**
- * Level7's route: along x through the blocks south of the z = 360 street, out to the edge of the city. The ride
- * passes under it 3 s after GO (track at y 49) and over it 12 s in (y 159).
+ * Level7's route: along x through the blocks north of the z = -600 street, from beside the first drop's towers out to the
+ * edge of the city. The ride passes under it 20 s in, its eye just under the slab (the head-chopper, #871).
  */
-export const HIGHWAY: HighwayRoute = { from: { x: -2160, z: 280 }, to: { x: 2160, z: 280 }, deck: 86 }
+export const HIGHWAY: HighwayRoute = { from: { x: 120, z: -720 }, to: { x: 2160, z: -720 }, deck: 47 }
 
 /** The deck's cross-section (world units): road width, slab depth under the road, parapet height and thickness. */
 export const DECK = { width: 52, thickness: 7, parapet: 3.5, wall: 1.6 } as const

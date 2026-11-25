@@ -93,6 +93,14 @@ describe('vercel.json routing', () => {
     }
     expect(fs.existsSync(path.join(root, 'public/assets'))).toBe(false)
   })
+
+  it('serves the service worker (built, not in public/) revalidated on every check, so a deploy reaches returning players (#999)', () => {
+    const built = new Set([...files, '/sw.js'])
+    expect(route('/sw.js', built)).toEqual({ status: 200, serves: '/sw.js' })
+    expect(headersFor('/sw.js')['Cache-Control']).toBe('no-cache')
+    expect(headersFor('/sw.js')['X-Content-Type-Options']).toBe('nosniff')
+    expect(files.has('/sw.js')).toBe(false)
+  })
 })
 
 describe('share card (as an unfurler reads index.html)', () => {

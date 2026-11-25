@@ -352,4 +352,43 @@ export const ATMOSPHERES: Record<BiomeType, AtmosphereConfig> = {
     enemyRimLift: 2.5,
     aerialFog: { strength: 0 },
   },
+  // Jungle Ruins (#870): a humid morning, the sun hazy gold over steaming hills. The pale green-white horizon is the
+  // fog, close enough that the temple on its terrace stands half-veiled, a silhouette in the haze; teal in the
+  // shadows, gold in the light.
+  jungle: {
+    sky: {
+      zenith: 0x3f7f9c,
+      horizon: 0xc9d8bf,
+      ground: 0x7c9270,
+      horizonFalloff: 0.55,
+      sunColor: 0xfff0c4,
+      sunSize: 0.03,
+      sunGlow: 0.75,
+      cloudiness: 0.55,
+      cloudColor: 0xf2f5ea,
+      cloudSpeed: 3,
+      cloudStretch: 1.4,
+    },
+    sunDirection: [0.5, 0.5, -0.7],
+    sunLightColor: 0xffe9b8,
+    sunLightIntensity: 1.35,
+    hemiSkyColor: 0xd8ead0,
+    hemiGroundColor: 0x3f5a2a,
+    hemiIntensity: 1.05,
+    fogNear: 250,
+    fogFar: 3900,
+    envIntensity: 0.45,
+    grade: {
+      exposure: 1.02,
+      temperature: 0.04,
+      tint: -0.03,
+      shadowTint: 0x2f6a5a,
+      highlightTint: 0xffdf9a,
+      splitTone: 0.2,
+      contrast: 1.08,
+      saturation: 1.08,
+      vibrance: 0.25,
+      vignette: 0.32,
+    },
+  },
 }

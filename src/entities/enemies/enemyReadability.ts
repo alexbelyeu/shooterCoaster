@@ -6,6 +6,7 @@ export const ENEMY_SILHOUETTE: Record<EnemyType | 'goldenBalloon', number> = {
   balloon: 60, // sphere r=30
   goldenBalloon: 60,
   crow: 64, // body ~72 long, wings span ~180 when open
+  toucan: 72, // body and bill ~92 long, the crow's wings
   scorpion: 48, // body ~52 long x 24 wide, plus tail
   shark: 60, // r=2.8 x10 wide, ~120 long
   jellyfish: 42, // dome r=3 x7

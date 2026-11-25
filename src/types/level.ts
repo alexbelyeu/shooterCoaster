@@ -1,10 +1,10 @@
 import type { PickupWeaponId } from '@/combat/weapons/weaponTypes'
 
 /** Every biome id, the one list (#509): anything per biome is a `Record<BiomeType, …>`, so a missing one fails `tsc -b`. */
-export const BIOME_TYPES = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym', 'city'] as const
+export const BIOME_TYPES = ['themePark', 'desert', 'ocean', 'arctic', 'volcanic', 'gym', 'city', 'jungle'] as const
 export type BiomeType = (typeof BIOME_TYPES)[number]
 export type BossType = 'goldenBlimp' | 'kraken' | 'giantScorpion' | 'yeti' | 'magmaTitan' | 'medusa' | 'helicopter'
-export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly' | 'hoverDrone' | 'billboardBot'
+export type EnemyType = 'balloon' | 'crow' | 'scorpion' | 'shark' | 'jellyfish' | 'flyingFish' | 'snowman' | 'snowmanScout' | 'snowmanBrute' | 'emberWisp' | 'lavaGolem' | 'fireImp' | 'infernalDrake' | 'climber' | 'rat' | 'dustBunny' | 'lanternfly' | 'hoverDrone' | 'billboardBot' | 'toucan'
 
 /**
  * A wall (#453), climbable unless it is a `perch`: from `origin`, its bottom-left corner, along unit `right` and `up`; it
@@ -169,6 +169,9 @@ export interface DarkSectionSpec {
   flashReach: number
   look?: DarkLook
   reach?: number
+  /** A floor it is ridden over (level 2's passage through the Pyramid, #937), `below` the rails and `halfWidth` either side of
+   *  them: a `darkFloor` wave's walkers stand on it (`spawning/darkFloor.ts`). */
+  floor?: { below: number; halfWidth: number }
 }
 
 export type DarkLook = 'blacklight' | 'ice'
@@ -212,6 +215,12 @@ export interface EnemyWave {
    * kill count. `maxScore` counts it: the harder way is the way to three stars.
    */
   route?: 'hard'
+  /**
+   * The wave stands on the floor of the dark section the rider is in or comes to next (#937: scorpions in the Pyramid's
+   * passage), along it ahead of the rider (`spawning/darkFloor.ts`): a ground walker, no formation, on a track with a
+   * `DarkSectionSpec.floor`.
+   */
+  darkFloor?: boolean
 }
 
 /** A whale breaching across the ride (Ocean, #793), where and when the level puts it; the breach's own shape is `BREACH` in `biomes/ocean/whaleBreach.ts`. */

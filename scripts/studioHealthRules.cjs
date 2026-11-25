@@ -16,7 +16,7 @@ const CAN_FIX_A_CHECK = /^(src|e2e|public|api|scripts)\/|^\.github\/workflows\/|
 const GAME_JOB = /^(verify|portal|smoke\b|deploy|nightly)/
 /** Jobs on main whose failure already opens `agent:prod-broken` (ci.yml's `verify` gate and what it needs; prod-alert.cjs). */
 const ALERTED_ON_MAIN = {
-  '.github/workflows/ci.yml': /^(verify|changes|unit|lighthouse|smoke|pacing)\b/,
+  '.github/workflows/ci.yml': /^(verify|changes|unit|lighthouse|smoke|pacing|offline)\b/,
   '.github/workflows/prod-smoke.yml': /./,
 }
 /** prod-smoke.yml's nightly runs at 06:00 UTC: older than this, GitHub's cron ran late or skipped it (#487). */

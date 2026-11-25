@@ -15,7 +15,7 @@ import {
 import { flatForward } from './bossAim.hot'
 import { followHeading, smooth } from './bossCycle.hot'
 import {
-  HELI, HELI_FALL, anchorAt, beamSpot, dropInHeight, heliPose, spotAt, type BeamSpot, type HeliPose,
+  HELI, HELI_FALL, anchorAt, beamSpot, dropInHeight, heliPose, lookSlope, spotAt, type BeamSpot, type HeliPose,
 } from './helicopterMotion.hot'
 
 /** The beam's opacity once it has swept in; it fades in over the tell. */
@@ -79,7 +79,7 @@ export default function Helicopter(props: BossProps) {
     const first = motion.tell === 0
     motion.tell += dt
     flatForward(camera, _fwd)
-    followHeading(motion.heading, _fwd.x, _fwd.z, dt, first)
+    followHeading(motion.heading, _fwd.x, _fwd.z, dt, first, HELI.headingTau)
     camera.getWorldPosition(_cam)
     anchorAt(_lamp, _cam, motion.heading, 0, groundFn).y += HELI.dropIn
     const k = motion.tell / HELICOPTER.tell.seconds
@@ -94,11 +94,12 @@ export default function Helicopter(props: BossProps) {
       const fighting = sinceDefeat < 0
       const tailLost = weakPointHp(state, 'tail-rotor') <= 0
       heliPose(_pose, age, tailLost, sinceDefeat)
+      const slope = lookSlope(camera.getWorldDirection(_fwd))
       flatForward(camera, _fwd)
-      followHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed)
+      followHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed, HELI.headingTau)
       const h = motion.heading
       camera.getWorldPosition(_cam)
-      anchorAt(_anchor, _cam, h, age, groundFn)
+      anchorAt(_anchor, _cam, h, age, groundFn, slope)
       _anchor.y += _pose.dy + dropInHeight(age)
 
       const k = 1 - Math.exp(-dt / HELI.followTau)

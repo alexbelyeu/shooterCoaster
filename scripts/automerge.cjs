@@ -32,7 +32,7 @@ function sweepNumbers(openPrs) {
 
 /** CI jobs that `verify` waits on (ci.yml `verify.needs`, held to it by automerge.test.ts): GitHub creates the `verify` check only once they end. */
 const isVerifyNeed = (name) =>
-  name === 'changes' || name === 'unit + build' || name === 'lighthouse' || name.startsWith('smoke (') || name.startsWith('pacing (')
+  name === 'changes' || name === 'unit + build' || name === 'lighthouse' || name.startsWith('smoke (') || name.startsWith('pacing (') || name === 'offline (service worker)'
 
 /**
  * The newest `verify` check run of a commit, or a `waiting` stand-in (with the commit's `head_sha`) while a job it

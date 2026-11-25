@@ -46,16 +46,17 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2450, Kraken 2624, Yeti 3060, Magma Titan 2914, Medusa 2652, Helicopter 1845', () => {
+  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2615, Kraken 3074, Yeti 3060, Magma Titan 2914, Medusa 2652, Helicopter 1875, Jungle Ruins (Blimp placeholder) 1970', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2675],
-      ['level2', 'giantScorpion', 2450],
-      ['level3', 'kraken', 2624],
+      ['level2', 'giantScorpion', 2615],
+      ['level3', 'kraken', 3074],
       ['level4', 'yeti', 3060],
       ['level5', 'magmaTitan', 2914],
       ['level6', 'medusa', 2652],
-      ['level7', 'helicopter', 1845],
+      ['level7', 'helicopter', 1875],
+      ['level8', 'goldenBlimp', 1970],
     ])
     expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
   })
@@ -255,17 +256,19 @@ describe('nextStar', () => {
 
   it('agrees with computeStars at every whole score on every level', () => {
     for (const l of levels) {
-      for (let score = 0; score <= l.maxScore; score++) {
+      // One assertion per level after the loop (scripts/vitestAssertionBudget.ts): the first score that disagrees.
+      let wrong: number | null = null
+      for (let score = 0; score <= l.maxScore && wrong === null; score++) {
         const earned = computeStars(score, l.maxScore, l.starThresholds)
         const next = nextStar(score, l.maxScore, l.starThresholds)
-        if (earned === 3) {
-          expect(next, `${l.id} @ ${score}`).toBeNull()
-          continue
-        }
-        expect(next?.stars, `${l.id} @ ${score}`).toBe(earned + 1)
-        expect(computeStars(score + next!.points, l.maxScore, l.starThresholds), `${l.id} @ ${score}`).toBe(earned + 1)
-        expect(computeStars(score + next!.points - 1, l.maxScore, l.starThresholds), `${l.id} @ ${score}`).toBe(earned)
+        const agrees = earned === 3
+          ? next === null
+          : next?.stars === earned + 1 &&
+            computeStars(score + next.points, l.maxScore, l.starThresholds) === earned + 1 &&
+            computeStars(score + next.points - 1, l.maxScore, l.starThresholds) === earned
+        if (!agrees) wrong = score
       }
+      expect(wrong, `${l.id}: nextStar disagrees with computeStars at this score`).toBeNull()
     }
   })
 })

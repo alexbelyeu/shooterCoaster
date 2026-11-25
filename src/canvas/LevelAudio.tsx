@@ -7,22 +7,30 @@ import { placeSound, prepareSfx, setSfxListener, sfx } from '@/audio/sfx'
 import { isAudioReady, setMusicDucked, setPauseMix, whenAudioReady } from '@/audio/AudioEngine'
 import { scrimPlayer, withScrim } from '@/audio/musicEngine'
 import { eventBus } from '@/core/EventBus'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
+import { rushComplete, rushStages } from '@/levels/bossRush'
 import { isInRun } from '@/store/startPhase'
 import { reportLoad } from '@/core/loadProgress'
 import { FIREWORK_BURST_EVENT, FIREWORK_LAUNCH_EVENT } from '@/effects/fireworks'
 import { applyCombatMix, type CombatMixTargets } from '@/audio/combatMix'
-import { RESULTS_CUTS, resultsCut } from '@/audio/scores/resultsCut'
+import { RESULTS_CUTS, resultsCut, type ResultsCut } from '@/audio/scores/resultsCut'
 import { runStars } from '@/levels/scoring'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import type { BossDefeatedEvent, BossHitEvent, BossSpawnEvent } from '@/entities/bosses/BossBase'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import { BYSTANDER_HIT_EVENT, type BystanderHitEvent } from '@/combat/bystanders'
 
-/** The run's stars as the results screen shows them, which pick the results score's cut (#792, #797). */
-function finishedRunStars(level: string): number {
+/**
+ * The results score's cut for the run that just ended: a campaign or daily run's from its stars, as the results screen
+ * shows them (#792, #797); a Boss Rush's from whether it beat every boss, since a stage's score is only its boss (#1011).
+ */
+function finishedRunCut(level: string): ResultsCut {
+  const s = useGameStore.getState()
+  if (s.runMode.mode === 'bossRush') {
+    return rushComplete(s.runMode.stage, s.bossSeconds !== null, rushStages(getAllLevels()).length) ? 'results-win' : 'results-lose'
+  }
   const config = getLevelConfig(level)
-  return config ? runStars(useGameStore.getState().score, config) : 0
+  return resultsCut(config ? runStars(s.score, config) : 0)
 }
 
 /**
@@ -33,7 +41,7 @@ function finishedRunStars(level: string): number {
 function followPhase(phase: GamePhase, level: string): Promise<void> {
   if (!isInRun(phase) && phase !== 'results') return Promise.resolve()
   return withScrim((p) => {
-    if (phase === 'results') p.playScore(resultsCut(finishedRunStars(level)))
+    if (phase === 'results') p.playScore(finishedRunCut(level))
     else if (phase === 'paused') p.pauseScore(true)
     else {
       p.playScore(level)

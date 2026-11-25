@@ -13,9 +13,15 @@ import {
  * Ground-crawling scorpion: dark chitin with amber jointed legs, in three draw
  * calls (merged shell, swaying tail, glowing stinger). Scuttles round a small loop through
  * where it was placed (#494: a straight crawl took it hundreds of units out of the view its
- * placement chose within seconds), following terrain height.
+ * placement chose within seconds), following terrain height. On a dark section's floor (#937, level 2's passage) it
+ * holds its spot between the rails and the wall instead, shuffling to and fro down the passage and facing the car.
  */
+/** On a floor: how far it shuffles either way down the passage, and how far it turns either side of facing the car (radians). */
+const FLOOR_SHUFFLE = 8
+const FLOOR_SWAY = 0.3
+
 export default function Scorpion(props: EnemyProps) {
+  const { floor } = props
   const { moveAngle, turnRate } = useEnemyRandom(props.id, (rng) => ({
     moveAngle: rng() * Math.PI * 2,
     // 0.6–1.4 rad/s, either way round: a lap in 4.5–10 s at 12–28 units/s.
@@ -27,19 +33,25 @@ export default function Scorpion(props: EnemyProps) {
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
-      // Heading `h`, turning at `turnRate`: the loop of SCUTTLE_RADIUS it traces passes through the spawn at h = moveAngle.
-      const h = moveAngle + turnRate * time
-      const r = SCUTTLE_RADIUS * Math.sign(turnRate)
-      mesh.position.x = spawnPos.x + r * (Math.sin(h) - Math.sin(moveAngle))
-      mesh.position.z = spawnPos.z - r * (Math.cos(h) - Math.cos(moveAngle))
-      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 5
-      if (bodyRef.current) bodyRef.current.rotation.y = -h
-
-      if (tailRef.current) {
-        tailRef.current.rotation.z = Math.sin(time * 2.5) * 0.2
+      let heading: number
+      if (floor) {
+        const along = Math.sin(time * 1.7 + moveAngle) * FLOOR_SHUFFLE
+        mesh.position.x = spawnPos.x + Math.cos(floor.heading) * along
+        mesh.position.z = spawnPos.z + Math.sin(floor.heading) * along
+        mesh.position.y = floor.y + 5
+        heading = floor.heading + Math.sin(time * 1.1 + moveAngle) * FLOOR_SWAY
+      } else {
+        // Turning at `turnRate`: the loop of SCUTTLE_RADIUS it traces passes through the spawn at heading = moveAngle.
+        heading = moveAngle + turnRate * time
+        const r = SCUTTLE_RADIUS * Math.sign(turnRate)
+        mesh.position.x = spawnPos.x + r * (Math.sin(heading) - Math.sin(moveAngle))
+        mesh.position.z = spawnPos.z - r * (Math.cos(heading) - Math.cos(moveAngle))
+        mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 5
       }
+      if (bodyRef.current) bodyRef.current.rotation.y = -heading
+      if (tailRef.current) tailRef.current.rotation.z = Math.sin(time * 2.5) * 0.2
     },
-    [moveAngle, turnRate, heightFn],
+    [moveAngle, turnRate, heightFn, floor],
   )
 
   return (

@@ -1,10 +1,10 @@
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { flipWinding, mergePainted, painted, paintedAt, paintedPolygon, placedParts, pose, sunShaded } from '@/levels/environments/shared/paintedParts'
-import { withRim } from './enemyRim'
+import { withEmissivePatch, withRim } from './enemyRim'
 import { DRAKE_PARTS, withDrakePose } from './infernoEnemyAssets'
 import { DRAKE_ROAR, poseDrake } from './drakePose.hot'
-import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, FFISH_BODY, FFISH_BELLY, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_LIGHT, DUST_DARK, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY } from './enemyPalette'
+import { BALLOON_COLORS, CROW_BODY as CROW_BODY_HEX, CROW_SHEEN as CROW_SHEEN_HEX, SCORPION_BODY_COLOR, SCORPION_PINCER_COLOR, SCORPION_LEG_COLOR, JELLY_COLORS, FFISH_BODY, FFISH_BELLY, CLIMBER_SHIRT, CLIMBER_TROUSERS, RAT_FUR, RAT_BELLY, DUST_GREY, DUST_LIGHT, DUST_DARK, DUST_CHALK, LANTERNFLY_FOREWING, LANTERNFLY_RED, LANTERNFLY_BODY, TOUCAN_BODY as TOUCAN_BODY_HEX, TOUCAN_BIB, TOUCAN_BILL, TOUCAN_TIP } from './enemyPalette'
 
 type Vec3 = [number, number, number]
 
@@ -219,26 +219,26 @@ const CROW_WING_FLAP = /* glsl */ `
 }
 `
 
-export function patchCrowWingVertex(vertexShader: string): string {
+export function patchBirdWingVertex(vertexShader: string): string {
   return vertexShader
     .replace('#include <common>', `#include <common>\n${CROW_WING_PARS}`)
     .replace('#include <begin_vertex>', `#include <begin_vertex>\n${CROW_WING_FLAP}`)
 }
 
 /** Wing angles (arm, hand; radians, + = down): a quick downstroke, and the hand lagging so the wrist bends. */
-export function crowWingPose(phase: number, out: THREE.Vector2): THREE.Vector2 {
+export function birdWingPose(phase: number, out: THREE.Vector2): THREE.Vector2 {
   const p = phase + 0.5 * Math.sin(phase)
   return out.set(0.05 + 0.6 * Math.sin(p), 0.5 * Math.sin(p - 0.9))
 }
 
-/** Flaps `material`'s crow wings by `flap`; every material built the same way shares one program. */
+/** Flaps `material`'s bird wings (crow and toucan) by `flap`; every material built the same way shares one program. */
 function withCrowWings<T extends THREE.Material>(material: T, flap: { value: THREE.Vector2 }): T {
   const base = material.onBeforeCompile
   const baseKey = material.customProgramCacheKey()
   material.onBeforeCompile = (shader, renderer) => {
     base.call(material, shader, renderer)
     shader.uniforms.uWingFlap = flap
-    shader.vertexShader = patchCrowWingVertex(shader.vertexShader)
+    shader.vertexShader = patchBirdWingVertex(shader.vertexShader)
   }
   material.customProgramCacheKey = () => `${baseKey}-crow-wing`
   return material
@@ -248,8 +248,8 @@ function withCrowWings<T extends THREE.Material>(material: T, flap: { value: THR
 // also read against the hazy horizon and the red mesas.
 const CROW_RIM = { color: '#a8bce0', intensity: 0.4, power: 3.5 }
 
-/** One crow's feathers, flapping by `flap` (arm, hand radians); every instance shares one program. */
-export function createCrowFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
+/** One bird's feathers (crow or toucan), flapping by `flap` (arm, hand radians); every instance shares one program. */
+export function createBirdFeatherMaterial(flap: { value: THREE.Vector2 }): THREE.MeshPhysicalMaterial {
   return withCrowWings(withRim(new THREE.MeshPhysicalMaterial({
     vertexColors: true,
     metalness: 0.1,
@@ -261,10 +261,64 @@ export function createCrowFeatherMaterial(flap: { value: THREE.Vector2 }): THREE
   }), CROW_RIM), flap)
 }
 
-/** Only for ShaderWarmup: crows build their own instances. */
-export const CROW_FEATHER_MAT = createCrowFeatherMaterial({ value: new THREE.Vector2() })
+/** Only for ShaderWarmup: the birds build their own instances. */
+export const BIRD_FEATHER_MAT = createBirdFeatherMaterial({ value: new THREE.Vector2() })
 
-export const CROW_EYE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+export const BIRD_EYE_MAT = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false })
+
+// ── Toucan: the crow's wings and flap on a chunkier body, a yellow bib and a big orange bill ─
+// Brief: docs/art/ENEMIES.md (#870). Same axes as the crow; it flaps with the crow's feather material and flinch, so
+// it adds no program.
+
+const TOUCAN_BODY = new THREE.Color(TOUCAN_BODY_HEX)
+
+// Body and head, (radius, z) from the tail to the bill's root: rounder and shorter-necked than the raven.
+const TOUCAN_BODY_PROFILE = [
+  [0, -3], [0.9, -2.4], [1.6, -1.2], [2, 0], [2, 1.3], [1.75, 2.6],
+  [1.55, 3.5], [1.6, 4.3], [1.3, 5], [0.7, 5.4], [0, 5.5],
+].map(([r, z]) => new THREE.Vector2(r, z))
+
+/** The bill: a frustum from the head and a cone tip on its end, tall and narrow, drooping by `DROOP` radians. */
+const TOUCAN_BILL_LEN = 4.4
+const TOUCAN_TIP_LEN = 1.3
+const TOUCAN_BILL_DROOP = 0.1
+const TOUCAN_BILL_MID_Z = 5 + TOUCAN_BILL_LEN / 2
+/** From the frustum's centre to the tip's, along the bill (a hair short, so the tip seats on the frustum's end). */
+const TOUCAN_TIP_OFFSET = (TOUCAN_BILL_LEN + TOUCAN_TIP_LEN) / 2 - 0.02
+
+export const TOUCAN_GEO = mergePainted([
+  paintedAt(new THREE.LatheGeometry(TOUCAN_BODY_PROFILE, 8), TOUCAN_BODY, pose([0, 0, 0], [Math.PI / 2, 0, 0], [1, 1, 0.9])),
+  // Bib: the throat and chest, below and ahead of the wings.
+  paintedAt(new THREE.SphereGeometry(1, 8, 6), TOUCAN_BIB, pose([0, -0.4, 4], [0, 0, 0], [1.6, 1.4, 1.5])),
+  // Bill: an orange frustum and a red tip, drooping a little.
+  paintedAt(
+    new THREE.CylinderGeometry(0.42, 1, TOUCAN_BILL_LEN, 8),
+    TOUCAN_BILL,
+    pose([0, 0.35, TOUCAN_BILL_MID_Z], [Math.PI / 2 + TOUCAN_BILL_DROOP, 0, 0], [0.62, 1, 1.25]),
+  ),
+  paintedAt(
+    new THREE.ConeGeometry(0.42, TOUCAN_TIP_LEN, 8),
+    TOUCAN_TIP,
+    pose([0, 0.35 - TOUCAN_TIP_OFFSET * Math.sin(TOUCAN_BILL_DROOP), TOUCAN_BILL_MID_Z + TOUCAN_TIP_OFFSET * Math.cos(TOUCAN_BILL_DROOP)], [Math.PI / 2 + TOUCAN_BILL_DROOP, 0, 0], [0.62, 1, 1.25]),
+  ),
+  // Red under the tail, and the feet tucked back.
+  painted(new THREE.ConeGeometry(0.6, 1.4, 5), TOUCAN_TIP, [0, -1, -2.2], [-Math.PI / 2 - 0.3, 0, 0]),
+  ...[1, -1].map((side) =>
+    painted(new THREE.ConeGeometry(0.28, 1.2, 4), '#5a6a9a', [side * 0.6, -1.5, -1.4], [-Math.PI / 2, 0, 0])),
+  featherPlate(CROW_TAIL, 0.18, () => TOUCAN_BODY, TOUCAN_BODY).rotateX(0.1).translate(0, 0.15, -2.2),
+].map((g) => wingTagged(g, 0)).concat(crowWing(1), crowWing(-1)))
+
+// Eyes: a sky-blue skin patch round a dark pupil and a glint; unlit, like the crow's.
+export const TOUCAN_EYES_GEO = mergePainted([1, -1].flatMap((side) => {
+  const eye = new THREE.Vector3(side * 1.3, 0.55, 4.3)
+  const on = (dir: [number, number, number], r: number): [number, number, number] =>
+    eye.clone().addScaledVector(new THREE.Vector3(side * dir[0], dir[1], dir[2]).normalize(), r).toArray()
+  return [
+    paintedAt(new THREE.SphereGeometry(0.5, 8, 5), new THREE.Color('#6fd0ff').multiplyScalar(1.3), pose(eye.toArray(), [0, 0, 0], [0.6, 1, 1])),
+    painted(new THREE.SphereGeometry(0.22, 5, 3), '#050406', on([1, 0.1, 0.3], 0.26)),
+    painted(new THREE.SphereGeometry(0.09, 4, 2), new THREE.Color(3, 3, 3), on([0.8, 0.6, 0.4], 0.36)),
+  ]
+}))
 
 // ── Scorpion: merged shell + swaying tail + glowing stinger ─────────
 
@@ -364,27 +418,30 @@ function makeWingGeo(
 // ── Jellyfish: bell + glowing core ───────────────────────────────
 const JELLY_TENTACLES = 5
 /**
- * Bell + five hanging tentacles as one geometry: a whole Ocean wave floats in view beside
- * the track (#316), and at 7 draw calls a jellyfish broke level3's draw budget.
+ * The glowing core, the bell and five hanging tentacles as one geometry and one single-pass material: one draw call
+ * a jellyfish (#937: level3's lines float a dozen or more in view at once). The core comes first, so it draws under
+ * the bell; it is painted black and the material lights it itself, opaque (`JELLY_CORE_APPLY`).
  */
-export const JELLY_BODY_GEO = placedParts([
-  [new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [0, 0, 0]],
-  ...Array.from({ length: JELLY_TENTACLES }, (_, i): [THREE.BufferGeometry, Vec3] => {
-    const a = (i / JELLY_TENTACLES) * Math.PI * 2
-    return [new THREE.CylinderGeometry(0.15, 0.08, 5, 4), [Math.cos(a) * 1.8, -3, Math.sin(a) * 1.8]]
-  }),
+export const JELLY_GEO = mergePainted([
+  painted(new THREE.SphereGeometry(1.5, 6, 6), 0, [0, 1, 0]),
+  painted(placedParts([
+    [new THREE.SphereGeometry(3, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), [0, 0, 0]],
+    ...Array.from({ length: JELLY_TENTACLES }, (_, i): [THREE.BufferGeometry, Vec3] => {
+      const a = (i / JELLY_TENTACLES) * Math.PI * 2
+      return [new THREE.CylinderGeometry(0.15, 0.08, 5, 4), [Math.cos(a) * 1.8, -3, Math.sin(a) * 1.8]]
+    }),
+  ]), '#fff'),
 ])
-export const JELLY_INNER_GEO = new THREE.SphereGeometry(1.5, 6, 6)
+const JELLY_CORE_APPLY = /* glsl */ `{
+  float core = step(vColor.g, 0.5);
+  diffuseColor = mix(diffuseColor, vec4(diffuse, 1.0), core);
+  totalEmissiveRadiance += diffuse * 1.5 * core;
+}`
 
-export const JELLY_BODY_MATS = JELLY_COLORS.map(
-  (c) => withRim(
-    new THREE.MeshPhongMaterial({ color: c, transparent: true, opacity: 0.5, flatShading: true, side: THREE.DoubleSide }),
-    { color: c, intensity: 0.8, power: 2 },
-  ),
-)
-export const JELLY_INNER_MATS = JELLY_COLORS.map(
-  (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.5, toneMapped: false }),
-)
+export const JELLY_MATS = JELLY_COLORS.map((c) => withEmissivePatch(withRim(
+  new THREE.MeshPhongMaterial({ color: c, vertexColors: true, transparent: true, opacity: 0.5, flatShading: true, side: THREE.DoubleSide, forceSinglePass: true }),
+  { color: c, intensity: 0.8, power: 2 },
+), 'jelly-core', {}, '', JELLY_CORE_APPLY))
 export const JELLY_COLOR_COUNT = JELLY_COLORS.length
 
 // ── Flying Fish: one painted body, two wing-fins ─────────────────

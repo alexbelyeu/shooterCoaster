@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { useGameStore } from '@/store/useGameStore'
 import { SCREEN_SHAKE_LEVELS, type ScreenShakeLevel } from '@/combat/screenShake.hot'
 import { GRAPHICS_QUALITIES, type GraphicsQuality } from '@/canvas/graphicsQuality'
 import { usePrefersReducedMotion, useSystemPrefersReducedMotion } from '@/ui/reducedMotion'
 import { browserStorage, isInternalBrowser, setInternalBrowser } from '@/app/analyticsGate'
+import { canInstall, onInstallChange, promptInstall } from '@/app/installPrompt'
 import { isInRun } from '@/store/startPhase'
 import { FairBoard } from '@/ui/Fair'
 import { touchFirst } from '@/ui/touchFirst'
@@ -135,6 +136,23 @@ function InternalDeviceRow() {
   )
 }
 
+/** The browser's install offer (#999), while it holds one: never on iOS or once installed. */
+function InstallRow() {
+  const available = useSyncExternalStore(onInstallChange, canInstall)
+  if (!available) return null
+  return (
+    <div className="settings-row settings-install">
+      <span>
+        Home screen
+        <small className="settings-note">Plays full screen, even offline</small>
+      </span>
+      <button type="button" className="fair-plate" onClick={promptInstall}>
+        Install
+      </button>
+    </div>
+  )
+}
+
 interface SettingsScreenProps {
   onClose: () => void
 }
@@ -231,6 +249,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
 
           <section className="settings-group">
             <h3>Data</h3>
+            {fromTitle && <InstallRow />}
             <ClearDataRow />
             {fromTitle && <InternalDeviceRow />}
           </section>

@@ -9,8 +9,8 @@ import { createTowerMaterial } from './cityShaders'
 import { LANDMARK_SITE } from './config'
 
 /**
- * The city's landmarks: the hero tower beyond the track (#323), a stepped skyscraper with lit windows, neon crowns and
- * a lit needle; and the elevated highway the ride threads under and over (#921), neon down both edges.
+ * The hero tower the ride winds round (#323, #871): a stepped skyscraper with lit windows, neon crowns and a lit needle;
+ * and the elevated highway the ride passes under (#921, #871), neon down both edges.
  */
 export default function CityFeatures({ groundFn, track }: BiomeFeaturesProps) {
   const hero = useMemo(layoutHeroTower, [])

@@ -69,6 +69,7 @@ export const Countdown = lazyScreen(() => loadPlayScreens().then((m) => m.Countd
 export const Intro = lazyScreen(() => loadPlayScreens().then((m) => m.Intro))
 export const PauseScreen = lazyScreen(() => loadPlayScreens().then((m) => m.PauseScreen))
 export const ResultsScreen = lazyScreen(() => loadPlayScreens().then((m) => m.ResultsScreen))
+export const BossRushResults = lazyScreen(() => loadPlayScreens().then((m) => m.BossRushResults))
 export const GhostCrosshair = lazyScreen(() => loadPlayScreens().then((m) => m.GhostCrosshair))
 export const ScorePopups = lazyScreen(() => loadPlayScreens().then((m) => m.ScorePopups))
 export const WaveAnnouncement = lazyScreen(() => loadPlayScreens().then((m) => m.WaveAnnouncement))

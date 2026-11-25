@@ -1,6 +1,7 @@
 import { useEffect, useMemo, type CSSProperties } from 'react'
 import { useGameStore } from '@/store/useGameStore'
-import { getLevelConfig } from '@/levels/LevelRegistry'
+import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
+import { rushStages } from '@/levels/bossRush'
 import { biomeTheme } from '@/ui/theme'
 import { bindings, matchesKey } from '@/input/bindings'
 import ScoreDisplay from './ScoreDisplay'
@@ -27,6 +28,18 @@ function KillStrip() {
   )
 }
 
+/** "Boss 2 of 8" under the score on a Boss Rush stage (#1011), where there is nothing else to count. */
+function RushStrip({ stage }: { stage: number }) {
+  const stages = useMemo(() => rushStages(getAllLevels()).length, [])
+  return (
+    <div className="hud-kills" data-rush-stage={stage + 1}>
+      <span className="hud-kills-count">
+        Boss <span className="hud-kills-value">{stage + 1}</span> of {stages}
+      </span>
+    </div>
+  )
+}
+
 /**
  * In-play HUD. The root only subscribes to the current level, so it renders once
  * per level; each widget subscribes to its own store slice (see ScoreDisplay for
@@ -34,6 +47,7 @@ function KillStrip() {
  */
 export default function HUD() {
   const currentLevel = useGameStore((s) => s.currentLevel)
+  const rushStage = useGameStore((s) => (s.runMode.mode === 'bossRush' ? s.runMode.stage : null))
   const config = currentLevel ? getLevelConfig(currentLevel) : null
   const theme = biomeTheme(config?.biome)
   const style = useMemo(
@@ -57,7 +71,7 @@ export default function HUD() {
     <div className="hud" style={style}>
       <div className="hud-panel hud-panel--left">
         <ScoreDisplay />
-        <KillStrip />
+        {rushStage === null ? <KillStrip /> : <RushStrip stage={rushStage} />}
       </div>
       <div className="hud-panel hud-panel--right">
         <TimerBar />

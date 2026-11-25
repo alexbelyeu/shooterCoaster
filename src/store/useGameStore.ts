@@ -29,10 +29,14 @@ import { scoreAfterPenalty } from '@/levels/scoring'
 // The saved-medal helpers, not `levels/medals.ts`, whose table only the lazy results and level select screens need.
 import { addMedals, sanitizeSavedMedals } from '@/levels/savedMedals'
 import type { MedalRun } from '@/levels/medals'
+import { bestAfter, rushStages, sanitizeRushBest, stageSeconds } from '@/levels/bossRush'
+import { RUN_SECONDS } from '@/levels/pacing'
 // The generated table, not `scoreLimits()`, which would pull the boss specs into the startup JS.
 import { LEVEL_LIMITS } from '../../api/_lib/levelLimits'
 
 const CAMPAIGN: RunMode = { mode: 'campaign' }
+/** A Boss Rush from its first stage. */
+export const BOSS_RUSH: RunMode = { mode: 'bossRush', stage: 0, seconds: 0 }
 
 export interface StartRunOptions {
   seed?: number
@@ -71,18 +75,22 @@ interface GameState {
   runFrom: RunFrom
   /** Day, or the level's Night Ride (#829): set by every `startRun` (day unless asked), kept by a restart. */
   runVariant: RideVariant
+  /** Level time the run's ride and timer start at: 0, or a Boss Rush stage's start a few seconds before its boss. */
+  runStartAt: number
   /** The last campaign level started, persisted: title PLAY falls back to it once every level has a star. */
   lastLevel: string | null
   /**
    * The one way to start a level (enters `loading`, `playing` under `?e2e=1`; `startPhase.ts`); seed precedence:
-   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`. A `replay` skips the intro, and
-   * the loading screen too when the level is still warm. A campaign run from level select unless told otherwise.
+   * `seed` > `?seed=` > the daily seed of `mode.dateKey` (daily runs) > `Date.now()`. A `replay` (and every Boss Rush stage) skips the
+   * intro, and the loading screen too when the level is still warm. A campaign run from level select unless told otherwise.
    */
   startRun: (levelId: string, options?: StartRunOptions) => void
   /** Starts the player's next level (`nextLevelIndex`, the one level select focuses first): title PLAY, #329. */
   startNextRun: (from: RunFrom) => void
-  /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one. */
+  /** Restarts the current level in the same mode: a daily keeps its seed, a campaign run gets a fresh one; a Boss Rush starts over from its first stage. */
   restartRun: (from: RunFrom) => void
+  /** Play ended at level time `endedAt`: the results, or a Boss Rush's next stage after a beaten boss. */
+  endRun: (endedAt: number) => void
   /** This run's loading screen goes straight to the countdown (a restart), not the intro. */
   skipIntro: boolean
 
@@ -148,7 +156,7 @@ interface GameState {
   /** Enters a run under `lastInitials`; returns its 0-based rank, or null when it misses the board. */
   addLeaderboardEntry: (levelId: string, run: { score: number; stars: number; date: number }) => number | null
   setEntryInitials: (levelId: string, date: number, initials: string) => void
-  /** Settings "Clear local data": scores, stars (so unlocks), leaderboards, the last level played and the Daily Run's bests and streak. */
+  /** Settings "Clear local data": scores, stars (so unlocks), leaderboards, the last level played and the Daily Run's bests and streak, the Boss Rush best. */
   clearLocalData: () => void
 
   /** Best daily run per UTC day (`YYYY-MM-DD`), the last `DAILY_KEEP_DAYS` only; never touches `savedScores`. */
@@ -158,6 +166,9 @@ interface GameState {
   saveDailyScore: (entry: ScoreEntry, dateKey: string) => void
   /** Saves a finished run where its mode keeps bests: the day's daily best, or the level's campaign best. */
   saveRunResult: (entry: ScoreEntry) => void
+  /** The fastest whole Boss Rush in level seconds, persisted; null before the first. */
+  bossRushBest: number | null
+  saveBossRushTime: (seconds: number, complete: boolean) => void
 
   timeScale: number
   frenzy: FrenzyStage
@@ -242,6 +253,7 @@ export const useGameStore = create<GameState>()(
       runMode: CAMPAIGN,
       runFrom: 'select',
       runVariant: 'day',
+      runStartAt: 0,
       lastLevel: null,
       startRun: (levelId, { seed, mode = CAMPAIGN, replay = false, from = 'select', variant = 'day' } = {}) => {
         markStartup('runStart')
@@ -249,7 +261,9 @@ export const useGameStore = create<GameState>()(
         const s = get()
         // A new level isn't warmed up yet: the outgoing level's `sceneReady` must not end its loading screen (#597).
         const warm = levelId === s.currentLevel && s.sceneReady
-        const phase = startPhaseFor({ search: urlSearch() ?? '', warm, replay })
+        // A Boss Rush stage starts mid-ride: the intro tour from the station would end in a jump to its start.
+        const skipIntro = replay || mode.mode === 'bossRush'
+        const phase = startPhaseFor({ search: urlSearch() ?? '', warm, replay: skipIntro })
         // The same level's scene stays mounted and won't report its stages again, warm or still warming up; an
         // unmounted one was zeroed as it left (`unloadLevel`) and reports them all once it mounts.
         if (levelId !== s.currentLevel) resetLoad(levelId)
@@ -259,25 +273,43 @@ export const useGameStore = create<GameState>()(
           runSeed: (seed ?? urlSeed() ?? fallback) >>> 0,
           runMode: mode,
           runFrom: from,
-          runVariant: mode.mode === 'daily' ? 'day' : variant,
+          runVariant: mode.mode === 'campaign' ? variant : 'day',
+          runStartAt: mode.mode === 'bossRush' ? (rushStages(getAllLevels())[mode.stage]?.startAt ?? 0) : 0,
           lastLevel: mode.mode === 'campaign' ? levelId : s.lastLevel,
           runId: s.runId + 1,
           sceneReady: warm,
           phase,
           resuming: false,
           photo: false,
-          skipIntro: replay,
+          skipIntro,
         })
       },
       restartRun: (from) => {
         const { currentLevel, runMode, runSeed, runVariant, startRun } = get()
         if (!currentLevel) return
+        if (runMode.mode === 'bossRush') {
+          startRun(rushStages(getAllLevels())[0].levelId, { mode: BOSS_RUSH, from })
+          return
+        }
         startRun(currentLevel, { seed: runMode.mode === 'daily' ? runSeed : undefined, mode: runMode, replay: true, from, variant: runVariant })
       },
       startNextRun: (from) => {
         const { savedScores, isLevelUnlocked, lastLevel, startRun } = get()
         const cards = buildLevelCards(getAllLevels(), savedScores, isLevelUnlocked, {})
         startRun(cards[nextLevelIndex(cards, lastLevel)].id, { from })
+      },
+      endRun: (endedAt) => {
+        const s = get()
+        const mode = s.runMode
+        if (mode.mode !== 'bossRush') {
+          s.setPhase('results')
+          return
+        }
+        const stages = rushStages(getAllLevels())
+        const seconds = mode.seconds + stageSeconds(stages[mode.stage], Math.min(endedAt, RUN_SECONDS))
+        const next = s.bossSeconds !== null ? stages[mode.stage + 1] : undefined
+        if (next) s.startRun(next.levelId, { mode: { mode: 'bossRush', stage: mode.stage + 1, seconds }, from: s.runFrom })
+        else set({ runMode: { ...mode, seconds }, phase: 'results', resuming: false, photo: false })
       },
       skipIntro: false,
 
@@ -382,6 +414,7 @@ export const useGameStore = create<GameState>()(
           savedDaily: {},
           dailyStreak: { count: 0, lastKey: null },
           lastLevel: null,
+          bossRushBest: null,
         })
       },
 
@@ -399,8 +432,10 @@ export const useGameStore = create<GameState>()(
       saveRunResult: (entry) => {
         const { runMode, saveDailyScore, saveScore } = get()
         if (runMode.mode === 'daily') saveDailyScore(entry, runMode.dateKey)
-        else saveScore(entry)
+        else if (runMode.mode === 'campaign') saveScore(entry)
       },
+      bossRushBest: null,
+      saveBossRushTime: (seconds, complete) => set((s) => ({ bossRushBest: bestAfter(s.bossRushBest, seconds, complete) })),
 
       isLevelUnlocked: (levelId) => {
         if (!getLevelConfig(levelId)) return false
@@ -419,6 +454,7 @@ export const useGameStore = create<GameState>()(
         savedDaily: state.savedDaily,
         dailyStreak: state.dailyStreak,
         lastLevel: state.lastLevel,
+        bossRushBest: state.bossRushBest,
       }),
       // Hand-edited, older or half-written storage loads as valid data or not at all.
       merge: (persisted, current) => {
@@ -433,6 +469,7 @@ export const useGameStore = create<GameState>()(
           savedDaily: sanitizeSavedDaily(p.savedDaily),
           dailyStreak: sanitizeStreak(p.dailyStreak),
           lastLevel: typeof p.lastLevel === 'string' && getLevelConfig(p.lastLevel) ? p.lastLevel : null,
+          bossRushBest: sanitizeRushBest(p.bossRushBest),
         }
       },
     },

@@ -76,7 +76,7 @@ const REVEAL_OUT = 1.5
 const REVEAL_TURN = 1.1
 const PASS_TURN = 0.45
 /** The pass goes by this many orbit radii out from the landmark. */
-const PASS_OUT = 1.3
+export const PASS_OUT = 1.3
 /** The reveal is at least this many track half-diagonals over the track's mean height: high enough to see the level. */
 const REVEAL_RISE = 0.3
 /** A track approach (`hero.approach`) is joined from this many times its length further back along the track's line. */
