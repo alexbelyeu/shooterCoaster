@@ -1,6 +1,7 @@
 import { particleShare } from '@/canvas/graphicsQuality'
 import { createRng } from '@/utils/rng'
 import { smoothNoise1 } from '@/utils/valueNoise.hot'
+import type { PerchSpec } from '@/entities/spawning/perch'
 import type { ParticleFieldPreset } from '../../shared/types'
 import { FLAME, GYM_SCALE, HALL, blockRings, footprint, piece, toWorld, type Vec3 } from './blockout'
 
@@ -195,6 +196,23 @@ export function fireLightSource(): { x: number; z: number; rot: number; halfLeng
 
 /** The Flame's top in its own frame (blockout metres). */
 export const FLAME_TOP = { y: TOP.y, halfLength: FLAME.piece.w / 2 + TOP.f, halfWidth: FLAME.piece.d / 2 + TOP.f }
+
+/**
+ * The Flame's top as level 6's dust perch (#945): chalk dust caught in the fire's updraft, from a little over the top to
+ * 2 m up, where the rider looks rolling across its middle, a car's width and more off the rails (world units).
+ */
+const PERCH_CENTRE = worldPoint(0, TOP.y, 0)
+export const FLAME_PERCH: PerchSpec = {
+  x: PERCH_CENTRE.x,
+  y: PERCH_CENTRE.y,
+  z: PERCH_CENTRE.z,
+  yaw: FLAME.piece.rot * DEG,
+  halfLength: FLAME_TOP.halfLength * GYM_SCALE,
+  halfWidth: FLAME_TOP.halfWidth * GYM_SCALE,
+  lift: 0.3 * GYM_SCALE,
+  rise: 2 * GYM_SCALE,
+  railClear: 1.2 * GYM_SCALE,
+}
 
 /** The fire's light at time `t` (s), 0.5..1: a slow breathing under a quicker flicker, never steady, never out. */
 export function fireFlicker(t: number): number {

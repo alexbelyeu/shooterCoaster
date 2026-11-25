@@ -187,8 +187,9 @@ const LEVELS: LevelConfig[] = [
     nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
-    // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
-    // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
+    // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more from 5 s
+    // round the Flame's top and up in its fire's updraft (#945, the gym's `perch`), in sight on the climb to it and all
+    // through the roll across it, rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
     // landing one after another on the Alaska walls beside the climbing car, each where the rider looks as it lands
     // (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948), the last ones on the Starr
     // and the Shield the car looks at from the Shield's top and on the auto belay's fall (#957), and the pack in the pit
@@ -197,8 +198,8 @@ const LEVELS: LevelConfig[] = [
     // until the car reaches it, ~20 s), they line the branch ahead (ridden 20.2–22.5 s), and only that run meets them.
     ...paceLevel({
       waves: [
-        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
-        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 4 },
+        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 5, bystanders: { type: 'climber', count: 4 } },
+        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 7, perch: true },
         { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 8, bystanders: { type: 'climber', count: 3 } },
         { type: 'lanternfly', count: 36, waveLabel: 'Lanternflies!', weight: 5 },
         { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },

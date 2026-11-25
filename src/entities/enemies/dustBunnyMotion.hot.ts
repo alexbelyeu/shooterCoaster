@@ -14,6 +14,8 @@ export const DUST_BUNNY = {
   bob: 0.45,
   /** How much it flattens at each touchdown (fraction of its height). */
   squash: 0.14,
+  /** Over a perch (`dustBunnyCirclePose`): the radius of the circle it drifts round, world units. */
+  circle: 24,
 } as const
 
 /** Fraction of a bounce's height by which the touchdown squash has eased off. */
@@ -60,6 +62,21 @@ export function dustBunnyPose(base: number, rollRadius: number, t: number, out: 
   const hop = Math.abs(Math.sin(Math.PI * DUST_BUNNY.bobHz * time))
   out.lift = DUST_BUNNY.bob * hop
   out.squash = DUST_BUNNY.squash * Math.max(0, 1 - hop / SQUASH_EASE)
+  return out
+}
+
+/**
+ * Over a perch (#945, `spawning/perch.ts`: the Flame's top and the updraft over it), where rolling away would take it off
+ * the edge: the same speed and bounce round a circle through where it started.
+ */
+export function dustBunnyCirclePose(base: number, rollRadius: number, t: number, out: DustBunnyPose): DustBunnyPose {
+  dustBunnyPose(base, rollRadius, t, out)
+  const r = DUST_BUNNY.circle
+  const angle = base + (DUST_BUNNY.speed * Math.max(0, t)) / r
+  out.x = r * (Math.cos(angle) - Math.cos(base))
+  out.z = r * (Math.sin(angle) - Math.sin(base))
+  // Travelling along (-sin, cos) of the angle: heading 0 is +z.
+  out.heading = -angle
   return out
 }
 
