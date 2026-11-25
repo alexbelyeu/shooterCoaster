@@ -30,6 +30,13 @@ describe('biome UI theme', () => {
       .filter((r) => r.ratio < 4.5)
     expect(low).toEqual([])
   })
+
+  it("every world's name plate after dark (its accent letters on tar, #1057) reads at 4.5:1 or better", () => {
+    const low = Object.entries(BIOME_UI)
+      .map(([biome, t]) => ({ biome, ratio: contrast(t.accent, TAR) }))
+      .filter((r) => r.ratio < 4.5)
+    expect(low).toEqual([])
+  })
 })
 
 describe('the fair palette', () => {
@@ -47,6 +54,8 @@ describe('the fair palette', () => {
       ['gilt on the board', FAIR.gilt, FAIR.oxblood],
       ['tar on the Daily Run card', FAIR.tar, FAIR.sky],
       ['oxblood on the World card', FAIR.oxblood, FAIR.cream],
+      ['cream on a Night Ride board', FAIR.cream, FAIR.night],
+      ['gilt on a Night Ride board', FAIR.gilt, FAIR.night],
     ]
     const low = pairs.map(([what, ink, ground]) => ({ what, ratio: contrast(ink, ground) })).filter((p) => p.ratio < 4.5)
     expect(low).toEqual([])

@@ -189,14 +189,15 @@ const LEVELS: LevelConfig[] = [
         // (#937): the tube, up the lift, its top at the volcano's flank, the drop tower, out of the cone, the camelbacks,
         // then the turntable, where what is left stands along the track the car faces once it turns. A full group a wave
         // (12 embers, 7 in a line, 9 in a `v`), so each lasts until the next is in view: a player clears about 3 a second.
-        // The Eruption rises out of the cone over the drop tower, low enough to be seen through the flank's hole; the imps
+        // The Eruption rises out of the cone over the drop tower, low enough to be seen through the flank's hole, as the last
+        // near embers leave the top of the frame on the approach to it (a second sooner than it was, the same spot); the imps
         // come a second before the drop, so they are on the cone's floor as the car falls; two spirals straight down the
         // track ahead of the exit hole, then the imps out on the plain.
         { type: 'emberWisp', count: 12, waveLabel: 'Embers Rise!', formation: 'spiral', weight: 4 },
         { type: 'emberWisp', count: 12, formation: 'spiral', weight: 4 },
         { type: 'emberWisp', count: 12, formation: 'spiral', formationOrigin: NEAR_EMBERS, weight: 4 },
-        { type: 'emberWisp', count: 12, formation: 'spiral', formationOrigin: NEAR_EMBERS, weight: 3 },
-        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationOrigin: { ahead: 200, side: 0, up: 100 }, weight: 3 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationOrigin: NEAR_EMBERS, weight: 2 },
+        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationOrigin: { ahead: 300, side: 0, up: 100 }, weight: 4 },
         { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', weight: 3 },
         { type: 'emberWisp', count: 10, formation: 'spiral', formationOrigin: EXIT_EMBERS, weight: 1 },
         { type: 'emberWisp', count: 8, formation: 'spiral', formationOrigin: EXIT_EMBERS, weight: 1.5 },

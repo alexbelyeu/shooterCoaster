@@ -3157,6 +3157,35 @@ async function levelSelectCheck(page, levels) {
   const target = levels[Math.min(2, levels.length - 1)].id
   problems.push(...featsProblems(await page.evaluate(shownFeats), target, 'at open'))
   if (layout.focused !== target) problems.push(`initial focus on ${layout.focused}, expected ${target}`)
+
+  // #1057: the bullseye stands in for the hidden pointer, so it draws over the screen.
+  const pointer = await page.evaluate(() => {
+    const z = (sel) => Number(getComputedStyle(document.querySelector(sel) ?? document.body).zIndex) || 0
+    return { crosshair: z('.crosshair-svg'), screen: z('.level-select') }
+  })
+  if (!(pointer.crosshair > pointer.screen)) problems.push(`the crosshair (z ${pointer.crosshair}) draws under level select (z ${pointer.screen})`)
+
+  // #1057: the 3-star first level's sun/moon switch, on its board's corner, turns that board to night.
+  const nightId = levels[0].id
+  await page.locator(`[data-night="${nightId}"]`).click({ timeout: 10000 }).catch((e) => problems.push(`Night Ride switch: ${e.message}`))
+  const night = await page.evaluate((id) => {
+    const sw = document.querySelector(`[data-night="${id}"]`)
+    const card = document.querySelector(`.level-card[data-level="${id}"]`)
+    const s = sw?.getBoundingClientRect()
+    const c = card?.getBoundingClientRect()
+    return {
+      checked: sw?.getAttribute('aria-checked') ?? null,
+      cardNight: !!card?.classList.contains('is-night'),
+      postcardNight: !!card?.querySelector('.level-postcard.is-night'),
+      onCorner: !!s && !!c && s.left >= c.left - 8 && s.right <= c.right + 8 && s.top >= c.top - 8 && s.top <= c.top + 24 && s.right >= c.right - 24,
+      switches: document.querySelectorAll('[data-night]').length,
+    }
+  }, nightId)
+  await page.screenshot({ path: path.join(OUT, 'levelSelect-night.png'), timeout: SHOT_TIMEOUT })
+  if (night.switches !== 1) problems.push(`${night.switches} Night Ride switches, expected 1 (only ${nightId} has its three stars)`)
+  if (night.checked !== 'true' || !night.cardNight || !night.postcardNight || !night.onCorner)
+    problems.push(`Night Ride switch on ${nightId} ${JSON.stringify(night)}, expected it checked, on the board's top corner, the board and its postcard at night`)
+  await page.locator(`.level-card[data-level="${target}"]`).focus()
   let keyboard = null
   if (levels.length >= 4) {
     await page.keyboard.press('ArrowLeft')
@@ -3189,25 +3218,37 @@ async function levelSelectCheck(page, levels) {
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
 }
 
-/** The level select's medal tickets on screen (#978): each shown one's card, feat count and whether it stays in the viewport. */
+/**
+ * The level select's medal tickets on screen (#978): each shown one's level, feat count, whether it stays in the viewport,
+ * and the cards and switches it covers (#1057: none; the desktop's one ticket sits over the grid, a phone's in its card).
+ */
 function shownFeats() {
   return [...document.querySelectorAll('.level-feats')]
-    .filter((t) => t.getBoundingClientRect().height > 0)
+    .filter((t) => t.getBoundingClientRect().height > 0 && getComputedStyle(t).visibility !== 'hidden')
     .map((t) => {
       const r = t.getBoundingClientRect()
+      const own = t.closest('.level-card')
+      const covers = [...document.querySelectorAll('.level-card, .level-night, .level-select-back')].filter((c) => {
+        if (c === own) return false
+        const q = c.getBoundingClientRect()
+        return r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top
+      })
       return {
-        level: t.closest('.level-card')?.dataset.level ?? null,
+        level: t.dataset.level ?? own?.dataset.level ?? null,
         feats: [...t.querySelectorAll('.level-feat-line')].filter((l) => l.textContent.trim()).length,
         inView: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+        covers: covers.map((c) => c.dataset.level ?? c.dataset.night ?? c.className),
       }
     })
 }
 
-/** One ticket out, the focused card's, with its three feats on screen. */
+/** One ticket out, the focused card's, with its three feats on screen, covering no card or control. */
 function featsProblems(shown, level, when) {
   if (shown.length !== 1 || shown[0].level !== level) return [`medal tickets ${when} ${JSON.stringify(shown)}, expected only ${level}'s`]
   const [t] = shown
-  return t.feats === 3 && t.inView ? [] : [`${level}'s medal ticket ${when} ${JSON.stringify(t)}, expected 3 feats on screen`]
+  return t.feats === 3 && t.inView && t.covers.length === 0
+    ? []
+    : [`${level}'s medal ticket ${when} ${JSON.stringify(t)}, expected 3 feats on screen covering nothing`]
 }
 
 /** Click the level select's Daily card (#184) and return the run it started and its spawnDigest(). */
