@@ -131,10 +131,10 @@ function renderWarmupBatch(
 export default function ShaderWarmup({ levelId }: { levelId: string }) {
   const get = useThree((s) => s.get)
 
-  // The frame loop can draw once between the mount's commit and its passive effects (#1051): with the
-  // title's camera still the default and no layer mask yet, the composer drew the whole level and compiled every
-  // program it uses in that one frame (20 on level 3, ~1.9 s under 4x throttling). The scene draws nothing until the
-  // warm-up below has masked the camera; a run already playing at mount (`?e2e=1`) draws as before.
+  // The frame loop can draw once between the mount's commit and its passive effects (#1051): with no layer mask
+  // yet, the composer drew the whole level and compiled every program it uses in that one frame (20 on level 3,
+  // ~1.9 s under 4x throttling). The scene draws nothing until the effect below has masked the camera; a run
+  // already playing at mount (`?e2e=1`) draws as before.
   useLayoutEffect(() => {
     const { scene } = get()
     if (useGameStore.getState().phase === 'playing') return
