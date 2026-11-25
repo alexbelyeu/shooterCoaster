@@ -110,6 +110,8 @@ export default defineConfig(({ mode }) => {
       __PORTAL_BUILD__: JSON.stringify(portal),
       // Sent with online leaderboard scores (`client_version`, #365).
       __APP_VERSION__: JSON.stringify(commit ? `${version}+${commit}` : version),
+      // The Blender crow spike (#1040): its chunk, loader and GLB only in dev and `SC_BLENDER_CROW=1` builds (the turntable imports it itself).
+      __BLENDER_CROW__: JSON.stringify(mode === 'development' || process.env.SC_BLENDER_CROW === '1'),
     },
     resolve: {
       alias: {
