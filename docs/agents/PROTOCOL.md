@@ -111,7 +111,7 @@ control center's autopilot swaps it to `agent:ready` once every issue on that li
 2. Otherwise: the oldest open `studio-health` issue labelled `agent:ready` (the watchdog's;
    close it with the PR link instead if a PR merged after its **Last seen** time fixes it),
    then the highest-priority `agent:ready` issue (P1 > P2 > P3, then oldest), skipping `epic`.
-3. Claim it immediately: swap `agent:ready` → `agent:in-progress` and comment `Claimed by builder run <date time>`. When dispatching several builders, the dispatcher claims all issues **before** spawning them so two builders never take the same one. A claim holds the issue while it is under 6 hours old and no `Handoff:`, `Backing off` or `Blocked:` comment has come after it; after one of those the issue is free to claim again (`docs/agents/runbooks/builders.md` step 4).
+3. Claim it immediately: swap `agent:ready` → `agent:in-progress` and comment `Claimed by builder run <date time>`. When dispatching several builders, the dispatcher claims all issues **before** spawning them so two builders never take the same one. A claim holds the issue while it is under 6 hours old and its run hasn't ended it: a later `Handoff:` or `Blocked:` comment ends every claim before it, a `Backing off — builder run <timestamp>` comment only the claim of the run it names. A run backs off only from a live claim earlier than its own, checking every earlier claim, not just the newest (`docs/agents/runbooks/builders.md` step 4).
 4. Branch: `agent/<issue-number>-<short-slug>`. One issue per PR.
 
 ## Pull requests
