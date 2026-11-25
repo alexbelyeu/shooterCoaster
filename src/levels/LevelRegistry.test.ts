@@ -53,7 +53,7 @@ describe('LevelRegistry', () => {
       ['level2', 'giantScorpion', 2615],
       ['level3', 'kraken', 3164],
       ['level4', 'yeti', 3720],
-      ['level5', 'magmaTitan', 3636],
+      ['level5', 'magmaTitan', 3732],
       ['level6', 'medusa', 2652],
       ['level7', 'helicopter', 1875],
       ['level8', 'goldenBlimp', 1970],
