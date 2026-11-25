@@ -817,17 +817,24 @@ async function ghostProblems(page, id) {
 /**
  * The nearest on-screen enemy with game time frozen, or null. A slow runner (#919: 21 frames in 8.6 s) can freeze
  * the ride between waves with nothing on screen, so game time runs until an enemy shows (up to 20 s wall clock),
- * then freezes and reads it again once the frozen frame has rendered.
+ * then freezes and reads it again once the frozen frame has rendered. The combat checks hold the level timer, so no
+ * wave comes due: when they have shot every enemy in view, the search lets the level timer run too (#1028: on a slow
+ * runner it found nothing for 20 s at a held 11 s of level1), and holds it again as it returns.
  */
 async function frozenEnemyTarget(page) {
   const deadline = Date.now() + 20000
-  for (;;) {
-    await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
-    await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
-    const [target] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
-    if (target || Date.now() > deadline || (await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return target ?? null
-    await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
-    await waitFrames(page, 2, { minMs: 250, maxMs: 4000, pollMs: 40 })
+  const held = await page.evaluate(() => window.__SC_TEST__.holdLevelTime)
+  try {
+    for (;;) {
+      await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+      await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
+      const [target] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
+      if (target || Date.now() > deadline || (await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return target ?? null
+      await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false; window.__SC_TEST__.setTimeScale(1) })
+      await waitFrames(page, 2, { minMs: 250, maxMs: 4000, pollMs: 40 })
+    }
+  } finally {
+    await page.evaluate((h) => { window.__SC_TEST__.holdLevelTime = h }, held)
   }
 }
 
