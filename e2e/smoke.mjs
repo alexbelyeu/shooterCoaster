@@ -2417,7 +2417,8 @@ async function waveCheck(page) {
       problems.push(`the tell came late: the wave tick at ${tickBefore.toFixed(2)} s was already within ${tellS} s of the wave at ${due} s`)
     }
   }
-  const events = log.map((e) => `${e.kind} "${e.label}"`)
+  // An unlabelled wave fires its events with no label: told apart by when it is due, so two in the window aren't a repeat.
+  const events = log.map((e) => (e.label === 'undefined' ? `${e.kind} (unlabelled, due ${e.due} s)` : `${e.kind} "${e.label}"`))
   const repeated = [...new Set(events.filter((e, i) => events.indexOf(e) !== i))]
   if (repeated.length) problems.push(`wave events fired twice after a pause and Resume: ${repeated.join(', ')}`)
   if (flock.length < minOnScreen) problems.push(`only ${flock.length} ${type}s on screen after the wave flew in (want ≥ ${minOnScreen})`)
