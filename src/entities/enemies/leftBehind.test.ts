@@ -5,6 +5,7 @@ import { flyBack } from './leftBehind.hot'
 const BEHIND_DISTANCE = 400
 const AHEAD = 700
 const UP = 80
+const OVER = 300
 
 const eye = { x: 0, y: 10, z: 0 }
 const forward = { x: 0, y: 0, z: -1 }
@@ -12,7 +13,7 @@ const far = BEHIND_DISTANCE + 100
 const STEP = 1 / 60
 
 /** Whether a bird at `p`, flying on its own, turns to fly back. */
-const turnsBack = (p: { x: number; y: number; z: number }) => flyBack({ flying: false }, { ...p }, eye, forward, STEP, 0) !== null
+const turnsBack = (p: { x: number; y: number; z: number }) => flyBack({ flying: false }, { ...p }, eye, forward, STEP, 0, true) !== null
 
 describe('flyBack', () => {
   it('turns a bird behind the look and past the distance round', () => {
@@ -25,13 +26,28 @@ describe('flyBack', () => {
     expect(turnsBack({ x: far, y: 10, z: -1 })).toBe(false)
   })
 
+  it('starts none once told not to (the boss has arrived), but lets one already flying back finish', () => {
+    expect(flyBack({ flying: false }, { x: 0, y: 10, z: far }, eye, forward, STEP, 0, false)).toBeNull()
+    expect(flyBack({ flying: true }, { x: 0, y: 10, z: far }, eye, forward, STEP, 0, false)).not.toBeNull()
+  })
+
+  it('climbs over the rider coming from straight behind, never through the seat', () => {
+    const p = { x: 0, y: eye.y, z: far }
+    const s = { flying: false }
+    let closest = Infinity
+    for (let i = 0; i < 2000 && flyBack(s, p, eye, forward, STEP, 0, true) !== null; i++) {
+      closest = Math.min(closest, Math.hypot(p.x, p.y - eye.y, p.z))
+    }
+    expect(closest).toBeGreaterThan(200)
+  })
+
   it('flies it round to out in front, in the middle of the look, then lets it go', () => {
     const p = { x: 300, y: 10, z: far }
     const s = { flying: false }
     let heading: number | null = null
     let flew = 0
     for (let i = 0; i < 2000; i++) {
-      heading = flyBack(s, p, eye, forward, STEP, 0)
+      heading = flyBack(s, p, eye, forward, STEP, 0, true)
       if (heading !== null) flew++
       else if (flew) break
     }
@@ -41,13 +57,13 @@ describe('flyBack', () => {
     expect(p.z).toBeLessThan(0)
     expect(Math.abs(p.x) / Math.abs(p.z)).toBeLessThan(0.5)
     expect(p.y).toBeGreaterThan(eye.y)
-    expect(p.y).toBeLessThanOrEqual(eye.y + UP)
+    expect(p.y).toBeLessThanOrEqual(eye.y + OVER)
   })
 
   it('heads the way it flies, and outpaces a rider who rode `rode`', () => {
     const s = { flying: true }
     const p = { x: 0, y: eye.y + UP, z: far }
-    expect(flyBack(s, p, eye, forward, STEP, 50)).toBeCloseTo(-Math.PI / 2)
-    expect(p.z).toBeLessThan(far - 50)
+    expect(flyBack(s, p, eye, forward, STEP, 50, true)).toBeCloseTo(-Math.PI / 2)
+    expect(Math.hypot(p.y - eye.y - UP, p.z - far)).toBeGreaterThan(50)
   })
 })

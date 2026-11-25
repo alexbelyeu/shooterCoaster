@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { flyBack } from './leftBehind.hot'
+import { useGameStore } from '@/store/useGameStore'
 import { setFlashMaterial } from './hitFlash'
 import { useMarch } from './useMarch'
 import { BIRD_EYE_MAT, CROW_FLINCH_MAT, createBirdFeatherMaterial, birdWingPose } from './SharedEnemyAssets'
@@ -49,7 +50,7 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
   const phase = useRef(flapOffset)
   const camera = useThree((s) => s.camera)
   // Its fly-back state, and where the rider's eye was last frame: a bird flying back outpaces the ride.
-  const back = useMemo(() => ({ flying: false, lastEye: new THREE.Vector3() }), [])
+  const back = useMemo(() => ({ flying: false, lastEye: camera.position.clone() }), [camera])
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
@@ -57,7 +58,9 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
       const wobble = Math.sin(time * 1.5) * 0.3
       const rode = back.lastEye.distanceTo(camera.position)
       back.lastEye.copy(camera.position)
-      const facing = flyBack(back, mesh.position, camera.position, camera.getWorldDirection(LOOK), delta, rode) ?? moveAngle
+      // None starts back during the boss fight: the rider's shots belong to the boss then.
+      const game = useGameStore.getState()
+      const facing = flyBack(back, mesh.position, camera.position, camera.getWorldDirection(LOOK), delta, rode, game.bossArrivedAt === null || game.bossSeconds !== null) ?? moveAngle
       if (!back.flying) {
         const speed = moving() ? moveSpeed : 0
         mesh.position.x += (Math.cos(moveAngle) * speed + wobble) * dt
