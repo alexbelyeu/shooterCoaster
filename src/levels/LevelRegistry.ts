@@ -1,4 +1,4 @@
-import type { LevelConfig } from '@/types/level'
+import type { EnemyType, LevelConfig } from '@/types/level'
 import { paceLevel, type PacedWave } from './pacing'
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS (#863). Every other generated
 // ride is its world chunk's (`World.rides`), out of the startup JS altogether (#960).
@@ -19,6 +19,11 @@ const NEAR_EMBERS = { ahead: 300, side: 120, up: 160 }
  */
 function jellyfishLine(count: number, waveLabel?: string): PacedWave {
   return { type: 'jellyfish', count, waveLabel, formation: 'line', formationOrigin: JELLYFISH_LINE, weight: 2 }
+}
+
+/** Level 4's waves (#937): seven snowmen beside the track every ~2 s. */
+function snowmen(type: EnemyType, waveLabel?: string, count = 7): PacedWave {
+  return { type, count, waveLabel, weight: 2 }
 }
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -127,23 +132,31 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: 36 * 15 + 40 * 30 + 16 * 50 + 2 * 60 + 400, // 2540 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3060
+    maxScore: 42 * 15 + 49 * 30 + 22 * 50 + 2 * 60 + 400, // 3200 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3720
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
     // The ride kit's (#866, `arcticTrack.ts`).
     ...paceLevel({
       waves: [
-        // A wave to each stretch of the storyboard (weights in seconds of the 45 s wave span), so no element rides empty
-        // (#937): the station and the lift's foot, up the lift to the drop, the ice cave and out of it, the blizzard's
-        // ridge, the crest, then the brutes down the helix. Half the party at a time also keeps the lift's draws
-        // under the ceiling (all 44 at once went over it, #866).
-        { type: 'snowmanScout', count: 18, waveLabel: 'Scout Party', formation: 'line', weight: 6 },
-        { type: 'snowmanScout', count: 18, formation: 'line', weight: 6 },
-        { type: 'snowman', count: 10, weight: 6 },
-        { type: 'snowman', count: 15, waveLabel: 'Snowmen Incoming!', weather: 'blizzard', weight: 5 },
-        { type: 'snowman', count: 15, weight: 6 },
-        { type: 'snowmanBrute', count: 8, waveLabel: 'Brutes!', weight: 4 },
-        { type: 'snowmanBrute', count: 8, weight: 12 },
+        // A small wave every ~2 s (#937), so no stretch of the storyboard rides empty: scouts from the station up the
+        // lift and down into the ice cave, snowmen out of it, through the blizzard's ridge and over the crest, then
+        // brutes down the helix to the Yeti. A snowman falls to one hit: a player meets about two a second.
+        snowmen('snowmanScout', 'Scout Party'),
+        snowmen('snowmanScout'),
+        snowmen('snowmanScout'),
+        snowmen('snowmanScout'),
+        snowmen('snowmanScout'),
+        snowmen('snowmanScout'),
+        snowmen('snowman'),
+        snowmen('snowman'),
+        { ...snowmen('snowman', 'Snowmen Incoming!'), weather: 'blizzard' },
+        snowmen('snowman'),
+        snowmen('snowman'),
+        snowmen('snowman'),
+        snowmen('snowman'),
+        snowmen('snowmanBrute', 'Brutes!', 6),
+        snowmen('snowmanBrute', undefined, 6),
+        { ...snowmen('snowmanBrute', undefined, 10), weight: 11 },
       ],
       boss: 'yeti',
     }),
