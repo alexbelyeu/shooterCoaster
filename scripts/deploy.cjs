@@ -1,13 +1,10 @@
 // Production deploys (deploy.yml). Vercel no longer builds every merge to main (vercel.json `git.deploymentEnabled`;
-// Standard build minutes are billed from 8 Dec 2026): this deploys main's head once a day, on demand, and after every
-// green CI on main while the deploy check's `agent:prod-broken` issue is open (the live site is broken), so a revert or
-// fix ships at once. A red nightly or a red main waits for the daily deploy, which runs just before the nightly. It calls the project's
-// Deploy Hook (secret VERCEL_DEPLOY_HOOK), which can only build main, rather than holding a Vercel token here, then
-// waits for the GitHub deployment Vercel posts for the commit: its deployment_status starts prod-smoke.yml's check.
+// Standard build minutes are billed from 8 Dec 2026). The control center decides when (daily after 05:00 UTC, at once
+// while the deploy check is red, Deploy now); this deploys main's head unless production already serves it. It calls
+// the project's Deploy Hook (secret VERCEL_DEPLOY_HOOK), which can only build main, rather than holding a Vercel token
+// here, then waits for the GitHub deployment Vercel posts for the commit: its deployment_status starts prod-smoke.yml's check.
 
 const ENV = 'Production'
-const PROD_BROKEN = 'agent:prod-broken'
-const { ownIssue } = require('./prod-alert.cjs')
 const APPEAR_MS = 5 * 60e3
 const FINISH_MS = 20 * 60e3
 const POLL_MS = 15e3
@@ -28,12 +25,6 @@ function outcome(statuses) {
  */
 const isLive = (statusesPerDeployment) => statusesPerDeployment.some((s) => outcome(s) === 'success')
 
-/** Why to deploy now, or null to wait for the daily run. `deployCheckRed`: the deploy check's open alert, if any. */
-function reason({ event, force, deployCheckRed }) {
-  if (event === 'workflow_run') return deployCheckRed ? `the deploy check is red (#${deployCheckRed.number})` : null
-  if (event === 'schedule') return 'the daily deploy'
-  return force ? 'started by hand, forced' : 'started by hand'
-}
 
 // ---------- the run ----------
 
@@ -44,16 +35,7 @@ async function run({ github, context, core }) {
   // main's head now, not the commit that started the run: the hook builds main as it is when called.
   const sha = (await github.rest.repos.getBranch({ ...repo, branch: 'main' })).data.commit.sha
   const short = sha.slice(0, 7)
-  const force = context.eventName === 'workflow_dispatch' && String(context.payload.inputs?.force) === 'true'
-
-  const deployCheckRed = context.eventName === 'workflow_run'
-    ? ownIssue((await github.rest.issues.listForRepo({ ...repo, state: 'open', labels: PROD_BROKEN, per_page: 30 })).data, 'deploy')
-    : undefined
-  const why = reason({ event: context.eventName, force, deployCheckRed })
-  if (!why) {
-    core.notice(`${context.sha.slice(0, 7)} waits for the daily deploy (05:00 UTC) or Deploy now in the control center.`)
-    return
-  }
+  const force = String(context.payload.inputs?.force) === 'true'
 
   const deploymentsOf = async (filter) =>
     (await github.rest.repos.listDeployments({ ...repo, ...filter, environment: ENV, per_page: 30 })).data
@@ -76,7 +58,7 @@ async function run({ github, context, core }) {
     core.setFailed(`The Deploy Hook answered ${res.status}: ${(await res.text()).slice(0, 300)}`)
     return
   }
-  core.info(`Deploying ${short} (${why}).`)
+  core.info(`Deploying ${short}${force ? ' (forced)' : ''}.`)
 
   let deployment = null
   while (!deployment) {
@@ -110,4 +92,4 @@ async function run({ github, context, core }) {
 }
 
 module.exports = run
-Object.assign(module.exports, { outcome, isLive, reason })
+Object.assign(module.exports, { outcome, isLive })
