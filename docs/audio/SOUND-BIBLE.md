@@ -24,6 +24,18 @@ could hear it across a loud arcade. Every sound tells the player something.
 
 ## Per level (starting briefs: the sound designer turns these into demos for Alex)
 
+**Every level sounds like its own world, not like the title (Alex, #900, 25 Nov).** A level's score
+follows the game's style (arcade energy, a hook up front, the house rules below), but its sound has to
+say what the level is about: the place, the era, the mood. Alex turned down every Neon Metropolis
+option of #868 because they "all sound similar to the theme song" and said "nothing about what this
+level is about". So:
+- No level option uses the title's signature as its own: a supersaw lead, a gated-snare backbeat, or
+  a four-on-the-floor bigkick under a big synth hook. Those belong to "Neon Marquee".
+- A round's options are different genres that each fit the world, not three takes on one sound.
+- Each listening issue gives, per option, its genre and how it differs from the title (lead
+  instrument, drums, groove, key or mode), and links the title's render beside them.
+- A brief that names the title's palette is wrong: fix the brief before writing the music.
+
 **What the first round (#301) taught us.** Alex picked the most direct option in each slot: "Neon
 Marquee" for the title (a supersaw hook in bar 1 over four-on-the-floor electronic drums), and he
 kept "Midway Rush" for level1 (one fairground instrument on the riff, a skank and a bass that each
@@ -56,7 +68,7 @@ Each keeps its hook in `base`: the doubling or stabs come in at 3×.
 | level4 | Antarctica | Glassy and tense but still driving. Minor key, crystalline: mallets an octave or two up, pads quiet and high (they fill the SFX mids fast), and a hard bigkick so it never floats | bells, celesta, icy pads with a hard kick |
 | level5 | Inferno | Heaviest level, the boss-rush mood. Low and fast, but with gaps in the low end: the bass follows the guitar's chug rhythm instead of droning, and double-kick sixteenths stay in fills, or kick, bass and chug blur into one wall below 250 Hz | distorted guitar, choir stabs, timpani, orchestra hits |
 | level6 | Climbing Gym | Alex's own climbing gym in New York (#513): urban, a little grimy and funny, arcade-bright. Rats, spotted lanternflies and dust bunnies to shoot, climbers not to; the Medusa of the Starr for the finale. Faster than the Desert, less sinister than the Inferno; bouncy and percussive (909 claps and kit), a plucky hook that could be chalk-slapping hands; leave room for a boss section later | a plucky supersaw, FM-bass or mallet hook over 909 claps |
-| level7 | Neon Metropolis | Night city, synthwave through a late-90s arcade lens (#322): synth bass, gated drums, a hook you'd hum, neon and wet asphalt; hover drones and billboard bots, a helicopter for the finale (its boss section can chop like a rotor) | supersaw, synth brass or square-wave hook over gatesnare and FM bass |
+| level7 | Neon Metropolis | A futuristic neon city at night (#322, re-briefed after #900): skyscrapers, traffic far below, hover drones and billboard bots, a police helicopter for the finale (its boss section chops like a rotor). Machine-tight and electronic, but not the title: sequenced 16th arpeggios, robotic or electro sounds (formant or vocoder-like stabs, metallic FM pings, glitchy hits), city texture in the base layer (siren sweeps, traffic hum, rain). Genres to try: electro / robot funk, cyberpunk breakbeat or drum & bass, neon-noir sequencer | sequenced arps, formant stabs, metallic FM, electro or broken kit (never a supersaw lead or gated snare) |
 | FRENZY (5× combo) | any | The level's track lifts: double-time hats, extra lead layer, filter opens (the score's `frenzy` layer: `SCORE-FORMAT.md`, "Intensity layers") | same as the level, brighter |
 | Boss / finale | any | A variation of the level theme, darker and louder | the level's colour + orchestra hits |
 | Results | any | 3–6 s jingle: rising for 2–3★ (`results-win`), flatter for 0–1★ (`results-lose`, #792), then a calm loop | bells + brass |
@@ -69,7 +81,7 @@ and the last 8 bars lift a minor third. He took the grimiest and darkest option,
 under E minor / F major stabs, orchestra hits in base and a hissing guiro, with the brass taking a line of its own in its
 second half; the sting is an E major chord (#566).
 
-**Neon Metropolis round (#868, open).** Three options for level7 in `scores/themes/level7.<name>.scrim`, filed before the world lands: "Neon Overpass" (`overpass`, B minor, 150: night-drive synthwave, a supersaw hook over pumping FM octaves, rotor-sixteenth bass in the boss section), "Gridlock" (`gridlock`, F-sharp minor, 168: synth-brass hook over distorted power-chord punches, a galloping boss section) and "Pixel Avenue" (`pixel`, A-flat major, 144: bright arcade house, a square-wave hook over house organ, the boss drops to F minor). Each has layers, a boss section and a sting; renders in `renders/theme-level7-*` (`-seam`, `-boss`).
+**Neon Metropolis round 1 (#868), turned down (#900).** Three options, all synthwave on the title's palette ("Neon Overpass", "Gridlock", "Pixel Avenue"): Alex passed on all three as too close to the title and saying nothing about a future city. Round 2 is #1053, on the new level7 brief above.
 
 **Picked themes (#301):** the title is "Neon Marquee" (A minor, 160, supersaw hook over a
 four-on-the-floor bigkick, gated snare and FM bass; the lift replays the hook a tone up). level1
