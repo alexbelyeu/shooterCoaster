@@ -226,6 +226,9 @@ export interface SCTestApi {
   /** Seconds every live bullet flies per frame instead of the frame time, and no bullet expires;
    *  0 freezes them (e.g. a fresh one at the muzzle), null is normal play. */
   bulletStep: number | null
+  /** Bullets hit only collision targets whose id starts with this (`'boss:'`: the boss step's real bullet, which a regular
+   *  enemy crossing its path must not take, #1046); null is normal play. */
+  bulletsHitOnly: string | null
   /** Seconds the level timer and game clock advance per playing frame instead of the frame time; null is normal play. */
   timerStep: number | null
   /** Most seconds the level timer and game clock advance per playing frame (a slower frame counts as this much); null
@@ -1160,6 +1163,7 @@ export function installE2EApi() {
     weapon: null,
     holdFeedback: false,
     bulletStep: null,
+    bulletsHitOnly: null,
     timerStep: null,
     timerStepMax: null,
     stopAtLevelTime: null,

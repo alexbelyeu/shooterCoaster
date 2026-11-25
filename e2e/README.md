@@ -132,7 +132,7 @@ When level1 is in the run, a `boss` step summons the Golden Blimp (`summonBoss()
 hull must be ≥ 15% of the frame wide and ≥ 1 balloon on screen (every boss is summoned into a ride frozen where it stands, and
 moved alone until its first phase is on screen, at most 20 s: the blimp places itself off the camera's heading, which riding on
 through its arrival had turned away from on some runners, #905), with the boss bar clear of the HUD (`level1-boss.png`; a bar that never shows prints the phase, the screens mounted and the `runLog`, #938), only the balloons exposed; a real
-bullet must hit one, `bossHit` clears them and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
+bullet must hit one (fired with `bulletsHitOnly: 'boss:'`, so no regular enemy crossing its path from the muzzle can take it: #1046, a bird in the way took the shot), `bossHit` clears them and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
 `boss:defeated`, one kill per weak point and the big score popup over the confetti (`level1-boss-down.png`). The phone run
 resumes after its Pause tap with the boss summoned: the bar must sit inside the viewport and clear of the HUD in portrait and
 landscape (`mobile-level1-boss.png`).
@@ -185,10 +185,8 @@ Then, on the same run held, it checks the Training Area cave's dark section (#75
 held; the ride must be fully dark there (`depth` 1) and the shot must light it (`flash` > 0). The nightly `dark` step (needs
 `switch`) also shoots `level6-dark.png` and `level6-dark-flash.png` there: the frame must be mostly dark (`DARK_SHOT.dark`) but
 not blank, its blacklit holds showing (`DARK_SHOT.glow`, saturated bright pixels), and the flash must brighten it (`DARK_SHOT.flash`).
-It then shoots `level6-gap.png` (#659: game time and the level timer held, `rideTo` jumps the car into the Tree's gap, its 56.5 s
-heartline-roll beat read from `rideBeats()`, and back; the car must be there and the frame not blank: the trunk on one side, the
-back wall on the other). These frame captures are nightly only, like the tour's (#766: the dark shots took the `level6` shard's
-`switch` step from ~90 s to ~260 s, and the gap still was ~30 s of its `ride` step on a 2-core box).
+These frame captures are nightly only, like the tour's (#766: the dark shots took the `level6` shard's
+`switch` step from ~90 s to ~260 s on a 2-core box). The ride no longer goes through the Tree's gap (#926), so there is no gap still.
 **Settled steps** (#471, `settledSteps.mjs`): the ride and the pacing run advance level time one fixed step on one frame,
 then hold it (`timerStep` 0) until React has gone quiet (no commit on a held frame, and a message posted on the frame before
 answered), and only then take the next step. Waves, enemy mounts, fly-ins ending and boss arrivals go through React state
@@ -355,10 +353,11 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   Back-to-back deploys: the job's concurrency group cancels the older run, which reports nothing.
 - **Nightly full smoke** (06:00 UTC): every step on every level, so it is also where the deep checks the PR shards leave
   out run (#372, "Two depths" above). One run outgrew its 60 min cap once level 6 joined every deep step (#570), so it runs
-  as three parallel jobs, each under its own 60 min cap: `node e2e/smoke.mjs --nightly-part <main|deep|pacing> --url <site> --seconds 10`
-  (`e2e/shards.mjs` `NIGHTLY_PARTS`: `main` the UI, first-level and phone steps and every level's ride / shot / results / share,
+  as four parallel jobs, each under its own 60 min cap: `node e2e/smoke.mjs --nightly-part <main|rides|deep|pacing> --url <site> --seconds 10`
+  (`e2e/shards.mjs` `NIGHTLY_PARTS`: `main` the UI, first-level and phone steps and levels 1–4's ride / tour / shot / results / share,
+  `rides` the same five steps on every later level (#1046: with 8 levels and Boss Rush one `main` reached level 6 45 min in and stopped at the cap),
   `deep` wave / weather / boss / pickup / switch / dark / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
-  A fourth, `slow` (#539), is an `extra` part outside that count: level1 and level3's ride + results again under `--cpu-throttle 4`
+  A fifth, `slow` (#539), is an `extra` part outside that count: level1 and level3's ride + results again under `--cpu-throttle 4`
   (the part sets it), writing `throttle.json`. `slow` and `pacing` set `gatePrograms`: a shader compiled after the warm-up fails the level.
   Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
   them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
@@ -393,7 +392,7 @@ onScreenEnemies/onScreenBystanders/levelBystanders/bystandersHit/shotsFired/hits
 bystander through `processHit`; `{ id, penalty }` or null), `killNearest(n)` (never a boss weak point or a bystander; fires one real shot,
 then resolves hits via `processHit`, the bullet pool's own path), `enemyScreenPoints(n)`,
 `fireShot(x, y)` (one real shot through NDC), `bullets()` → drawn count, largest screen radius now / since load, newest bullet's
-screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideBeats()` (the level's v2 ride beats: track fraction and second), `rideFastest` (on a v2 ride, the track fraction 1.5 s before its top speed; null otherwise), `rideSpeed` (set 0–1 to put the coaster at that speed; ignored on a `ride: v2` level, which follows its solved plan, #696), `sceneStats()`, `combat` fire/hit/kill event counters,
+screen point, `bulletStep` (seconds per frame for every live bullet; 0 freezes them), `bulletsHitOnly` (a collision-target id prefix: bullets hit only targets whose id starts with it; null is normal play), `endLevel()`, `setTimeScale(s)` (an override over the slow-mo envelopes; 1 clears it), `gpuMemory()` (`renderer.info.memory` textures / geometries), `rideTo` (set a track fraction 0–1 to jump the coaster there), `rideProgress` (its track fraction on the last frame), `rideBeats()` (the level's v2 ride beats: track fraction and second), `rideFastest` (on a v2 ride, the track fraction 1.5 s before its top speed; null otherwise), `rideSpeed` (set 0–1 to put the coaster at that speed; ignored on a `ride: v2` level, which follows its solved plan, #696), `sceneStats()`, `combat` fire/hit/kill event counters,
 `cameraTranslation` {current, max} = translation off the track pose (must be 0), `cameraTrauma`
 {current, max} in degrees, `cameraWeight` → bank / pitch / speed + drop FOV kick now and max (degrees), smoothed speed 0–1, wind-streak opacity, the caps the smoke checks (`caps`, from the source constants), `weapon` → the gun's on-screen box, pivot, muzzle tip + last shot point, `holdFeedback`,
 `view()` → camera vs canvas aspect + FOV, drawing-buffer size + dpr, `graphics()` → quality setting, its preset, adaptive steps, reduced motion, `audio()` → unlocked?, score engine chunk loaded? (`engineLoaded`; the title step fails it before the first key press), long-lived SFX node count, arcade voice pool (`sfxVoices`: budget / live / peak / stolen / rejected, and `ui`: countdown and UI blips played on their own voices past the pause gate), music ducked? (the slow-mo low-pass), the pause mix on? (`pauseMix`: music down and low-passed, SFX silent), sounds dropped by a caught audio error, `music` (live music buses with their gain + the last few fade ramps), `scrim` (score engine: current score, tracks with the score each plays (a `?theme=` option or its own), paused + song position + `layered` / `intensity`, the asked-for `targetIntensity`, long-lived nodes, timer running),

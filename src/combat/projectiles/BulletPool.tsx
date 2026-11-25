@@ -115,6 +115,7 @@ export default function BulletPool({
     // WeaponViewModel (priority -1) has already turned the gun to the shot: the tracer starts from this same tip.
     if (muzzleTip.ready) _muzzle.set(muzzleTip.x, muzzleTip.y, muzzleTip.z).applyQuaternion(camera.quaternion).add(camera.position)
     const testStep = isE2E ? (window.__SC_TEST__?.bulletStep ?? null) : null
+    const testHitOnly = isE2E ? (window.__SC_TEST__?.bulletsHitOnly ?? null) : null
     let maxFrac = 0
     let newestBorn = -Infinity
     // Only live bullets are drawn, packed first: the idle pool used to cost ~39k triangles.
@@ -178,6 +179,7 @@ export default function BulletPool({
         for (let t = 0; t < targets.length; t++) {
           const target = targets[t]
           if (target.hitThisFrame || hasHit(bullet, target)) continue
+          if (testHitOnly !== null && !target.id.startsWith(testHitOnly)) continue
           const pos = target.getPosition()
           const a = bullet.prev
           const b = bullet.position
