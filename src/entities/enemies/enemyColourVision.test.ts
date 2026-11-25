@@ -73,7 +73,7 @@ const ENEMIES: Read[] = [
   enemy('crow', 'crow', 'desert', A.BIRD_FEATHER_MAT, P.CROW_BODY, P.CROW_SHEEN),
   enemy('toucan', 'toucan', 'jungle', A.BIRD_FEATHER_MAT, P.TOUCAN_BODY, P.TOUCAN_BIB, P.TOUCAN_BILL),
   enemy('scorpion', 'scorpion', 'desert', A.SCORPION_SHELL_MAT, P.SCORPION_BODY_COLOR, P.SCORPION_PINCER_COLOR, P.SCORPION_LEG_COLOR),
-  ...P.JELLY_COLORS.map((c, i) => enemy(`jellyfish ${c}`, 'jellyfish', 'ocean', null, A.JELLY_BODY_MATS[i], A.JELLY_INNER_MATS[i])),
+  ...P.JELLY_COLORS.map((c, i) => enemy(`jellyfish ${c}`, 'jellyfish', 'ocean', null, A.JELLY_MATS[i], glowColour(hex(c), hex(c), 1.5))),
   enemy('shark', 'shark', 'ocean', A.SHARK_MAT, P.SHARK_TOP, P.SHARK_BELLY),
   enemy('flyingFish', 'flyingFish', 'ocean', A.FFISH_MAT, P.FFISH_BODY, P.FFISH_BELLY, A.FFISH_WING_MAT),
   enemy('snowman', 'snowman', 'arctic', null, A.SNOWMAN_MAT, A.SNOWMAN_ARM_MAT, A.SNOWMAN_NOSE_MAT, A.SNOWMAN_COAL_MAT),
