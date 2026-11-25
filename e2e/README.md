@@ -83,7 +83,7 @@ however long the level takes to load) and counted once its draw count has held f
 any runner): low must render at dpr 1 with no contact shadows and fewer draw calls (`<id>-low.png`).
 A `levelSelect` step seeds saved progress (3★ + 1★), two of the first level's medals and leaderboards, reloads the page, opens the level select (`levelSelect.png`)
 and requires one card per level plus the Daily card, each top's initials on its card after the reload, the right locked count and `★ x / 15` total, every card
-inside 1280×720 with no sideways scroll, exactly one medal ticket out (#978: the focused card's, its three feat lines inside the viewport, at open and after ArrowLeft), and keyboard-only play (arrows move focus, Enter on a
+inside 1280×720 with no sideways scroll, exactly one medal ticket out (#978: the focused card's, its three feat lines inside the viewport and over no card, switch or Back, at open and after ArrowLeft), the crosshair drawn over the screen and the 3-star first level's Night Ride switch on its board's top corner turning that board to night (#1057, `levelSelect-night.png`), and keyboard-only play (arrows move focus, Enter on a
 locked card does nothing, Enter on an open one plays the launch transition and starts that level);
 the phone run checks its cards fit 390 px and every open card shows its medal ticket.
 A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run must be today's `daily()` level and seed in

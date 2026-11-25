@@ -4,7 +4,7 @@ import type { LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { currentStreak, dailyKey, dailyLevel, type DailyStreak } from '@/levels/daily'
 import { previousLevel } from '@/levels/LevelRegistry'
 import { rushStages, rushUnlocked, type RushLevel } from '@/levels/bossRush'
-import { hasNightRide } from '@/levels/environments/nightPreset'
+import { NIGHT_ATMOSPHERES, hasNightRide } from '@/levels/environments/nightPreset'
 import type { Medal } from '@/levels/medals'
 
 export interface LevelSelectSource {
@@ -42,6 +42,14 @@ export function medalsLine(medals: readonly Pick<LevelCard['medals'][number], 'n
   const won = medals.filter((m) => m.earned).length
   const each = medals.map((m) => (m.earned ? `${m.name}, won` : `${m.name}: ${m.line}`))
   return `${won} of ${medals.length} medals${each.length > 0 ? `. ${each.join('. ')}` : ''}`
+}
+
+const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`
+
+/** A card flipped to its Night Ride (#1057) paints its postcard on the night preset's sky, zenith to horizon; null without one. */
+export function nightPostcardSky(biome: BiomeType): string | null {
+  const sky = NIGHT_ATMOSPHERES[biome]?.sky
+  return sky ? `linear-gradient(180deg, ${hex(sky.zenith)} 0%, ${hex(sky.horizon)} 100%)` : null
 }
 
 export function buildLevelCards(

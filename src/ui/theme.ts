@@ -26,6 +26,7 @@ export const FAIR = {
   sky: '#63b7e6',
   cream: '#f6e7c1',
   tar: '#1b110d',
+  night: '#1c2147',
 } as const
 
 export type SkyStop =readonly [colour: string, at: number]
