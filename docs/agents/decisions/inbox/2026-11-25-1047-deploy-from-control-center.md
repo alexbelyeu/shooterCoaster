@@ -1,4 +1,4 @@
-## 2026-11-25 — The control center starts every deploy (Alex, #1016, studio-control#2)
+## 2026-11-25 — The control center starts every deploy (Alex, #1047, studio-control#2)
 
 **Context:** #1015 gave `deploy.yml` a 05:00 UTC cron and a run after every green CI on `main` while production was
 broken. Neither fired: GitHub ran this repo's crons hours late or not at all (the first daily deploy never ran; the
