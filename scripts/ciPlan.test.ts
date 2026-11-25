@@ -59,11 +59,15 @@ describe('ciPlan', () => {
     }
   })
 
-  it('runs pacing for the levels a PR touches: its biome folder, or every level for shared ride / spawn code', () => {
+  it('runs pacing for the levels a PR touches: its biome folder, or every level for shared ride / spawn / enemy code', () => {
     expect(pr('src/levels/environments/biomes/gym/gymTrack.ts', 'src/levels/environments/biomes/gym/gymTrack.test.ts').pacing).toEqual(['level6'])
     expect(pr('src/levels/environments/biomes/desert/Desert.tsx', 'src/levels/environments/biomes/ocean/x.ts').pacing).toEqual(['level2', 'level3'])
     expect(pr('src/track/rideV2.ts').pacing).toHaveLength(8)
     expect(pr('src/levels/LevelRegistry.ts').pacing).toHaveLength(8)
+    for (const f of ['src/entities/enemies/FlapBird.tsx', 'src/entities/enemies/ratMotion.hot.ts', 'src/entities/bosses/Kraken.tsx', 'src/entities/spawning/x.ts']) {
+      expect(pr(f).pacing, f).toEqual(Object.values(BIOME_LEVEL))
+    }
+    expect(pr('src/entities/enemies/ratMotion.test.ts').pacing).toEqual([])
     expect(pr('src/track/rideV2.test.ts', 'src/ui/HUD.tsx').pacing).toEqual([])
     expect(pr('docs/x.md').pacing).toEqual([])
     expect(ciPlan({ event: 'push' }).pacing).toEqual([])

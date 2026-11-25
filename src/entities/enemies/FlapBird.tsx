@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { flyBack } from './leftBehind.hot'
+import { useGameStore } from '@/store/useGameStore'
 import { setFlashMaterial } from './hitFlash'
 import { useMarch } from './useMarch'
 import { BIRD_EYE_MAT, CROW_FLINCH_MAT, createBirdFeatherMaterial, birdWingPose } from './SharedEnemyAssets'
@@ -9,6 +12,9 @@ import { BIRD_EYE_MAT, CROW_FLINCH_MAT, createBirdFeatherMaterial, birdWingPose 
 /** Flap rates (radians of flap phase per game second) while hovering and in a dive. */
 const CROW_FLAP_HOVER = 4.5
 const CROW_FLAP_DIVE = 8
+
+/** The rider's look this frame, shared: one bird reads it at a time. */
+const LOOK = new THREE.Vector3()
 
 const tagFlinch = (mesh: THREE.Mesh | null) => {
   if (mesh) setFlashMaterial(mesh, CROW_FLINCH_MAT)
@@ -23,7 +29,8 @@ interface FlapBirdProps extends EnemyProps {
 /**
  * A bird with the crow's wings in two draw calls, feathers and eyes (the crow, the toucan); its wings flap in the
  * feather material's vertex shader. It takes turns hovering (slow flap, body bob) and diving (fast flap, nose down),
- * banking into its sway.
+ * banking into its sway. One the rider has gone past unshot flies back round in front of it (`flyBack`; every crow and toucan
+ * flies in a formation wave, placed ahead of the rider for that stretch alone).
  */
 export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
   // One speed for the whole flock, or its V stretches apart.
@@ -41,15 +48,27 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
   useEffect(() => () => featherMat.dispose(), [featherMat])
   const rigRef = useRef<THREE.Group>(null)
   const phase = useRef(flapOffset)
+  const camera = useThree((s) => s.camera)
+  // Its fly-back state, and where the rider's eye was last frame: a bird flying back outpaces the ride.
+  const back = useMemo(() => ({ flying: false, lastEye: camera.position.clone() }), [camera])
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
       const wobble = Math.sin(time * 1.5) * 0.3
-      const speed = moving() ? moveSpeed : 0
-      mesh.position.x += (Math.cos(moveAngle) * speed + wobble) * dt
-      mesh.position.z += (Math.sin(moveAngle) * speed + wobble * 0.5) * dt
+      const rode = back.lastEye.distanceTo(camera.position)
+      back.lastEye.copy(camera.position)
+      // None starts back during the boss fight: the rider's shots belong to the boss then.
+      const game = useGameStore.getState()
+      const facing = flyBack(back, mesh.position, camera.position, camera.getWorldDirection(LOOK), delta, rode, game.bossArrivedAt === null || game.bossSeconds !== null) ?? moveAngle
+      if (!back.flying) {
+        const speed = moving() ? moveSpeed : 0
+        mesh.position.x += (Math.cos(moveAngle) * speed + wobble) * dt
+        mesh.position.z += (Math.sin(moveAngle) * speed + wobble * 0.5) * dt
+      }
       mesh.position.y += Math.sin(time * 2 + flapOffset) * 0.05 * dt
+      // Its model faces `moveAngle`: the base turns it to the heading it flies back on.
+      mesh.rotation.y = moveAngle - facing
 
       const dive = 0.5 + 0.5 * Math.sin(time * 0.7 + flapOffset)
       phase.current += delta * (CROW_FLAP_HOVER + (CROW_FLAP_DIVE - CROW_FLAP_HOVER) * dive)
@@ -63,7 +82,7 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
         rig.position.y = -0.35 * (1 - dive) * Math.cos(phase.current)
       }
     },
-    [moveAngle, moveSpeed, moving, flapOffset, flap, sway],
+    [moveAngle, moveSpeed, moving, flapOffset, flap, sway, camera, back],
   )
 
   return (

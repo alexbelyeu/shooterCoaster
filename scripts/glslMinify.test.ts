@@ -46,7 +46,10 @@ describe('minifyGlsl', () => {
     for (const file of files) {
       const code = fs.readFileSync(path.resolve(file), 'utf8')
       const out = minifyGlsl(code)
-      if (/\/\* glsl \*\/\s*`\n?[ \t]+\S/.test(out)) kept.push(file)
+      // Any line still indented, or a `//` comment left, in a tagged literal: the minifier gave up on it (#1022).
+      for (const [, body] of out.matchAll(/\/\* glsl \*\/\s*`([^`]*)`/g)) {
+        if (/\n[ \t]+[^\s$]|^\s*\/\/|\n\s*\/\//.test(body)) kept.push(file)
+      }
     }
     expect(kept).toEqual([])
   })
