@@ -85,7 +85,7 @@ Web Audio (procedural music and SFX, no audio library), zustand (state),
 framer-motion (UI), Vite 6, TypeScript strict. Fonts (Ultra, Big Shoulders; Lobster for the logo) are self-hosted from `public/fonts/` (OFL, Ultra Apache 2.0); the game makes no
 third-party request at runtime. `vite build --mode portal` (`build:portal`) is the same game with `base: './'` for web portals. Deployed on Vercel at **https://scoaster.com** (www.scoaster.com redirects there; https://shooter-coaster.vercel.app also still serves it).
 A merge to `main` is **not** live at once: `deploy.yml` ships main's head daily at 05:00 UTC, when Alex starts it (Deploy now in the
-control center), and after every green CI on `main` while an `agent:prod-broken` issue is open (`scripts/deploy.cjs`). Vercel builds no
+control center), and after every green CI on `main` while the deploy check's `agent:prod-broken` issue is open (`scripts/deploy.cjs`; a red nightly or red `main` waits for the daily deploy). Vercel builds no
 push itself (`git.deploymentEnabled` in `vercel.json`: Standard build minutes are billed) — verification happens in CI. `vercel.json` rewrites only
 the `/go/<campaign>` landing paths to the game; any other unknown path gets `public/404.html` with a real 404,
 and it sets the security headers, a year's `immutable` cache on Vite's hashed `/assets/*` (so nothing unhashed goes in
