@@ -17,7 +17,7 @@ import {
   TITAN_HEART_SHUT_GEO, TITAN_LEG_GEO, TITAN_OBSIDIAN_MAT, TITAN_VENT_GEO,
 } from './bossAssets'
 import { approachAngle, firstSlot, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
-import { aimAtRider, flatForward } from './bossAim.hot'
+import { flatForward } from './bossAim.hot'
 import { needsRelocate, windowAmount } from './bossCycle.hot'
 import {
   TITAN_BEAT, TITAN_BODY, TITAN_BREAK_POINTS, TITAN_DEFEAT, TITAN_PERCH, TITAN_RISE, TITAN_WADE, crackGlow, defeatHeat, defeatSink, pickRiverSpot,
@@ -86,8 +86,6 @@ export default function MagmaTitan(props: BossProps) {
   const [tellStep] = useState(gameClockStep)
   const sim = useMemo(
     () => ({
-      heading: new THREE.Vector3(),
-      headed: false,
       spot: { x: 0, z: 0 } as Point2,
       perch: { x: 0, z: 0, slot: 0, sign: 1 } as Perch,
       pos: { x: 0, z: 0 } as Point2,
@@ -114,19 +112,17 @@ export default function MagmaTitan(props: BossProps) {
     [],
   )
 
-  /** `repick` moves `sim.perch` to a clear slot ahead. */
-  const aim = useCallback(
-    (dt: number, repick: boolean) => {
-      aimAtRider(camera, _cam, sim, input, dt)
-      if (repick && !pickPerch(sim.perch, input, TITAN_PERCH)) firstSlot(sim.perch, input, TITAN_PERCH)
-    },
-    [camera, sim, input],
-  )
+  /** The rider's position into `_cam` and `input`. */
+  const locateRider = useCallback(() => {
+    camera.getWorldPosition(_cam)
+    input.camera.x = _cam.x
+    input.camera.z = _cam.z
+  }, [camera, input])
 
   /**
-   * A lava river ahead if one is in view, else the first clear slot. Ahead of where the rider looks now, not the eased
-   * heading the Titan turns by: level 5's tell runs through the turntable that turns the car round, and the eased
-   * heading still looked sideways when it climbed out (#937).
+   * A lava river ahead if one is in view, else the first clear slot. Ahead of where the rider looks now, not a heading
+   * eased through the loops (`aimAtRider`): level 5's tell runs through the turntable that turns the car round, and an
+   * eased heading still looked sideways when it climbed out (#937).
    */
   const pickSpot = useCallback(() => {
     flatForward(camera, _view)
@@ -160,7 +156,7 @@ export default function MagmaTitan(props: BossProps) {
       eventBus.emit('eruption:start', FINAL_ERUPTION_FOG_FAR)
     }
     sim.tell += dt
-    aim(dt, false)
+    locateRider()
     pickSpot()
     if (sim.tell >= sim.nextBubble) {
       sim.nextBubble += BUBBLE_EVERY_S
@@ -171,7 +167,7 @@ export default function MagmaTitan(props: BossProps) {
   const move = useCallback(
     ({ root, state, dt, age, sinceDefeat, retract }: BossFrame) => {
       const fighting = sinceDefeat < 0
-      aim(dt, false)
+      locateRider()
 
       // Out of the rider's view (level 5's turntable turns the car round as it climbs out, #937): it sinks unseen and
       // climbs out of a river ahead of the new view, at once while it is still climbing out, else once it has been
@@ -207,10 +203,15 @@ export default function MagmaTitan(props: BossProps) {
       if (fighting && sim.placed && !sim.wading && risen && open === 0) {
         const dx = sim.pos.x - _cam.x
         const dz = sim.pos.z - _cam.z
-        const ahead = dx * sim.heading.x + dz * sim.heading.z
-        const side = dz * sim.heading.x - dx * sim.heading.z
+        // Judged and re-picked against where the rider looks now, like `pickSpot`: an eased heading still lagged the
+        // turntable's turn 3 s on and sent it wading over the rider's shoulder, out of the frame (#937).
+        flatForward(camera, _view)
+        const ahead = dx * _view.x + dz * _view.z
+        const side = dz * _view.x - dx * _view.z
         if (needsRelocate(TITAN_WADE, age - sim.holdStart, ahead, side)) {
-          aim(0, true)
+          input.forwardX = _view.x
+          input.forwardZ = _view.z
+          if (!pickPerch(sim.perch, input, TITAN_PERCH)) firstSlot(sim.perch, input, TITAN_PERCH)
           sim.wading = true
         }
       }
@@ -263,7 +264,7 @@ export default function MagmaTitan(props: BossProps) {
         eventBus.emit(CAMERA_TRAUMA_EVENT, BREAK_TRAUMA[0], BREAK_TRAUMA[1])
       }
     },
-    [aim, pickSpot, groundFn, sim],
+    [locateRider, pickSpot, groundFn, sim, camera, input],
   )
 
   const renderWeakPoint = useCallback((w: WeakPointSpec, exposed: boolean) => {
