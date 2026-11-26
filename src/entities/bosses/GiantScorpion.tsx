@@ -11,7 +11,7 @@ import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { desertObstacles, layoutDesert } from '@/levels/environments/biomes/desert/desertLayout'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import { setLimb } from './bossLimbs'
-import { isExposed, type BossState, type WeakPointSpec } from './bossModel'
+import { currentPhase, isExposed, type BossState, type WeakPointSpec } from './bossModel'
 import { GIANT_SCORPION } from './bossSpecs'
 import {
   SCORPION_BODY_GEO, SCORPION_CLAW_GEO, SCORPION_FINGER_GEO, SCORPION_FINGER_HINGE, SCORPION_GLOW_GEO, SCORPION_GLOW_MAT,
@@ -20,7 +20,7 @@ import {
 } from './bossAssets'
 import {
   SCORPION_BODY, SCORPION_RISE, SCORPION_TAIL, advanceGait, approachAngle, createTailPose, faceYaw, firstSlot, footStep, layTail,
-  lungeAmount, lungeImpactBetween, PERCH, perchBehind, pickPerch, pickSeenPerch, riseOffset, type FootStep, type Perch, type PerchInput,
+  lungeAmount, lungeImpactBetween, PERCH, scorpionShut, perchBehind, pickPerch, pickSeenPerch, riseOffset, type FootStep, type Perch, type PerchInput,
 } from './scorpionMotion.hot'
 import { aimAtRider } from './bossAim.hot'
 
@@ -69,14 +69,17 @@ function inFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: n
 
 const _wp = new THREE.Vector3()
 
-/** One of its exposed weak points inside the rider's frame, no dune between: what the rider can shoot (#937). */
+/**
+ * One of its live weak points of this phase inside the rider's frame, no dune between: what the rider can shoot (#937),
+ * shut or not, since one shut between strikes opens on the next (#1059).
+ */
 function weakPointSeen(camera: THREE.Camera, groundFn: HeightFunction, parts: ReadonlyMap<string, THREE.Group>, state: BossState): boolean {
   // By index, not `for…of parts`: that allocates an iterator and an entry array per weak point every frame (hard rule 8).
   const wps = state.spec.weakPoints
+  const phase = currentPhase(state)
   for (let i = 0; i < wps.length; i++) {
-    const id = wps[i].id
-    if (!isExposed(state, id)) continue
-    const part = parts.get(id)
+    if (state.hp[i] <= 0 || wps[i].phase !== phase) continue
+    const part = parts.get(wps[i].id)
     if (!part) continue
     part.getWorldPosition(_wp)
     if (pointInFrame(camera, groundFn, _wp.x, _wp.y, _wp.z, WEAK_POINT_NDC)) return true
@@ -198,7 +201,7 @@ export default function GiantScorpion(props: BossProps) {
 
   const move = useCallback(
     (frame: BossFrame) => {
-      const { root, parts, state, dt, age, sinceDefeat } = frame
+      const { root, parts, state, retract, dt, age, sinceDefeat } = frame
       const limbs = limbsRef.current
       if (!limbs) return
       const fighting = sinceDefeat < 0
@@ -268,6 +271,18 @@ export default function GiantScorpion(props: BossProps) {
       }
 
       const lunge = fighting ? lungeAmount(age) : 0
+      const wps = state.spec.weakPoints
+      let clawsLive = false
+      let tailLive = false
+      for (let i = 0; i < wps.length; i++) {
+        if (state.hp[i] <= 0) continue
+        if (wps[i].id.startsWith('claw')) clawsLive = true
+        else if (wps[i].id !== 'stinger') tailLive = true
+      }
+      for (let i = 0; i < wps.length; i++) {
+        const id = wps[i].id
+        retract(id, fighting && scorpionShut(id, age, id.startsWith('claw') ? tailLive : clawsLive))
+      }
       for (let s = 0; s < 2; s++) {
         const side = s === 0 ? 1 : -1
         const id = s === 0 ? 'claw-l' : 'claw-r'

@@ -1,5 +1,5 @@
 import type { TrackIndex } from '@/levels/environments/shared/trackClearance'
-import { smooth } from './bossCycle.hot'
+import { inWindow, smooth, type ExposureWindow } from './bossCycle.hot'
 
 /** The Giant Scorpion's motion, pure and allocation-free per frame. Local frame: +z its head, +y up, +x its left. */
 
@@ -55,6 +55,26 @@ export const SCORPION_LUNGE = {
 } as const
 
 export const LUNGE_IMPACT_S = SCORPION_LUNGE.windupS + SCORPION_LUNGE.strikeS
+
+/** Each lunge, from its windup to the end of its recovery. */
+export const STRIKE_WINDOW: ExposureWindow = {
+  first: SCORPION_LUNGE.first,
+  period: SCORPION_LUNGE.period,
+  openS: LUNGE_IMPACT_S + SCORPION_LUNGE.holdS + SCORPION_LUNGE.recoverS,
+  rampS: 0.2,
+}
+
+/**
+ * It fights back (#1059): its tail takes hits only while it strikes, and its claws only between strikes (raised to guard
+ * while it does), so the rider shoots each in its moment and never the whole of it at once. A part never shuts when it is
+ * all that is left to shoot (`othersLive` false: the other group is broken; the stinger, alone on the bare stub), or the
+ * rider would have nothing to shoot half the fight.
+ */
+export function scorpionShut(id: string, age: number, othersLive: boolean): boolean {
+  if (id === 'stinger' || !othersLive) return false
+  const striking = inWindow(STRIKE_WINDOW, age)
+  return id.startsWith('claw') ? striking : !striking
+}
 
 const GAIT = {
   step: 45,

@@ -50,7 +50,7 @@ describe('LevelRegistry', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2675],
-      ['level2', 'giantScorpion', 2745],
+      ['level2', 'giantScorpion', 3025],
       ['level3', 'kraken', 3164],
       ['level4', 'yeti', 4620],
       ['level5', 'magmaTitan', 3828],

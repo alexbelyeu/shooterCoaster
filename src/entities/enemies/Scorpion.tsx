@@ -2,6 +2,8 @@ import { useCallback, useContext, useRef } from 'react'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { useSlipAway } from './useSlipAway'
+import { SAND_BURROW } from './slipAway.hot'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { SCUTTLE_RADIUS } from '../spawning/enemyPlacement'
 import {
@@ -15,6 +17,7 @@ import {
  * where it was placed (#494: a straight crawl took it hundreds of units out of the view its
  * placement chose within seconds), following terrain height. On a dark section's floor (#937, level 2's passage) it
  * holds its spot between the rails and the wall instead, shuffling to and fro down the passage and facing the car.
+ * One left too long once the rider has seen it burrows back into the sand, unscored (`SAND_BURROW`, #1059).
  */
 /** On a floor: how far it shuffles either way down the passage, and how far it turns either side of facing the car (radians). */
 const FLOOR_SHUFFLE = 8
@@ -30,6 +33,7 @@ export default function Scorpion(props: EnemyProps) {
   const bodyRef = useRef<THREE.Group>(null)
   const tailRef = useRef<THREE.Group>(null)
   const heightFn = useContext(TerrainContext)
+  const burrow = useSlipAway(SAND_BURROW)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
@@ -48,10 +52,13 @@ export default function Scorpion(props: EnemyProps) {
         mesh.position.z = spawnPos.z - r * (Math.cos(heading) - Math.cos(moveAngle))
         mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 5
       }
+      const sunk = burrow(mesh.position, time)
+      if (sunk < 0) return 'escaped'
+      mesh.position.y -= sunk
       if (bodyRef.current) bodyRef.current.rotation.y = -heading
       if (tailRef.current) tailRef.current.rotation.z = Math.sin(time * 2.5) * 0.2
     },
-    [moveAngle, turnRate, heightFn, floor],
+    [moveAngle, turnRate, heightFn, floor, burrow],
   )
 
   return (

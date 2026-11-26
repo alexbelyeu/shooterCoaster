@@ -5,6 +5,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import type { EnemyProps } from './EnemyBase'
 import FlapBird from './FlapBird'
+import { CROW_FLEE } from './slipAway.hot'
 import { withRim } from './enemyRim'
 import { BIRD_EYE_MAT, CROW_RIM } from './SharedEnemyAssets'
 import crowUrl from './models/crow.glb?url'
@@ -63,5 +64,5 @@ export default function BlenderCrow(props: EnemyProps) {
   }, [at])
   const onHit = useCallback(() => at(WINGS_UP), [at])
 
-  return <FlapBird {...props} model={<primitive object={root} />} pose={pose} onHit={onHit} />
+  return <FlapBird {...props} flee={CROW_FLEE} model={<primitive object={root} />} pose={pose} onHit={onHit} />
 }
