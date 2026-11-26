@@ -134,7 +134,7 @@ export const MAGMA_TITAN: BossSpec = {
     titanVent('vent-l', 1),
     titanVent('vent-r', -1),
     { id: 'heart', radius: 115, offset: [...TITAN_BODY.heart], hp: 6, score: 60, phase: 0 },
-    { id: 'crown', radius: 120, offset: [...TITAN_BODY.crown], hp: 14, score: 0, phase: 1 },
+    { id: 'crown', radius: 120, offset: [...TITAN_BODY.crown], hp: 12, score: 0, phase: 1 },
   ],
 }
 
