@@ -193,7 +193,7 @@ const LEVELS: LevelConfig[] = [
         // (12 embers, 7 in a line, 9 in a `v`), so each lasts until the next is in view: a player clears about 3 a second.
         // The Eruption rises out of the cone over the drop tower, low enough to be seen through the flank's hole, as the last
         // near embers leave the top of the frame on the approach to it (a second sooner than it was, the same spot); the imps
-        // come a second before the drop, so they are on the cone's floor as the car falls; a spiral straight down the
+        // come two seconds before the drop, so they are on the cone's floor as the car falls and stand in the entry hole's view; a spiral straight down the
         // track ahead of the exit hole, then a column through it (single file down the rails, the one shape the rider sees in
         // there), then the imps out on the plain. The tube's own wave is a column too: anything off the rails' line is in the rock.
         { type: 'emberWisp', count: 8, waveLabel: 'Embers Rise!', formation: 'column', weight: 1 },
@@ -201,8 +201,8 @@ const LEVELS: LevelConfig[] = [
         { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, weight: 4 },
         { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, formationOrigin: NEAR_EMBERS, weight: 4 },
         { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, formationOrigin: NEAR_EMBERS, weight: 2 },
-        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationSpread: 1.5, formationOrigin: { ahead: 300, side: 0, up: 100 }, weight: 4 },
-        { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', formationSpread: 2, weight: 3 },
+        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationSpread: 1.5, formationOrigin: { ahead: 300, side: 0, up: 100 }, weight: 3 },
+        { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', formationSpread: 2, weight: 4 },
         { type: 'emberWisp', count: 10, formation: 'spiral', formationSpread: 2, formationOrigin: EXIT_EMBERS, weight: 1 },
         { type: 'emberWisp', count: 8, formation: 'column', weight: 1.5 },
         { type: 'fireImp', count: 7, formation: 'line', formationSpread: 2, weight: 0.5 },
