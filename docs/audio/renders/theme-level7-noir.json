@@ -1,0 +1,125 @@
+{
+  "name": "theme-level7-noir",
+  "kind": "music",
+  "request": {
+    "kind": "score",
+    "seconds": 30,
+    "chain": "game",
+    "seam": false,
+    "score": "src/audio/scores/themes/level7.noir.scrim",
+    "engine": "port"
+  },
+  "seed": 1,
+  "sampleRate": 44100,
+  "measuredFrom": "the float WAV render (the MP3 is for listening)",
+  "events": [
+    {
+      "t": 0.15,
+      "name": "render score"
+    },
+    {
+      "t": 3.307894736842105,
+      "name": "loop starts"
+    }
+  ],
+  "seams": [],
+  "bar": {
+    "startS": 3.307894736842105,
+    "barS": 1.5789473684210527
+  },
+  "metrics": {
+    "seconds": 30,
+    "integrated": -17.3,
+    "shortTermMax": -16.9,
+    "lra": 0.4,
+    "truePeak": -9.4,
+    "clipped": 0,
+    "silence": 0.5,
+    "correlation": 0.989,
+    "below30Db": -31,
+    "bands": {
+      "sub": {
+        "pct": 28.5,
+        "db": -5.5
+      },
+      "low": {
+        "pct": 34.5,
+        "db": -4.6
+      },
+      "mid": {
+        "pct": 33.3,
+        "db": -4.8
+      },
+      "presence": {
+        "pct": 2.5,
+        "db": -15.9
+      },
+      "air": {
+        "pct": 1.1,
+        "db": -19.7
+      },
+      "below30": {
+        "pct": 0.1,
+        "db": -31
+      }
+    },
+    "seamJumps": [],
+    "seamJumpMax": null
+  },
+  "targets": [
+    {
+      "label": "Integrated loudness",
+      "value": -17.3,
+      "unit": "LUFS",
+      "min": -18,
+      "max": -16,
+      "status": "pass"
+    },
+    {
+      "label": "Short-term max",
+      "value": -16.9,
+      "unit": "LUFS",
+      "status": "info"
+    },
+    {
+      "label": "True peak",
+      "value": -9.4,
+      "unit": "dBTP",
+      "max": -1,
+      "status": "pass"
+    },
+    {
+      "label": "Clipped samples",
+      "value": 0,
+      "unit": "",
+      "max": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Energy below 30 Hz",
+      "value": -31,
+      "unit": "dB rel",
+      "max": -30,
+      "status": "pass"
+    },
+    {
+      "label": "Stereo correlation",
+      "value": 0.989,
+      "unit": "",
+      "min": 0,
+      "status": "pass"
+    },
+    {
+      "label": "Loudness range",
+      "value": 0.4,
+      "unit": "LU",
+      "status": "info"
+    },
+    {
+      "label": "Digital silence",
+      "value": 0.5,
+      "unit": "%",
+      "status": "info"
+    }
+  ]
+}

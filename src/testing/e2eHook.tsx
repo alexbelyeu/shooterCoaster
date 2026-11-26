@@ -36,7 +36,7 @@ import { medalRun, useGameStore } from '@/store/useGameStore'
 import type { RideVariant, RunMode } from '@/types/game'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
-import { ENEMY_SILHOUETTE, projectedPx } from '@/entities/enemies/enemyReadability'
+import { ENEMY_SILHOUETTE, REFERENCE_VIEWPORT_H, projectedPx } from '@/entities/enemies/enemyReadability'
 import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
 import { levelWeather, weatherSeconds } from '@/levels/environments/shared/weatherPulse'
 import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
@@ -73,7 +73,9 @@ import { RIG_MAX_PITCH_DEG, RIG_MAX_ROLL_DEG } from '@/track/cameraRig.hot'
 import { STREAK_SPEED_THRESHOLD } from '@/track/windStreaks'
 import { MAX_FOV_KICK_DEG } from '@/track/cameraFov.hot'
 import { programsAfterWarmup } from '@/core/hitchLog'
-import { collectOccluders, countSight, type SightCounts, type SightTarget } from './lineOfSight'
+import { collectOccluders, countSight, drawnCentre, largestCluster, type SightCounts, type SightTarget } from './lineOfSight'
+import { TOUCH_ASSIST_RADIUS_PX } from '@/combat/aimAssist'
+import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
 import { bystanderCount } from '@/combat/bystanders'
 import { BYSTANDER_PENALTY } from '@/levels/scoring'
@@ -149,6 +151,9 @@ export interface SCTestApi {
   variant: () => RideVariant
   /** `restartRun`, as Replay / R / the pause menu's Restart do: a warm level goes straight to the countdown (#674). */
   restartLevel: () => void
+  /** This run's enemies (#1058): how many came into play and how many the model player (`autoFire(true, rate)`) killed,
+   *  golden balloons, bystanders and boss weak points apart. Reset by `startLevel` / `restartLevel`. */
+  runTally: () => { spawned: number; killed: number; basePoints: number }
   /** `<count>:<hash>` of the latest run's spawn positions (formation members: their seeded slots); null until a spawner has generated them. */
   spawnDigest: () => string | null
   /** Level time (s) now, when the next wave still to come is due (null once all are in) and the spawner's last wave tick (s); null with no level. */
@@ -226,6 +231,9 @@ export interface SCTestApi {
   /** Seconds every live bullet flies per frame instead of the frame time, and no bullet expires;
    *  0 freezes them (e.g. a fresh one at the muzzle), null is normal play. */
   bulletStep: number | null
+  /** Bullets hit only collision targets whose id starts with this (`'boss:'`: the boss step's real bullet, which a regular
+   *  enemy crossing its path must not take, #1046); null is normal play. */
+  bulletsHitOnly: string | null
   /** Seconds the level timer and game clock advance per playing frame instead of the frame time; null is normal play. */
   timerStep: number | null
   /** Most seconds the level timer and game clock advance per playing frame (a slower frame counts as this much); null
@@ -566,6 +574,8 @@ export interface E2ESight extends SightCounts {
   bossFramed: boolean
   /** The shootable enemies by type (#928: how long a wave's own enemies last). */
   byType: Record<string, number>
+  /** The most shootable enemies inside one aim-assist circle (#1058, `bunching`). */
+  bunch: number
 }
 
 export interface E2EEnemyOnScreen {
@@ -580,7 +590,23 @@ export interface E2EEnemyOnScreen {
 /** Live enemy objects, registered by EnemyBase only when the e2e flag is on. */
 const enemyRegistry = new Map<string, { type: EnemyType | 'goldenBalloon'; object: THREE.Object3D }>()
 export function registerE2EEnemy(id: string, type: EnemyType | 'goldenBalloon', object: THREE.Object3D) {
-  if (isE2E) enemyRegistry.set(id, { type, object })
+  if (!isE2E) return
+  enemyRegistry.set(id, { type, object })
+  if (countsInTally(id)) runTally.spawned.add(id)
+}
+
+/**
+ * The run's enemies (#1058 `killShare`): each that came into play, and each the model player (`autoFire`'s player mode)
+ * killed. Golden balloons (outside `maxScore`), bystanders and the boss's weak points are left out. `basePoints`: every kill's
+ * points before the combo multiplier (weak points and goldens in), the score `maxScore` is the kill-everything total of. Reset by
+ * `startLevel` and `restartLevel`.
+ */
+const runTally = { spawned: new Set<string>(), killed: new Set<string>(), basePoints: 0 }
+const countsInTally = (id: string) => !id.startsWith('bystander-') && !isBossId(id) && enemyRegistry.get(id)?.type !== 'goldenBalloon'
+function resetRunTally() {
+  runTally.spawned.clear()
+  runTally.killed.clear()
+  runTally.basePoints = 0
 }
 export function unregisterE2EEnemy(id: string) {
   if (isE2E) enemyRegistry.delete(id)
@@ -957,7 +983,7 @@ function isMounted(t: CollisionTarget) {
   return t.getPosition().y > -9000
 }
 
-const NO_SIGHT: E2ESight = { levelTime: 0, shootable: 0, occluded: 0, tiny: 0, ids: [], bossStage: 'none', bossFramed: false, byType: {} }
+const NO_SIGHT: E2ESight = { levelTime: 0, shootable: 0, occluded: 0, tiny: 0, ids: [], bossStage: 'none', bossFramed: false, byType: {}, bunch: 0 }
 
 function readSight(): E2ESight {
   const cam = probeCamera
@@ -974,8 +1000,16 @@ function readSight(): E2ESight {
   for (const t of getCollisionTargets()) {
     if (!isLive(t)) continue
     const radius = Math.sqrt(t.radiusSq)
-    const type = enemyRegistry.get(t.id)?.type
-    targets.push({ id: t.id, position: t.getPosition().clone(), size: type ? (ENEMY_SILHOUETTE[type] ?? 2 * radius) : 2 * radius, radius })
+    const enemy = enemyRegistry.get(t.id)
+    const type = enemy?.type
+    const body = enemy ? drawnCentre(enemy.object, new THREE.Vector3()) : null
+    targets.push({
+      id: t.id,
+      position: t.getPosition().clone(),
+      size: type ? (ENEMY_SILHOUETTE[type] ?? 2 * radius) : 2 * radius,
+      radius,
+      ...(body ? { body } : {}),
+    })
   }
   const counts = countSight(targets, cam, collectOccluders(scene, cam, skip))
   const bossFramed = e2eBoss.stage === 'active' && counts.ids.some((id) => isBossId(id))
@@ -984,7 +1018,24 @@ function readSight(): E2ESight {
     const type = enemyRegistry.get(id)?.type
     if (type) byType[type] = (byType[type] ?? 0) + 1
   }
-  return { ...counts, levelTime: e2eLevelTime, bossStage: e2eBoss.stage, bossFramed, byType }
+  return { ...counts, levelTime: e2eLevelTime, bossStage: e2eBoss.stage, bossFramed, byType, bunch: bunching(targets, counts.ids, cam) }
+}
+
+/**
+ * The most shootable enemies (boss weak points apart) inside one aim-assist circle (#1058): `TOUCH_ASSIST_RADIUS_PX` of a
+ * `REFERENCE_VIEWPORT_H` tall view, like `MIN_ENEMY_PX`, so the review's 960×540 and the smoke's 1280×720 measure alike.
+ */
+function bunching(targets: readonly SightTarget[], shootable: readonly string[], cam: THREE.Camera): number {
+  const ids = new Set(shootable.filter((id) => !isBossId(id)))
+  const half = REFERENCE_VIEWPORT_H / 2
+  const aspect = probeSize.width / probeSize.height
+  const points = targets
+    .filter((t) => ids.has(t.id))
+    .map((t) => {
+      _v.copy(t.position).project(cam)
+      return { x: _v.x * half * aspect, y: _v.y * half }
+    })
+  return largestCluster(points, TOUCH_ASSIST_RADIUS_PX)
 }
 
 /** Weapon pickups, a junction's switch and bystanders are targets too, but no enemy. */
@@ -1041,7 +1092,12 @@ function playerFireTick(camera: THREE.Camera, rate: number) {
   // The shot's look only: a real bullet, throttled on wall-clock time, would land extra hits
   // that depend on the runner's speed. processHit is the one path that hits here.
   if (onScreenNDC(victims[0].t, camera, _aim)) showShotAtNDC(_aim.x, _aim.y, victims.length)
-  for (const { t } of victims) processHit(t)
+  const live = getCollisionTargets()
+  for (const { t } of victims) {
+    processHit(t)
+    // A kill unregisters its target at once (`EnemyBase.kill`).
+    if (countsInTally(t.id) && !live.includes(t)) runTally.killed.add(t.id)
+  }
 }
 
 function autoFireTick(camera: THREE.Camera) {
@@ -1106,9 +1162,16 @@ export function installE2EApi() {
         weather: e2eWeather(l.enemies),
       }))
     },
-    startLevel: (id: string, seed?: number, variant?: RideVariant) => useGameStore.getState().startRun(id, { seed, variant }),
+    startLevel: (id: string, seed?: number, variant?: RideVariant) => {
+      resetRunTally()
+      useGameStore.getState().startRun(id, { seed, variant })
+    },
     variant: () => useGameStore.getState().runVariant,
-    restartLevel: () => useGameStore.getState().restartRun('results'),
+    restartLevel: () => {
+      resetRunTally()
+      useGameStore.getState().restartRun('results')
+    },
+    runTally: () => ({ spawned: runTally.spawned.size, killed: runTally.killed.size, basePoints: Math.round(runTally.basePoints) }),
     levelReady: () => {
       const { sceneReady, currentLevel } = useGameStore.getState()
       return sceneReady && api.shaderWarmup?.levelId === currentLevel
@@ -1160,6 +1223,7 @@ export function installE2EApi() {
     weapon: null,
     holdFeedback: false,
     bulletStep: null,
+    bulletsHitOnly: null,
     timerStep: null,
     timerStepMax: null,
     stopAtLevelTime: null,
@@ -1330,7 +1394,11 @@ export function installE2EApi() {
   eventBus.on('boss:defeated', () => { api.bossEvents.defeated += 1 })
   eventBus.on('weapon:fire', () => { api.combat.fired += 1 })
   eventBus.on('enemy:hit', () => { api.combat.hits += 1 })
-  eventBus.on('enemy:killed', () => { api.combat.kills += 1 })
+  eventBus.on('enemy:killed', (e: unknown) => {
+    api.combat.kills += 1
+    const { score, multiplier } = e as EnemyKilledEvent
+    runTally.basePoints += score / multiplier
+  })
   const onWave = (kind: 'incoming' | 'announce') => (label: unknown) => {
     const w = waveProbe?.()
     api.waveEvents.push({ kind, label: String(label), ms: performance.now(), levelTime: w?.levelTime ?? null, due: w?.due ?? null, lastTick: w?.lastTick ?? null })

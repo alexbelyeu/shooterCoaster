@@ -20,7 +20,7 @@ import ResultsMarquee from './ResultsMarquee'
 import { FairBoard, FairMedal, FairStars } from '@/ui/Fair'
 import { levelMedals, medalsWon } from '@/levels/medals'
 import { isReloadDue, reloadIfDue } from '@/app/staleReload'
-import { saveGhost } from '@/combat/ghost'
+import { encodeGhost, saveGhost } from '@/combat/ghost'
 import { recording } from '@/combat/ghostTrack.hot'
 import { bindings, matchesKey } from '@/input/bindings'
 
@@ -136,10 +136,12 @@ export default function ResultsScreen() {
           accuracy: runAccuracy(run.hits, run.shotsFired),
           version: __APP_VERSION__,
           daily,
+          // A daily's new best goes up with its ghost, which rides with the day's next players if it tops the board (#1042).
+          ghost: daily && recording.count ? encodeGhost(recording) : undefined,
         })
         .then((result) => result && show(result.top, result.rank))
 
-    // A daily stays off the campaign board and has no entry; only a new campaign best leaves a ghost.
+    // A daily stays off the campaign board and has no entry; only a new campaign best leaves a local ghost.
     const daily = run.mode.mode === 'daily' ? run.mode.dateKey : null
     let placed: number | null = null
     if (daily === null) {

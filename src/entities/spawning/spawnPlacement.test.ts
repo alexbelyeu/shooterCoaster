@@ -89,6 +89,16 @@ describe('formationSlots', () => {
     expect(a).not.toEqual(c)
   })
 
+  it('scales every slot by the wave spread (#1059)', () => {
+    const a = formationSlots('spiral', 12, createRng(1337))
+    const b = formationSlots('spiral', 12, createRng(1337), 2)
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i].local.x).toBeCloseTo(a[i].local.x * 2)
+      expect(b[i].local.y).toBeCloseTo(a[i].local.y * 2)
+      expect(b[i].local.z).toBeCloseTo(a[i].local.z * 2)
+    }
+  })
+
   it.each(Object.keys(FORMATIONS) as ChoreographedFormation[])('%s: keeps the count, groups no larger than the spec', (f) => {
     for (const count of [1, 7, 25, 50]) {
       const slots = formationSlots(f, count, createRng(1))
@@ -161,14 +171,16 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
       let ahead = 0
       placed.forEach((p, i) => {
         const ground = groundFn(p.position.x, p.position.z)
-        if (surface === 'air') expect(p.position.y).toBeGreaterThanOrEqual(ground + AIR_CLEARANCE - 1e-6)
+        // A column rides the rails' line, under the ground where the rails are (a tunnel), never below them.
+        if (formation === 'column') expect(p.position.y).toBeGreaterThan(Math.min(ground, trackPoint(table, nearestIndex(table, p.position)).y))
+        else if (surface === 'air') expect(p.position.y).toBeGreaterThanOrEqual(ground + AIR_CLEARANCE - 1e-6)
         else if (surface === 'water') expect(p.position.y).toBeGreaterThanOrEqual(WATER_Y)
         else expect(p.position.y).toBeGreaterThan(ground)
         expect(dist(p.position, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
         expect(dist(p.from, camera)).toBeGreaterThanOrEqual(NEAR_FIELD - 1e-6)
         expect(p.entrySeconds).toBeGreaterThanOrEqual(1)
         expect(p.entrySeconds).toBeLessThanOrEqual(2)
-        if (formation === 'ring') expect(p.motion).toEqual({ kind: 'hold' })
+        if (formation === 'ring' || formation === 'column') expect(p.motion).toEqual({ kind: 'hold' })
         else if (formation === 'spiral') expect(p.motion).toBeUndefined()
         else {
           // One heading per group, so its shape holds.
@@ -282,6 +294,14 @@ describe('tracksideSlots', () => {
       for (const s of slots.slice(0, nearCount)) expect(s.ahead).toBeLessThanOrEqual(band.near.max)
       expect(slots.slice(nearCount).some((s) => s.ahead > band.near!.max)).toBe(true)
     }
+  })
+
+  it("a wave's spread widens the far side only (#1059)", () => {
+    const { sideMin, sideMax } = tracksideBand('ground')
+    const sides = tracksideSlots(200, 'ground', createRng(3), 2).map((s) => Math.abs(s.side))
+    expect(Math.min(...sides)).toBeGreaterThanOrEqual(sideMin)
+    expect(Math.max(...sides)).toBeGreaterThan(sideMax)
+    expect(Math.max(...sides)).toBeLessThanOrEqual(2 * sideMax)
   })
 })
 
@@ -596,7 +616,7 @@ describe('placeWallSwarm (#516)', () => {
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
   })
 
-  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, the last ones on the walls seen from the Shield's top and its drop", () => {
+  it("splits level 6's lanternflies (#768) into groups along the ride: the Starr seen out of the cave, up Alaska beside the climbing car, the last ones on the walls seen from the Shield's top and its drop", () => {
     const { level, table: gym, rideFor } = world(shippedLevels().find((l) => l.id === 'level6')!)
     const wave = level.enemies.find((w) => w.type === 'lanternfly')!
     const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
@@ -605,7 +625,9 @@ describe('placeWallSwarm (#516)', () => {
     const ride = rideFor(wave)
     const placed = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarm, ride })
     const walls = placed.map((p) => p.wall.id)
-    expect(walls[0]).toMatch(/alaska/)
+    // At 17 s (#1033) the first group lands on the Starr the car looks at on its way out of the cave, the next ones on Alaska.
+    expect(walls[0]).toBe('w-starr-right')
+    expect([...new Set(walls)][1]).toMatch(/alaska/)
     expect(walls[walls.length - 1]).not.toMatch(/alaska/)
     // The crest (#948): over Alaska's top no wall is in frame, so a group lands on the roof the rider looks up into.
     expect(walls).toContain('roof-alaska')

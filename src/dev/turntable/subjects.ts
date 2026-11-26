@@ -11,7 +11,7 @@ import { hashString } from '@/utils/rng'
  * What the enemy turntable (`turntable.html`, `npm run turntable`) shows and how. Pure, so its test runs in Node; the
  * specs are keyed by `EnemyType` and `BossType`, so an enemy or boss with no subject fails `tsc -b`.
  */
-export type SubjectId = EnemyType | 'goldenBalloon' | BossType
+export type SubjectId = EnemyType | 'goldenBalloon' | 'blenderCrow' | BossType
 
 export interface Subject {
   id: SubjectId
@@ -47,11 +47,12 @@ const FIRST_HOP = (() => {
   return { from: HOP.arrive + route.sit[0] + 0.08 * route.hop[0], span: 0.84 * route.hop[0] }
 })()
 
-/** Every enemy the spawner can mount, and the golden balloon. A `Record`, so a missing one fails `tsc -b`. */
-const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon', Spec> = {
+/** Every enemy the spawner can mount, the golden balloon and the Blender crow (#1040). A `Record`, so a missing one fails `tsc -b`. */
+const ENEMY_SUBJECTS: Record<EnemyType | 'goldenBalloon' | 'blenderCrow', Spec> = {
   balloon: { front: 0, motion: at(cycle(1.6)), animated: false },
   goldenBalloon: { front: 0, motion: at(cycle(3)), animated: false },
   crow: { front: 0, holdHeading: 'model', motion: at(cycle(6.25)), animated: true },
+  blenderCrow: { front: 0, holdHeading: 'model', motion: at(cycle(6.25)), animated: true },
   toucan: { front: 0, holdHeading: 'model', motion: at(cycle(6.25)), animated: true },
   scorpion: { front: 0, holdHeading: 'model', motion: at(cycle(2.5)), animated: true },
   shark: { front: 0, motion: at(cycle(4.5)), animated: true },

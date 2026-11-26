@@ -8,3 +8,6 @@ declare const __PORTAL_BUILD__: boolean
 
 /** package.json version, + the short commit on Vercel builds; set by `define` in vite.config.ts. */
 declare const __APP_VERSION__: string
+
+/** The Blender crow spike (#1040, `entities/enemies/Crow.tsx`) is in this build: dev or `SC_BLENDER_CROW=1`. */
+declare const __BLENDER_CROW__: boolean

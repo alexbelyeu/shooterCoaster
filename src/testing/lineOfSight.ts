@@ -17,6 +17,12 @@ export interface SightTarget {
   size: number
   /** Its hit radius: a wall nearer the camera than the centre minus this hides it. */
   radius: number
+  /**
+   * The middle of what draws it (`drawnCentre`), when that is not `position`: a ground enemy stands its origin at its feet,
+   * where a ridge of terrain hides the point while its body stands in plain view (level 5's golems, #937). It is in sight
+   * when either line is clear.
+   */
+  body?: THREE.Vector3
 }
 
 export type SightVerdict = 'shootable' | 'offscreen' | 'tiny' | 'occluded'
@@ -83,15 +89,38 @@ export function judgeTarget(
   const fov = camera instanceof THREE.PerspectiveCamera ? camera.fov : 80
   // `MIN_ENEMY_PX` is px of a 720 px tall view: the same share of any viewport.
   if (projectedPx(t.size, distance, REFERENCE_VIEWPORT_H, fov) < MIN_ENEMY_PX) return 'tiny'
-  _ray.set(_cam, ahead.divideScalar(distance))
+  if (clearLine(t.position, t.radius, occluders)) return 'shootable'
+  return t.body && clearLine(t.body, t.radius, occluders) ? 'shootable' : 'occluded'
+}
+
+/** No occluder between the camera (`_cam`) and `point`, short of `radius` before it. */
+function clearLine(point: THREE.Vector3, radius: number, occluders: readonly THREE.Mesh[]): boolean {
+  _dir.copy(point).sub(_cam)
+  const distance = _dir.length()
+  _ray.set(_cam, _dir.divideScalar(distance))
   _ray.near = 0
-  _ray.far = Math.max(0, distance - t.radius)
+  _ray.far = Math.max(0, distance - radius)
   for (const o of occluders) {
     _hits.length = 0
     o.raycast(_ray, _hits)
-    if (_hits.some((h) => h.distance <= _ray.far)) return 'occluded'
+    if (_hits.some((h) => h.distance <= _ray.far)) return false
   }
-  return 'shootable'
+  return true
+}
+
+const _box = new THREE.Box3()
+const _meshBox = new THREE.Box3()
+
+/** The centre of the world box round `object`'s visible meshes (its matrices as last rendered); null when none draws. */
+export function drawnCentre(object: THREE.Object3D, out: THREE.Vector3): THREE.Vector3 | null {
+  _box.makeEmpty()
+  object.traverseVisible((o) => {
+    const geometry = (o as THREE.Mesh).geometry
+    if (!(o instanceof THREE.Mesh) || !geometry) return
+    if (!geometry.boundingBox) geometry.computeBoundingBox()
+    _box.union(_meshBox.copy(geometry.boundingBox!).applyMatrix4(o.matrixWorld))
+  })
+  return _box.isEmpty() ? null : _box.getCenter(out)
 }
 
 export function countSight(
@@ -109,4 +138,20 @@ export function countSight(
     else if (v === 'tiny') out.tiny++
   }
   return out
+}
+
+/**
+ * Bunching (#1058): the most points (screen px) inside one aim-assist circle of `radius` centred on one of them, the
+ * targets a single sweep of the blaster takes. A cluster parked in front of the camera meets the pacing gate cheaply and
+ * makes the run easy; this is the number that says so.
+ */
+export function largestCluster(points: readonly { x: number; y: number }[], radius: number): number {
+  const r2 = radius * radius
+  let best = 0
+  for (const p of points) {
+    let n = 0
+    for (const q of points) if ((p.x - q.x) ** 2 + (p.y - q.y) ** 2 <= r2) n++
+    best = Math.max(best, n)
+  }
+  return best
 }

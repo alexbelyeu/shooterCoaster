@@ -162,7 +162,6 @@ export function bossFraming(samples, end, fightSeconds = BOSS_FIGHT_SECONDS) {
   }
 }
 
-/** Problems against the level's `budgets.json` `pacing.bossFramedShare` floor. */
 /**
  * Which of a level's pacing problems fail and which only warn. `knownOver: "#<open issue>"` turns them into warnings until that
  * issue lands; with `knownOverOnly: "boss"` only the boss framing floor is excused, so the gap and share still hold the level.
@@ -176,6 +175,7 @@ export function pacingGate(budget, ride, boss) {
   return { fail: [], warn: [...ride, ...boss] }
 }
 
+/** Problems against the level's `budgets.json` `pacing.bossFramedShare` floor. */
 export function bossFramingProblems(m, budget) {
   if (!budget?.bossFramedShare) return []
   if (!m) return ['the boss never reached its fight']
@@ -184,4 +184,85 @@ export function bossFramingProblems(m, budget) {
     `the boss was shootable ${m.framedSeconds.toFixed(1)} s of its ${m.fightSeconds.toFixed(0)} s fight (${Math.round(m.framedShare * 100)}%, floor ${Math.round(budget.bossFramedShare * 100)}%), ` +
       `longest out of sight ${m.longestUnframed.seconds.toFixed(1)} s from ${m.longestUnframed.start.toFixed(1)} s`,
   ]
+}
+
+/** How many enemies in one aim-assist circle make a bunch one sweep clears (#1058): its longest stretch is reported. */
+export const BUNCH_SWEEP = 4
+
+/**
+ * Challenge (#1058): how hard the run was for the model player. Something shootable at every moment (the gap and share
+ * above) is cheapest met by a cluster parked in front of the camera; these push back.
+ * - `scoreShare`: its final score over the level's `maxScore` (the stars' ratio; the score carries the combo multiplier, so it
+ *   can pass 1), and `baseScoreShare`: its kills' points before the multiplier over `maxScore`.
+ * - `killShare`: enemies it killed over enemies that came into play (`runTally()`).
+ * - `bunching`: per level second, the most shootable enemies inside one aim-assist circle (`sight().bunch`); the seconds'
+ *   90th percentile and the longest stretch of seconds with `BUNCH_SWEEP` or more.
+ * - `bossSeconds`: the boss's arrival to its defeat; null when it was not beaten.
+ * @param {{ t: number, bunch?: number }[]} samples
+ * @param {{ score: number, maxScore: number, spawned: number, killed: number, basePoints?: number }} run
+ * @param {ReturnType<typeof bossFraming>} boss
+ */
+export function challengeMetrics(samples, run, boss) {
+  const seconds = []
+  for (const s of samples) {
+    const t = Math.floor(s.t)
+    const row = seconds.at(-1)
+    if (row?.t === t) row.max = Math.max(row.max, s.bunch ?? 0)
+    else seconds.push({ t, max: s.bunch ?? 0 })
+  }
+  const sorted = seconds.map((r) => r.max).sort((a, b) => a - b)
+  const p90 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * 0.9) - 1)] : 0
+  let longest = null
+  let open = null
+  for (const r of seconds) {
+    if (r.max >= BUNCH_SWEEP && open && r.t === open.start + open.seconds) open.seconds++
+    else open = r.max >= BUNCH_SWEEP ? { start: r.t, seconds: 1 } : null
+    if (open && (!longest || open.seconds > longest.seconds)) longest = { ...open }
+  }
+  return {
+    scoreShare: run.maxScore > 0 ? round(run.score / run.maxScore, 3) : 0,
+    baseScoreShare: run.maxScore > 0 ? round((run.basePoints ?? 0) / run.maxScore, 3) : 0,
+    killShare: run.spawned > 0 ? round(run.killed / run.spawned, 3) : 0,
+    killed: run.killed,
+    spawned: run.spawned,
+    bunchingP90: p90,
+    bunchingMax: sorted.at(-1) ?? 0,
+    longestBunch: longest,
+    bossSeconds: boss?.beatenAt != null ? round(boss.beatenAt - boss.arrivedAt, 2) : null,
+  }
+}
+
+/** `score 186% of max (base 72%), killed 92% (120 of 130), bunching p90 3 (4+ for 6 s from 12 s), boss down in 7.5 s` */
+export function challengeSummary(c) {
+  const bunch = c.longestBunch ? ` (${BUNCH_SWEEP}+ for ${c.longestBunch.seconds} s from ${c.longestBunch.start} s)` : ''
+  const boss = c.bossSeconds != null ? `, boss down in ${c.bossSeconds.toFixed(1)} s` : ', boss not beaten'
+  return `score ${(c.scoreShare * 100).toFixed(0)}% of max (base ${(c.baseScoreShare * 100).toFixed(0)}%), killed ${(c.killShare * 100).toFixed(0)}% (${c.killed} of ${c.spawned}), ` +
+    `bunching p90 ${c.bunchingP90}${bunch}${boss}`
+}
+
+/**
+ * A level's challenge limits: budgets.json `challenge._default` under its own `challenge.<level>` (#1058). A separate section
+ * from `pacing`, with its own `knownOver`, so excusing an easy level never excuses a gap.
+ * The share gate is on `baseScoreShare`: with the combo multiplier the final score runs 1.7 to 4.3 times `maxScore`, so a
+ * ceiling on it would say nothing a level's tuning can change.
+ * @returns {{ baseScoreShareMax?: number, bunchingP90Max?: number, bossSecondsMin?: number, knownOver?: string }}
+ */
+export function challengeBudget(budgets, level) {
+  const section = budgets?.challenge ?? {}
+  return { ...section._default, ...section[level] }
+}
+
+/** Problems against the limits, as `{ fail, warn }`: all warnings while `knownOver` names the issue that fixes the level. */
+export function challengeGate(c, budget) {
+  const problems = []
+  if (budget.baseScoreShareMax != null && c.baseScoreShare > budget.baseScoreShareMax) {
+    problems.push(`base score ${(c.baseScoreShare * 100).toFixed(0)}% of max over ${(budget.baseScoreShareMax * 100).toFixed(0)}%`)
+  }
+  if (budget.bunchingP90Max != null && c.bunchingP90 > budget.bunchingP90Max) {
+    problems.push(`bunching p90 ${c.bunchingP90} in one aim-assist circle over ${budget.bunchingP90Max}`)
+  }
+  if (budget.bossSecondsMin != null && c.bossSeconds != null && c.bossSeconds < budget.bossSecondsMin) {
+    problems.push(`boss down in ${c.bossSeconds.toFixed(1)} s, under ${budget.bossSecondsMin} s`)
+  }
+  return budget.knownOver ? { fail: [], warn: problems } : { fail: problems, warn: [] }
 }

@@ -44,6 +44,8 @@ export const FORMATIONS: Record<ChoreographedFormation, FormationSpec> = {
   school: { groupSize: 15, spacing: 55, origin: { ahead: 800, side: 260, up: 0 }, groupGap: 650 },
   spiral: { groupSize: 12, spacing: 20, origin: { ahead: 900, side: 260, up: 40 }, groupGap: 800 },
   ring: { groupSize: 10, spacing: 150, origin: { ahead: 700, side: 0, up: 10 }, groupGap: 450 },
+  // Up: about a tunnel's centre over the rails (`getTunnelDims` `centreUp`); the slots' jitter stays inside its radius.
+  column: { groupSize: 8, spacing: 50, origin: { ahead: 250, side: 0, up: 6 }, groupGap: 500 },
 }
 
 export const NEAR_FIELD = 40
@@ -75,16 +77,20 @@ export interface FormationSlot {
   local: Vec3
 }
 
-/** `count` members in groups no bigger than the spec's (sizes differ by at most one), each slot jittered by `rng`. */
-export function formationSlots(formation: ChoreographedFormation, count: number, rng: Rng): FormationSlot[] {
+/**
+ * `count` members in groups no bigger than the spec's (sizes differ by at most one), each slot jittered by `rng`; `spread`
+ * scales the spec's spacing (a wave's `formationSpread`).
+ */
+export function formationSlots(formation: ChoreographedFormation, count: number, rng: Rng, spread = 1): FormationSlot[] {
   const spec = FORMATIONS[formation]
+  const spacing = spec.spacing * spread
   const groups = Math.max(1, Math.ceil(count / spec.groupSize))
-  const jitter = spec.spacing * 0.15
+  const jitter = spacing * 0.15
   const slots: FormationSlot[] = []
   for (let g = 0; g < groups; g++) {
     const size = Math.floor(count / groups) + (g < count % groups ? 1 : 0)
     for (let i = 0; i < size; i++) {
-      const local = slotOffset(formation, i, size, spec.spacing)
+      const local = slotOffset(formation, i, size, spacing)
       local.x += (rng() - 0.5) * jitter
       local.y += (rng() - 0.5) * jitter
       local.z += (rng() - 0.5) * jitter
@@ -121,6 +127,8 @@ export function slotOffset(formation: ChoreographedFormation, i: number, n: numb
       const a = (i / n) * Math.PI * 2
       return { x: spacing * Math.cos(a), y: spacing * Math.sin(a), z: 0 }
     }
+    case 'column':
+      return { x: 0, y: 0, z: i * spacing }
   }
 }
 
@@ -160,6 +168,8 @@ export interface FormationFrame {
   /** `track` plus the side / up offsets. */
   origin: Vec3
   track: Vec3
+  /** `track`'s sample on the table, where a column's rails start (the straight-ahead fallback's: the rails `ahead` of the rider). */
+  index: number
   /** Horizontal unit vectors. */
   forward: Vec3
   right: Vec3
@@ -363,22 +373,23 @@ export function formationFrame(
     // Facing back, the group's forward is the rider's look: a V flies in from down it and marches back up it at the car.
     if (back) Object.assign(tangent, { x: -tangent.x, y: -tangent.y, z: -tangent.z })
     for (const side of sides) {
-      const f = frameAt(track, tangent, side, up, true)
-      if (inView(view, slotWorld(formation, f, centre), reach)) return f
+      const f = frameAt(i, track, tangent, side, up, true)
+      if (inView(view, formation === 'column' ? columnSlot(table, f, centre) : slotWorld(formation, f, centre), reach)) return f
     }
   }
   // The track doubles back (hairpin, loop): anchor straight ahead of where the rider looks.
   const look = horizontal(view.dir)
   const track = { x: view.eye.x + look.x * ahead, y: view.eye.y, z: view.eye.z + look.z * ahead }
-  return frameAt(track, look, preferred, up, false)
+  return frameAt(indexAhead(table, view.index, Math.abs(along)), track, look, preferred, up, false)
 }
 
-function frameAt(track: Vec3, tangent: Vec3, side: number, up: number, seen: boolean): FormationFrame {
+function frameAt(index: number, track: Vec3, tangent: Vec3, side: number, up: number, seen: boolean): FormationFrame {
   const forward = horizontal(tangent)
   const right = { x: -forward.z, y: 0, z: forward.x }
   return {
     origin: { x: track.x + right.x * side, y: track.y + up, z: track.z + right.z * side },
     track,
+    index,
     forward,
     right,
     tangent,
@@ -504,7 +515,8 @@ export function placeFormationWave(input: PlaceWaveInput): Placement[] {
   return slots.map((slot) => {
     const { f, motion } = frameFor(slot.group)
     let local = slot.local
-    let position = settle(slotWorld(formation, f, local), surface, groundFn)
+    // The straight-ahead fallback is off the rails: a column there is a straight one in the air, as the others.
+    let position = formation === 'column' && f.seen ? columnSlot(table, f, local) : settle(slotWorld(formation, f, local), surface, groundFn)
     // A fish whose slot is on the shore closes in toward the wet group centre.
     for (let k = 0; k < SHORE_PULL_TRIES && surface === 'water' && groundFn(position.x, position.z) >= WATER_DEPTH; k++) {
       local = { x: local.x * 0.5, y: local.y, z: local.z * 0.5 }
@@ -545,9 +557,22 @@ function findWater(
   return wet ?? first
 }
 
+/**
+ * A column's slot `local.z` down the rails from its head, at the head's height over them: it follows the track, which is
+ * clear of the ground wherever it runs (inside a tunnel, under it), so it is not lifted clear of the ground as the others are.
+ */
+function columnSlot(table: ArcTable, f: FormationFrame, local: Vec3): Vec3 {
+  const p = trackPoint(table, indexAhead(table, f.index, local.z))
+  return {
+    x: p.x + f.origin.x - f.track.x + f.right.x * local.x,
+    y: p.y + f.origin.y - f.track.y + local.y,
+    z: p.z + f.origin.z - f.track.z + f.right.z * local.x,
+  }
+}
+
 function slotWorld(formation: ChoreographedFormation, f: FormationFrame, local: Vec3): Vec3 {
-  if (formation === 'ring') {
-    // The hoop stands across the 3D tangent, so it faces the oncoming rider on a slope too.
+  if (formation === 'ring' || formation === 'column') {
+    // The hoop stands across the 3D tangent, so it faces the oncoming rider on a slope too; a column runs along it.
     const up = normalize(cross(f.right, f.tangent))
     const s = up.y < 0 ? -1 : 1
     return {
@@ -601,6 +626,7 @@ function entryStart(
         spin: SPIRAL_SPIN,
       }
     case 'ring': // bursting out from the hoop's centre
+    case 'column': // streaming out from its head
       return { from: { ...f.origin }, spin: 0 }
     case 'line': // up out of the ground
       return { from: { x: position.x, y: groundFn(position.x, position.z) - LINE_ENTRY_DEPTH, z: position.z }, spin: 0 }
@@ -616,7 +642,8 @@ function formationMotion(formation: ChoreographedFormation, f: FormationFrame, a
     case 'school': // across the track
       return { kind: 'march', heading: Math.atan2(f.right.z * -f.sideSign, f.right.x * -f.sideSign), anchor, startWithin }
     case 'ring':
-      return { kind: 'hold' } // drifting off would break the hoop before the rider gets there
+    case 'column':
+      return { kind: 'hold' } // drifting off would break the hoop (or leave the tunnel) before the rider gets there
     case 'spiral':
       return undefined
   }
@@ -658,12 +685,17 @@ export interface TracksideSlot {
   side: number
 }
 
-/** A spread band's slots are one per even step of it (jittered within the step), so the stretch has no empty run. */
-export function tracksideSlots(count: number, surface: Surface, rng: Rng): TracksideSlot[] {
-  const { aheadMin, aheadMax, sideMin, sideMax, near, spread } = tracksideBand(surface)
+/**
+ * A spread band's slots are one per even step of it (jittered within the step), so the stretch has no empty run. `spread`
+ * (a wave's `formationSpread`) widens the band's far side, so fewer stand in one aim-assist circle down the track (#1059).
+ */
+export function tracksideSlots(count: number, surface: Surface, rng: Rng, spread = 1): TracksideSlot[] {
+  const band = tracksideBand(surface)
+  const { aheadMin, aheadMax, sideMin, near } = band
+  const sideMax = band.sideMax * spread
   const nearCount = near ? Math.ceil(count * near.share) : 0
   return Array.from({ length: count }, (_, i) => {
-    const ahead = spread
+    const ahead = band.spread
       ? aheadMin + ((i + rng()) / count) * (aheadMax - aheadMin)
       : rng.range(aheadMin, i < nearCount ? near!.max : aheadMax)
     const side = rng.range(sideMin, sideMax) * (rng() < 0.5 ? -1 : 1)

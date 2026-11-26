@@ -96,10 +96,10 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { arg, launchBrowser, startPreview, stopPreview } from '../scripts/headless.mjs'
 import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitDrawsSettled, waitFrames, waitVisible } from './pageChecks.mjs'
-import { planRun, STEP_LEVELS } from './shards.mjs'
+import { planLevels, planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
-import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, challengeBudget, challengeGate, challengeMetrics, challengeSummary, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
@@ -777,6 +777,36 @@ async function freshShotProblems(page, id, { fresh }) {
 /** Right of the centre and a little high: clear of the player's reticle, which the smoke leaves mid-screen. */
 const GHOST_AT = { x: 0.62, y: 0.45 }
 
+/** A ghost aiming at `at` for 60 s, in src/combat/ghost.ts's format: `1;stepMs;base64`, three bytes a sample (x 10 bits, y 10, flags 2). */
+function ghostAimingAt(at) {
+  const x = Math.round(at.x * 1023)
+  const y = Math.round(at.y * 1023)
+  return `1;50;${btoa(String.fromCharCode(x & 255, (x >> 8) | ((y & 63) << 2), y >> 6).repeat(1200))}`
+}
+
+/** Where the ghost crosshair is, 0..1 of the view, and its opacity. */
+const readGhost = (page) => page.evaluate(() => {
+  const el = document.querySelector('.ghost-crosshair')
+  const r = el?.getBoundingClientRect()
+  return {
+    shown: !!el && !el.hidden,
+    x: r ? r.left / window.innerWidth : null,
+    y: r ? r.top / window.innerHeight : null,
+    opacity: el ? Number(getComputedStyle(el).opacity) : null,
+  }
+})
+
+/** What's wrong with a ghost crosshair `seen` that should be drawn at `GHOST_AT`, translucent. */
+function ghostSeenProblems(seen, what) {
+  if (!seen.shown) return [`ghost: ${what} drew no ghost crosshair`]
+  const problems = []
+  if (Math.abs(seen.x - GHOST_AT.x) > 0.01 || Math.abs(seen.y - GHOST_AT.y) > 0.01) {
+    problems.push(`ghost: drawn at (${seen.x.toFixed(2)}, ${seen.y.toFixed(2)}) of the view, not its recorded aim (${GHOST_AT.x}, ${GHOST_AT.y})`)
+  }
+  if (!(seen.opacity > 0.2 && seen.opacity < 0.9)) problems.push(`ghost: opacity ${seen.opacity}, not translucent`)
+  return problems
+}
+
 /**
  * Ghost replay (#844): a ghost stored for the level as a best run's would be, aiming at `GHOST_AT` throughout, then a
  * pause and back (the ghost loads as play starts), game time frozen. Its ring must show there, translucent;
@@ -786,41 +816,22 @@ const GHOST_AT = { x: 0.62, y: 0.45 }
 async function ghostProblems(page, id) {
   const problems = []
   if ((await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return { problems, result: { skipped: true } }
-  await page.evaluate(([lid, at]) => {
-    // src/combat/ghost.ts's format: `1;stepMs;base64`, three bytes a sample (x 10 bits, y 10, flags 2).
-    const x = Math.round(at.x * 1023)
-    const y = Math.round(at.y * 1023)
-    const sample = String.fromCharCode(x & 255, (x >> 8) | ((y & 63) << 2), y >> 6)
-    localStorage.setItem(`shootercoaster-ghost:${lid}`, `1;50;${btoa(sample.repeat(1200))}`)
+  await page.evaluate(([lid, ghost]) => {
+    localStorage.setItem(`shootercoaster-ghost:${lid}`, ghost)
     const s = window.__SC_TEST__
     s.setTimeScale(0)
     s.setPhase('paused')
-  }, [id, GHOST_AT])
+  }, [id, ghostAimingAt(GHOST_AT)])
   await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
   await page.evaluate(() => window.__SC_TEST__.setPhase('playing'))
   await waitFrames(page, 3, { maxMs: 8000, pollMs: 40 })
-  const seen = await page.evaluate(() => {
-    const el = document.querySelector('.ghost-crosshair')
-    const r = el?.getBoundingClientRect()
-    return {
-      shown: !!el && !el.hidden,
-      x: r ? r.left / window.innerWidth : null,
-      y: r ? r.top / window.innerHeight : null,
-      opacity: el ? Number(getComputedStyle(el).opacity) : null,
-    }
-  })
+  const seen = await readGhost(page)
   await page.screenshot({ path: path.join(OUT, `${id}-ghost.png`), timeout: SHOT_TIMEOUT })
   await page.evaluate((lid) => {
     localStorage.removeItem(`shootercoaster-ghost:${lid}`)
     window.__SC_TEST__.setTimeScale(1)
   }, id)
-  if (!seen.shown) problems.push('ghost: a seeded ghost drew no ghost crosshair')
-  else {
-    if (Math.abs(seen.x - GHOST_AT.x) > 0.01 || Math.abs(seen.y - GHOST_AT.y) > 0.01) {
-      problems.push(`ghost: drawn at (${seen.x.toFixed(2)}, ${seen.y.toFixed(2)}) of the view, not its recorded aim (${GHOST_AT.x}, ${GHOST_AT.y})`)
-    }
-    if (!(seen.opacity > 0.2 && seen.opacity < 0.9)) problems.push(`ghost: opacity ${seen.opacity}, not translucent`)
-  }
+  problems.push(...ghostSeenProblems(seen, 'a seeded ghost'))
   return { problems, result: seen }
 }
 
@@ -1045,25 +1056,28 @@ const ONLINE_TOP = Array.from({ length: 10 }, (_, i) => ({ initials: 'WEB', scor
 
 /**
  * The online board's API (#365), stubbed: the smoke never calls the real one. GET answers ONLINE_TOP; POST records the
- * run and places it 2nd; `down` answers everything 503, as before the daily board's migration (#854).
+ * run and places it 2nd; `down` answers everything 503, as before the daily board's migration (#854). A Daily Run's
+ * ghost request (`?ghost=1`, #1042) answers `ghost` (none by default) and is counted apart, in `ghostGets`.
  * The results screen uses it only while `__SC_TEST__.onlineBoard(ONLINE_ENDPOINT)` is set.
  */
-async function stubOnlineBoard(page, { down = false } = {}) {
+async function stubOnlineBoard(page, { down = false, ghost = null } = {}) {
   const posts = []
   const gets = []
+  const ghostGets = []
   await page.route((url) => url.pathname === ONLINE_ENDPOINT, (route) => {
     const req = route.request()
-    if (req.method() !== 'POST') {
-      const q = new URL(req.url()).searchParams
-      gets.push(q.get('level') ?? `daily=${q.get('daily')}`)
-    } else posts.push(req.postDataJSON())
+    const q = new URL(req.url()).searchParams
+    if (req.method() === 'POST') posts.push(req.postDataJSON())
+    else if (q.get('ghost') === '1') ghostGets.push(q.get('daily'))
+    else gets.push(q.get('level') ?? `daily=${q.get('daily')}`)
     if (down) return route.fulfill({ status: 503, json: { error: 'unavailable' } })
+    if (q.get('ghost') === '1') return route.fulfill({ json: { ghost } })
     if (req.method() !== 'POST') return route.fulfill({ json: { top: ONLINE_TOP } })
     const run = posts.at(-1)
     const mine = { initials: run.initials, score: run.score, at: new Date().toISOString() }
     return route.fulfill({ json: { rank: 2, top: [ONLINE_TOP[0], mine, ...ONLINE_TOP.slice(1, 9)] } })
   })
-  return { posts, gets }
+  return { posts, gets, ghostGets }
 }
 
 const readBoard = (page) => page.evaluate(() => {
@@ -2217,45 +2231,6 @@ async function speedScan(page, levelId) {
   return { id: 'speed', problems, speed: { level: levelId, fraction: best.fraction, scan: samples, ...w }, tunnel: tunnel.result }
 }
 
-/**
- * The level with the Tree's gap (#659, shot on the nightly `dark` step's run), and the second of its storyboard beat there: the heartline roll through the gap
- * between the trunk and the back wall (`gym/gymTrack.ts`). The still is shot at that beat's track fraction, read from the
- * level's v2 ride (`rideBeats()`), so a rebuilt ride can't leave it pointing somewhere else.
- */
-const GAP_LEVEL = 'level6'
-const GAP_BEAT_SECOND = 56.5
-
-/**
- * `level6-gap.png`: the ride from inside the Tree's gap, the trunk on one side and the back wall on the other. With game time and the level timer
- * held, `rideTo` jumps the car into the gap and back to where it was, so the combat that follows rides on from there.
- */
-async function gapShot(page) {
-  const back = await page.evaluate(() => {
-    const s = window.__SC_TEST__
-    s.holdLevelTime = true
-    s.setTimeScale(0)
-    return s.rideProgress
-  })
-  const jump = async (t) => {
-    await page.evaluate((f) => { window.__SC_TEST__.rideTo = f }, t)
-    await waitFrames(page, 3, { maxMs: 20000, pollMs: 100 })
-  }
-  const gap = await page.evaluate((second) => window.__SC_TEST__.rideBeats().find((b) => b.second === second)?.at ?? null, GAP_BEAT_SECOND)
-  if (gap === null) {
-    await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
-    return { problems: [`gap still: ${GAP_LEVEL}'s ride has no beat at ${GAP_BEAT_SECOND} s (the heartline roll through the Tree's gap)`], image: null }
-  }
-  await jump(gap)
-  const at = await page.evaluate(() => window.__SC_TEST__.rideProgress)
-  const image = await imageStats(page, await page.screenshot({ path: path.join(OUT, `${GAP_LEVEL}-gap.png`), timeout: SHOT_TIMEOUT }))
-  await jump(back)
-  await page.evaluate(() => { window.__SC_TEST__.setTimeScale(1); window.__SC_TEST__.holdLevelTime = false })
-  const problems = []
-  if (Math.abs(at - gap) > 0.002) problems.push(`gap still: the car is at track ${at.toFixed(4)}, not ${gap.toFixed(4)} in the Tree's gap`)
-  if (looksBlank(image)) problems.push('gap still looks blank')
-  return { problems, image }
-}
-
 /** How far through a tunnel `<id>-tunnel.png` is shot: past the middle, with the exit ahead. */
 const TUNNEL_SHOT_AT = 0.75
 /** `<id>-tunnel-entry.png` looks at its entry portal from this far back (× the tunnel's length). */
@@ -2435,7 +2410,9 @@ async function waveCheck(page) {
       problems.push(`the tell came late: the wave tick at ${tickBefore.toFixed(2)} s was already within ${tellS} s of the wave at ${due} s`)
     }
   }
-  const events = log.map((e) => `${e.kind} "${e.label}"`)
+  // Labelled events only: an unlabelled wave's events carry no label, and their `due` is the spawner's next wave, which two
+  // tells fired in one tick share (level2's waves at 6 and 7 s), so they can't be told from a repeat.
+  const events = log.filter((e) => e.label !== 'undefined').map((e) => `${e.kind} "${e.label}"`)
   const repeated = [...new Set(events.filter((e, i) => events.indexOf(e) !== i))]
   if (repeated.length) problems.push(`wave events fired twice after a pause and Resume: ${repeated.join(', ')}`)
   if (flock.length < minOnScreen) problems.push(`only ${flock.length} ${type}s on screen after the wave flew in (want ≥ ${minOnScreen})`)
@@ -2506,6 +2483,9 @@ async function pacingCheck(page, id) {
       const st = s.stats()
       // No step until the level's waves are registered: the scene, its timer and ride mount together, settled.
       if (!w && !run.samples.length) return 'hold'
+      // The challenge measures (#1058) read the run's score and enemies as they stand at its last step.
+      run.score = st.score
+      run.tally = s.runTally()
       if (st.phase === 'playing' && w) {
         run.end ??= w.levelTime + st.timeRemaining
         // What the rider can shoot (#925): in view, readable and in sight, not every enemy whose centre projects on screen.
@@ -2513,13 +2493,14 @@ async function pacingCheck(page, id) {
         run.samples.push({
           t: v.levelTime, targets: v.shootable, hidden: v.occluded, specks: v.tiny, track: s.rideProgress,
           waveTell: w.due != null && v.levelTime >= w.due - s.waveTellSeconds, bossTell: v.bossStage === 'incoming',
-          bossStage: v.bossStage, bossFramed: v.bossFramed,
+          bossStage: v.bossStage, bossFramed: v.bossFramed, bunch: v.bunch,
         })
       } else if (run.samples.length) {
         run.done = true
         return false
       }
     })
+    run.maxScore = s.levels().find((l) => l.id === lid)?.maxScore ?? 0
     s.startLevel(lid, seed)
     return s.frames
   }, [id, SEED, PACING_STEP, PLAYER_HITS_PER_SECOND])
@@ -2555,10 +2536,11 @@ async function pacingCheck(page, id) {
       break
     }
   }
-  const { samples, end, stepper } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
+  const { samples, end, stepper, score, maxScore, tally } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
   if (!samples.length) return { id: 'pacing', level: id, problems: [...problems, 'no playing frame sampled'], pacing: null, timeline: [] }
   const pacing = pacingMetrics(samples, end)
   pacing.boss = bossFraming(samples, end)
+  pacing.challenge = challengeMetrics(samples, { score, maxScore, ...tally }, pacing.boss)
   const shaders = await programsAfterWarmup(page)
   gatePrograms(problems, shaders)
   if (samplingCutShort(samples, end, PACING_STEP)) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
@@ -2570,6 +2552,10 @@ async function pacingCheck(page, id) {
     : pacingGate(budget, pacingBudgetProblems(id, pacing, budget), bossFramingProblems(pacing.boss, budget))
   if (warn.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${warn.join('; ')}`)
   problems.push(...fail)
+  const challenge = challengeBudget(BUDGETS, id)
+  const hard = challengeGate(pacing.challenge, challenge)
+  if (hard.warn.length) console.log(`     WARN too easy (known, ${challenge.knownOver}): ${hard.warn.join('; ')}`)
+  problems.push(...hard.fail)
   return { id: 'pacing', level: id, problems, placeholder, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
@@ -2698,17 +2684,27 @@ async function bossCheck(page, check) {
     projectiles.hpMoved = (await boss()).hpFraction !== before.hpFraction
   }
 
-  // One real bullet at an exposed weak point: time frozen, bullets stepping 0.25 s a frame.
+  // One real bullet at an exposed weak point, which only the boss's weak points can take (`bulletsHitOnly`): on the
+  // nightly (#1046) the shots at the Golden Blimp and the volcano each killed an enemy crossing the bullet's path from
+  // the muzzle instead, most likely a bird flown back round in front of the rider (#1020). Time frozen, bullets stepping
+  // 0.25 s a frame.
   const target = before.exposed.find((e) => e.onScreen)
   let bulletHit = false
+  let bulletKills = 0
   if (target) {
+    const killsBefore = (await getStats(page)).kills
     await page.waitForTimeout(100) // past the pool's fire delay
     await page.evaluate(({ x, y }) => {
       window.__SC_TEST__.bulletStep = 0.25
+      window.__SC_TEST__.bulletsHitOnly = 'boss:'
       window.__SC_TEST__.fireShot(x, y)
     }, { x: target.ndcX, y: target.ndcY })
     bulletHit = await pollUntil(page, async () => (await events()).hit > 0, { ms: 8000, frames: 8, pollMs: 200 })
-    await page.evaluate(() => { window.__SC_TEST__.bulletStep = null })
+    await page.evaluate(() => {
+      window.__SC_TEST__.bulletStep = null
+      window.__SC_TEST__.bulletsHitOnly = null
+    })
+    bulletKills = (await getStats(page)).kills - killsBefore
   }
 
   // Clear the first phase through processHit: what is left of its hp.
@@ -2780,7 +2776,8 @@ async function bossCheck(page, check) {
   if (!result.exposedAtStart.length || result.exposedAtStart.some((id) => !firstPrefixes.some((p) => id.startsWith(p))))
     problems.push(`at arrival the exposed weak points are [${result.exposedAtStart}] (want only ${firstPrefixes.join('* / ')}*)`)
   if (!target) problems.push('no exposed weak point on screen to shoot')
-  else if (!bulletHit) problems.push('a real bullet at an exposed weak point never hit it (boss:hit)')
+  else if (!bulletHit)
+    problems.push(`a real bullet at an exposed weak point never hit it (boss:hit)${bulletKills ? `: it killed ${bulletKills} other enemy in its way` : ''}`)
   if (JSON.stringify(result.exposedMidway) !== JSON.stringify(lastPhase))
     problems.push(`after the first phase the exposed weak points are [${result.exposedMidway}] (want [${lastPhase}])`)
   if (!(midway.hpFraction < before.hpFraction)) problems.push(`hp did not drop (${before.hpFraction} -> ${midway.hpFraction})`)
@@ -3016,8 +3013,8 @@ const SWITCH_LEADS = [0.012, 0.008, 0.018, 0.005, 0.025]
  * the easy way, and a restart sets it back (level6-switch.png: the sign in view, level6-switch-hard.png: on the branch).
  * With the level timer jumped to the branch wave's second (#720), the hard run meets it on the branch, on screen and in the
  * kill count; the easy run, past the sign, never does.
- * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots and the
- * Tree's gap still (`gapShot`), which are too slow for the PR's `level6` shard (#766).
+ * The same run then checks the cave's dark section; the nightly `dark` step (`darkShots`) adds its frame shots, which
+ * are too slow for the PR's `level6` shard (#766).
  */
 async function switchCheck(page, { darkShots = false } = {}) {
   const { level } = SWITCH_CHECK
@@ -3121,8 +3118,6 @@ async function switchCheck(page, { darkShots = false } = {}) {
   // The cave the switch stands at the mouth of rides dark (#752): checked on the same run, held.
   const dark = await darkSectionShot(page, level, { shots: darkShots })
   problems.push(...dark.problems)
-  const gap = darkShots ? await gapShot(page) : null
-  if (gap) problems.push(...gap.problems)
   // Past the sign the easy way is settled: its wave's second brings nothing, and the kill count never counts it.
   const before = await branchArrivals()
   await toLevelTime(branchWave.at)
@@ -3130,7 +3125,7 @@ async function switchCheck(page, { darkShots = false } = {}) {
   result.totals.easy = (await read()).totalEnemies
   if (result.totals.hard != null && result.totals.hard - result.totals.easy !== branchWave.count)
     problems.push(`the hard run's kill count has ${result.totals.hard} enemies, the easy run's ${result.totals.easy}: not ${branchWave.count} apart`)
-  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result, gap: gap?.image ?? null }
+  return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result }
 }
 
 /** Level select with saved progress (3★, 1★): cards, locks, star total, 1280x720 fit, keyboard-only start. */
@@ -3203,6 +3198,35 @@ async function levelSelectCheck(page, levels) {
   const target = levels[Math.min(2, levels.length - 1)].id
   problems.push(...featsProblems(await page.evaluate(shownFeats), target, 'at open'))
   if (layout.focused !== target) problems.push(`initial focus on ${layout.focused}, expected ${target}`)
+
+  // #1057: the bullseye stands in for the hidden pointer, so it draws over the screen.
+  const pointer = await page.evaluate(() => {
+    const z = (sel) => Number(getComputedStyle(document.querySelector(sel) ?? document.body).zIndex) || 0
+    return { crosshair: z('.crosshair-svg'), screen: z('.level-select') }
+  })
+  if (!(pointer.crosshair > pointer.screen)) problems.push(`the crosshair (z ${pointer.crosshair}) draws under level select (z ${pointer.screen})`)
+
+  // #1057: the 3-star first level's sun/moon switch, on its board's corner, turns that board to night.
+  const nightId = levels[0].id
+  await page.locator(`[data-night="${nightId}"]`).click({ timeout: 10000 }).catch((e) => problems.push(`Night Ride switch: ${e.message}`))
+  const night = await page.evaluate((id) => {
+    const sw = document.querySelector(`[data-night="${id}"]`)
+    const card = document.querySelector(`.level-card[data-level="${id}"]`)
+    const s = sw?.getBoundingClientRect()
+    const c = card?.getBoundingClientRect()
+    return {
+      checked: sw?.getAttribute('aria-checked') ?? null,
+      cardNight: !!card?.classList.contains('is-night'),
+      postcardNight: !!card?.querySelector('.level-postcard.is-night'),
+      onCorner: !!s && !!c && s.left >= c.left - 8 && s.right <= c.right + 8 && s.top >= c.top - 8 && s.top <= c.top + 24 && s.right >= c.right - 24,
+      switches: document.querySelectorAll('[data-night]').length,
+    }
+  }, nightId)
+  await page.screenshot({ path: path.join(OUT, 'levelSelect-night.png'), timeout: SHOT_TIMEOUT })
+  if (night.switches !== 1) problems.push(`${night.switches} Night Ride switches, expected 1 (only ${nightId} has its three stars)`)
+  if (night.checked !== 'true' || !night.cardNight || !night.postcardNight || !night.onCorner)
+    problems.push(`Night Ride switch on ${nightId} ${JSON.stringify(night)}, expected it checked, on the board's top corner, the board and its postcard at night`)
+  await page.locator(`.level-card[data-level="${target}"]`).focus()
   let keyboard = null
   if (levels.length >= 4) {
     await page.keyboard.press('ArrowLeft')
@@ -3235,25 +3259,37 @@ async function levelSelectCheck(page, levels) {
   return { id: 'levelSelect', ok: problems.length === 0, problems, levelSelect: { ...layout, keyboard } }
 }
 
-/** The level select's medal tickets on screen (#978): each shown one's card, feat count and whether it stays in the viewport. */
+/**
+ * The level select's medal tickets on screen (#978): each shown one's level, feat count, whether it stays in the viewport,
+ * and the cards and switches it covers (#1057: none; the desktop's one ticket sits over the grid, a phone's in its card).
+ */
 function shownFeats() {
   return [...document.querySelectorAll('.level-feats')]
-    .filter((t) => t.getBoundingClientRect().height > 0)
+    .filter((t) => t.getBoundingClientRect().height > 0 && getComputedStyle(t).visibility !== 'hidden')
     .map((t) => {
       const r = t.getBoundingClientRect()
+      const own = t.closest('.level-card')
+      const covers = [...document.querySelectorAll('.level-card, .level-night, .level-select-back')].filter((c) => {
+        if (c === own) return false
+        const q = c.getBoundingClientRect()
+        return r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top
+      })
       return {
-        level: t.closest('.level-card')?.dataset.level ?? null,
+        level: t.dataset.level ?? own?.dataset.level ?? null,
         feats: [...t.querySelectorAll('.level-feat-line')].filter((l) => l.textContent.trim()).length,
         inView: r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight,
+        covers: covers.map((c) => c.dataset.level ?? c.dataset.night ?? c.className),
       }
     })
 }
 
-/** One ticket out, the focused card's, with its three feats on screen. */
+/** One ticket out, the focused card's, with its three feats on screen, covering no card or control. */
 function featsProblems(shown, level, when) {
   if (shown.length !== 1 || shown[0].level !== level) return [`medal tickets ${when} ${JSON.stringify(shown)}, expected only ${level}'s`]
   const [t] = shown
-  return t.feats === 3 && t.inView ? [] : [`${level}'s medal ticket ${when} ${JSON.stringify(t)}, expected 3 feats on screen`]
+  return t.feats === 3 && t.inView && t.covers.length === 0
+    ? []
+    : [`${level}'s medal ticket ${when} ${JSON.stringify(t)}, expected 3 feats on screen covering nothing`]
 }
 
 /** Click the level select's Daily card (#184) and return the run it started and its spawnDigest(). */
@@ -3280,6 +3316,9 @@ async function dailyCheck(newPage) {
   const problems = []
   const campaign = { level1: { level: 'level1', score: 1000, maxScore: 0, stars: 3, timestamp: 0 } }
   const first = await newPage()
+  // #1042: the run starts by fetching the day's World best ghost from the (stubbed) board, which then rides with it.
+  const online = await stubOnlineBoard(first.page, { ghost: ghostAimingAt(GHOST_AT) })
+  await first.page.evaluate((endpoint) => window.__SC_TEST__.onlineBoard(endpoint), ONLINE_ENDPOINT)
   const a = await startDailyFromCard(first.page, campaign)
   const { run } = a
   if (!run) problems.push('no Daily card on the level select')
@@ -3290,15 +3329,19 @@ async function dailyCheck(newPage) {
     if (run.currentLevel !== run.level) problems.push(`daily started ${run.currentLevel}, expected ${run.level}`)
   }
   if (!a.digest) problems.push('spawnDigest() never reported the daily spawns')
+  await first.page.waitForFunction(() => document.querySelector('.ghost-crosshair')?.hidden === false, null, { timeout: 8000, polling: 50 }).catch(() => {})
+  const worldGhost = await readGhost(first.page)
+  await first.page.screenshot({ path: path.join(OUT, 'daily-ghost.png'), timeout: SHOT_TIMEOUT })
+  problems.push(...ghostSeenProblems(worldGhost, "the day's World best ghost"))
+  if (online.ghostGets.length !== 1 || online.ghostGets[0] !== run?.dateKey)
+    problems.push(`daily ghost: fetched for ${JSON.stringify(online.ghostGets)}, expected once for ${run?.dateKey}`)
 
   // Score something so the day's first result is a new best, then end the run: it goes on the (stubbed) day's World board (#854).
-  const online = await stubOnlineBoard(first.page)
-  await first.page.evaluate((endpoint) => {
+  await first.page.evaluate(() => {
     const s = window.__SC_TEST__
-    s.onlineBoard(endpoint)
     s.setLeaderboards({}, 'DAY')
     s.killNearest(3)
-  }, ONLINE_ENDPOINT)
+  })
   await waitFrames(first.page, 2, { maxMs: 20000 })
   await first.page.evaluate(() => window.__SC_TEST__.endLevel())
   const resultsShown = await first.page
@@ -3336,6 +3379,7 @@ async function dailyCheck(newPage) {
   if (!sent || extraPosts.length || online.gets.length) problems.push(`daily World board: ${online.posts.length} submission(s) and ${online.gets.length} fetch(es), expected 1 submission`)
   else if (sent.daily !== run?.dateKey || sent.level !== run?.level || sent.initials !== 'DAY' || sent.score !== Math.round(results.score))
     problems.push(`daily World board: submitted ${JSON.stringify(sent)}, expected ${run?.level} DAY ${Math.round(results.score)} daily ${run?.dateKey}`)
+  else if (typeof sent.ghost !== 'string' || !/^1;\d+;[A-Za-z0-9+/]{4,}$/.test(sent.ghost)) problems.push(`daily World board: submitted no ghost with the run (${String(sent.ghost).slice(0, 40)})`)
   if (world.source !== 'today' || world.rows !== 10 || world.rank !== '1' || world.label !== "The world's top 10 today")
     problems.push(`daily World board not shown from the stub: ${JSON.stringify(world)}`)
   if (Object.keys(results.boards).length) problems.push(`a daily run entered the campaign leaderboards: ${JSON.stringify(results.boards)}`)
@@ -3358,6 +3402,9 @@ async function dailyCheck(newPage) {
   const down = await stubOnlineBoard(second.page, { down: true })
   await second.page.evaluate((endpoint) => window.__SC_TEST__.onlineBoard(endpoint), ONLINE_ENDPOINT)
   const b = await startDailyFromCard(second.page, {})
+  // No ghost from a board that's down, and nothing errors.
+  const noGhost = await readGhost(second.page)
+  if (noGhost.shown || down.ghostGets.length !== 1) problems.push(`daily ghost with the board's API down: ${down.ghostGets.length} fetch(es), ring ${noGhost.shown ? 'shown' : 'hidden'}; expected 1, hidden`)
   await second.page.evaluate(() => window.__SC_TEST__.killNearest(3))
   await waitFrames(second.page, 2, { maxMs: 20000 })
   await second.page.evaluate(() => window.__SC_TEST__.endLevel())
@@ -3384,7 +3431,7 @@ async function dailyCheck(newPage) {
     ok: problems.length === 0,
     problems,
     errors,
-    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed, world, offline },
+    daily: { dateKey: run?.dateKey, level: run?.level, seed: run?.seed, digest: a.digest, digestAgain: b.digest, record: results.record, replaySeed: replay.runSeed, world, offline, worldGhost },
   }
 }
 
@@ -4922,7 +4969,7 @@ async function run() {
   if (has('settings')) await pageStep('settings', null, settingsCheck)
 
   // 2. Every level (or the requested subset); the first one also plays the FRENZY / leaderboard checks (`frenzy`)
-  const wanted = PLAN.levels ?? levels.map((l) => l.id)
+  const wanted = planLevels(PLAN, levels.map((l) => l.id))
   const first = wanted[0]
   for (const id of has('ride') ? wanted : []) {
     const { ctx, page, errors } = await newPage()
@@ -5204,7 +5251,7 @@ async function run() {
       : r.id === 'night'
         ? ` ${r.level} skyLuma=${r.skyLuma} draws=${r.drawCalls} tris=${r.triangles}${sceneSummary(r.scene)} enemiesOnScreen=${r.enemies?.onScreen ?? '-'} readable=${r.enemies?.readable ?? '-'} largestPx=${r.enemies?.largestPx ?? '-'}${programGrowthSummary(r.programs)}`
       : r.id === 'pacing'
-        ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)${programGrowthSummary(r.shaders)}`
+        ? ` ${r.pacing ? `${pacingSummary(r.level, r.pacing)}; ${challengeSummary(r.pacing.challenge)}` : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)${programGrowthSummary(r.shaders)}`
       : r.engine
         ? ` title=${r.engine.title} nodes ${r.engine.nodes.join('->')} position ${r.engine.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +

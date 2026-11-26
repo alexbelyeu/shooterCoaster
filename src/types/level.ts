@@ -176,8 +176,12 @@ export interface DarkSectionSpec {
 
 export type DarkLook = 'blacklight' | 'ice'
 
-/** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */
-export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring'
+/**
+ * How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. A `column`
+ * is single file down the rails' own line, held there: the one shape that fits a tunnel or a hole the rider sees straight
+ * through (#937: level 5's lava tube and the volcano's exit hole), so it keeps the track's clearance, not the air's.
+ */
+export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring' | 'column'
 
 /** Relative to the rider's track position at activation, in world units. */
 export interface FormationOrigin {
@@ -204,6 +208,8 @@ export interface EnemyWave {
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
+  /** Scales the formation's spacing, or a trackside wave's far side (default 1): a wider spread puts fewer members in one aim-assist circle (#1059). */
+  formationSpread?: number
   /**
    * Bystanders who come with the wave (#518): people, not targets, so a wall type (`ENEMY_PLACEMENT`) on the level's
    * `walls`. Shooting one costs `BYSTANDER_PENALTY` and the combo; they are never kills, `maxScore` or the kill count.
@@ -221,6 +227,11 @@ export interface EnemyWave {
    * `DarkSectionSpec.floor`.
    */
   darkFloor?: boolean
+  /**
+   * The wave hangs over the biome's raised top (`BiomeDefinition.perch`, #945: level 6's dust round the Flame through the
+   * roll across it), from just above it to its `rise` (`spawning/perch.ts`): a ground walker, no formation.
+   */
+  perch?: boolean
 }
 
 /** A whale breaching across the ride (Ocean, #793), where and when the level puts it; the breach's own shape is `BREACH` in `biomes/ocean/whaleBreach.ts`. */

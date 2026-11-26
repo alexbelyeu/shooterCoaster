@@ -4,7 +4,7 @@ import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { BALLOON_GEO } from '@/entities/enemies/SharedEnemyAssets'
 import { BOSS_DEFEAT_DEATH_STYLE } from '@/effects/deathStyles'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
-import { isExposed, type WeakPointSpec } from './bossModel'
+import { currentPhase, isExposed, type WeakPointSpec } from './bossModel'
 import { BLIMP_LAYOUT, GOLDEN_BLIMP, blimpHullRadius } from './bossSpecs'
 import {
   BLIMP_BALLOON_MAT, BLIMP_CABLE_GEO, BLIMP_CABLE_MAT, BLIMP_GONDOLA_EXPOSED_MAT, BLIMP_GONDOLA_GEO, BLIMP_GONDOLA_MAT,
@@ -12,6 +12,7 @@ import {
 } from './bossAssets'
 import { flatForward } from './bossAim.hot'
 import { leadHeading, type LeadTiming } from './bossCycle.hot'
+import { hatchShut, weaveAcross, weaveUp } from './blimpMotion.hot'
 
 /** Rides with the coaster: a fixed boss would be behind the rider within seconds. */
 const AHEAD = 760
@@ -51,24 +52,24 @@ function renderWeakPoint(w: WeakPointSpec, exposed: boolean) {
 
 const towLine = <mesh geometry={BLIMP_CABLE_GEO} material={BLIMP_CABLE_MAT} />
 
-/** Theme Park finale: pop the five towed balloons to expose the gondola, three hits on it bring the blimp down. */
+/** Theme Park finale: pop its five towed balloons as it weaves, then three hits on the gondola through its hatch's windows. */
 export default function GoldenBlimp(props: BossProps) {
   const heightFn = useContext(TerrainContext)
-  const motion = useRef({ placed: false, heading: { x: 0, z: 0, rate: 0, lastX: 0, lastZ: 0 }, fallSpeed: 0 }).current
+  const motion = useRef({ placed: false, heading: { x: 0, z: 0, rate: 0, lastX: 0, lastZ: 0 }, fallSpeed: 0, exposedAt: -1 }).current
   const prop = useRef<THREE.Mesh>(null)
   const glint = useRef<THREE.Mesh>(null)
 
   const move = useCallback(
-    ({ root, parts, camera, state, dt, age, sinceDefeat }: BossFrame) => {
+    ({ root, parts, camera, state, retract, dt, age, sinceDefeat }: BossFrame) => {
       flatForward(camera, _fwd)
       leadHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed, HEADING)
       const h = motion.heading
       const rx = -h.z
       const rz = h.x
-      const side = SIDE * (2 * Math.min(1, age / CROSS_SECONDS) - 1)
+      const side = SIDE * (2 * Math.min(1, age / CROSS_SECONDS) - 1) + weaveAcross(age)
       camera.getWorldPosition(_camPos)
       _anchor.set(_camPos.x + h.x * AHEAD + rx * side, 0, _camPos.z + h.z * AHEAD + rz * side)
-      _anchor.y = Math.max(_camPos.y + ABOVE, heightFn(_anchor.x, _anchor.z) + MIN_CLEARANCE) + Math.sin(age * 0.9) * 10
+      _anchor.y = Math.max(_camPos.y + ABOVE, heightFn(_anchor.x, _anchor.z) + MIN_CLEARANCE) + weaveUp(age)
 
       const k = 1 - Math.exp(-dt / FOLLOW_TAU)
       if (!motion.placed) {
@@ -104,6 +105,9 @@ export default function GoldenBlimp(props: BossProps) {
         glint.current.scale.set(GLINT_WIDTH, r, r)
         BLIMP_GLINT_MAT.opacity = GLINT_OPACITY * Math.sin(Math.PI * Math.min(1, s))
       }
+      // Its balloons gone, the gondola's hatch opens and shuts on its beat until the blimp falls.
+      if (sinceDefeat < 0 && motion.exposedAt < 0 && currentPhase(state) === 1) motion.exposedAt = age
+      retract('gondola', sinceDefeat < 0 && motion.exposedAt >= 0 && hatchShut(age - motion.exposedAt))
       if (isExposed(state, 'gondola')) BLIMP_GONDOLA_EXPOSED_MAT.emissiveIntensity = 1 + 0.6 * Math.sin(age * 7)
     },
     [heightFn, motion],

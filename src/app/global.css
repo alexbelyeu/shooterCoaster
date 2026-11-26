@@ -37,6 +37,7 @@
   --fair-sky: #63b7e6;
   --fair-cream: #f6e7c1;
   --fair-tar: #1b110d;
+  --fair-night: #1c2147;
   --fair-notch: 16px;
 }
 
@@ -846,14 +847,15 @@ canvas {
 }
 
 
-/* Crosshair — SVG reticle, follows mouse via JS transform (no left/top reflow) */
+/* Crosshair — SVG reticle, follows mouse via JS transform (no left/top reflow). It stands in for the hidden OS cursor
+   (`.playing-cursor`), so it draws over every screen it is shown on: the title, its Settings and level select (#1057). */
 .crosshair-svg {
   position: fixed;
   top: 0;
   left: 0;
   transform: translate(calc(50vw - 24px), calc(50vh - 24px));
   pointer-events: none;
-  z-index: 20;
+  z-index: 400;
   filter: drop-shadow(0 0 4px rgba(255, 100, 100, 0.4));
   transition: opacity 0.06s ease-out;
   will-change: transform;
@@ -953,7 +955,7 @@ canvas {
   align-items: center;
   gap: 0.75rem 1rem;
   width: min(1120px, 100%);
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.6rem;
 }
 
 .level-select-header h2.fair-title {
@@ -1009,7 +1011,6 @@ canvas {
    No filter here: a ride board's tar shadow is its FairBoard's .fair-board-shadow wrapper, the Daily Run
    ticket's is .level-card-daily's drop-shadow. So a ride board's focus outline casts no shadow, on purpose. */
 .level-card {
-  --tilt: -0.8deg;
   display: flex;
   /* Five to a row at desktop widths (5 x 206 + 4 gaps fits the 1120px grid), so eight ride boards and the
      Daily Run ticket fit a 1280x720 screen as two rows (#959). */
@@ -1026,26 +1027,36 @@ canvas {
   transition: transform 150ms ease-out, rotate 150ms ease-out, opacity 0.3s;
 }
 
-.level-card:nth-child(3n + 2) {
+/* Each grid cell's tilt, inherited by its card and, on a Night Ride slot, by the switch on its corner. */
+.level-grid > * {
+  --tilt: -0.8deg;
+}
+
+.level-grid > :nth-child(3n + 2) {
   --tilt: 0.7deg;
 }
 
-.level-card:nth-child(3n) {
+.level-grid > :nth-child(3n) {
   --tilt: -0.3deg;
 }
 
 @media (hover: hover) {
-  .level-card:hover {
+  .level-card:hover,
+  .level-slot:hover > * {
     rotate: 0deg;
     transform: translateY(-4px);
   }
 }
 
+.level-card:focus-visible,
+.level-slot:has(> :focus-visible) > * {
+  rotate: 0deg;
+  transform: translateY(-4px);
+}
+
 .level-card:focus-visible {
   outline: 3px solid var(--fair-cream);
   outline-offset: 3px;
-  rotate: 0deg;
-  transform: translateY(-4px);
 }
 
 .level-card:not(.locked):active {
@@ -1163,22 +1174,14 @@ canvas {
   height: 24px;
 }
 
-/* The medals' feats (#978) on a cream prize ticket hung from the focused board (above it in the screen's lower half);
-   on a phone it hangs under every open board (the phone rules below). */
+/* The medals' feats (#978) on a cream prize ticket. One ticket between the header and the grid shows the focused ride's,
+   its name on the stub, so nothing a pointer opens covers a card (#1057); a phone hangs one under every open board
+   instead (the phone rules below). */
 .level-card {
   position: relative;
 }
 
-.level-card.is-focused {
-  z-index: 2;
-}
-
 .level-feats {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 8px;
-  right: 8px;
-  display: none;
   gap: 0.45rem;
   padding: 10px 12px 12px;
   border-radius: 4px;
@@ -1187,13 +1190,41 @@ canvas {
   box-shadow: 4px 6px 0 var(--fair-tar);
 }
 
-.level-card.feats-above .level-feats {
-  top: auto;
-  bottom: calc(100% + 8px);
+.level-card .level-feats {
+  display: none;
 }
 
-.level-card.is-focused .level-feats {
+.level-prizes {
   display: grid;
+  grid-template-columns: auto repeat(3, minmax(0, 1fr));
+  align-items: center;
+  column-gap: 1.1rem;
+  flex-shrink: 0;
+  width: min(1120px, 100%);
+  min-height: 52px;
+  margin-bottom: 0.9rem;
+  padding: 4px 16px;
+}
+
+/* A feat on one line where the strip is wide enough: it keeps two rows of boards on a 1280x720 screen. */
+.level-prizes .level-feat-line {
+  font-size: 1rem;
+}
+
+.level-prizes:empty {
+  visibility: hidden;
+}
+
+.level-prizes-name {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  padding-right: 1.1rem;
+  border-right: 2px dashed var(--fair-oxblood);
+  font-family: 'Ultra', serif;
+  font-size: 1.25rem;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .level-feat {
@@ -1234,24 +1265,89 @@ canvas {
   white-space: nowrap;
 }
 
-/* A board with its Night Ride plate hung under it (#829): a latching switch, held down while it is on. */
+/* A board with a Night Ride (#829) carries its sun/moon switch on its top corner (#1057): the sun and the moon set in
+   a tar plate, the one in force raised on its own tile. It tilts and lifts with its board. */
 .level-slot {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.9rem;
 }
 
-.fair-plate.level-night {
-  padding-inline: 1rem;
-  font-size: 1.25rem;
+.level-night {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 0;
+  border-radius: 6px;
+  color: rgb(246 231 193 / 0.5);
+  background: var(--fair-tar);
+  cursor: pointer;
+  rotate: var(--tilt);
+  transition: transform 150ms ease-out, rotate 150ms ease-out, opacity 0.3s;
 }
 
-.fair-plate.level-night[aria-pressed='true'] {
+.level-night:focus-visible {
+  outline: 3px solid var(--fair-cream);
+  outline-offset: 2px;
+}
+
+.level-night svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border-radius: 4px;
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.level-night-moon {
+  stroke-width: 0;
+}
+
+.level-night[aria-checked='false'] .level-night-sun {
   color: var(--fair-tar);
-  background: var(--fair-sky);
-  transform: translateY(4px);
-  box-shadow: 0 1px 0 var(--fair-tar);
+  background: var(--fair-gilt);
+}
+
+.level-night[aria-checked='true'] .level-night-moon {
+  color: var(--fair-cream);
+  background: var(--fair-night);
+}
+
+/* Flipped to the Night Ride: the board and its lining dim to the night, the plate goes dark with the world's colour in
+   its letters, and the postcard shows the level after dark. */
+.level-card.is-night :is(.fair-board, .fair-lining > span) {
+  background: var(--fair-night);
+}
+
+.level-card.is-night .fair-lining {
+  background: var(--fair-gilt-block);
+}
+
+.level-card.is-night .level-plate {
+  color: var(--plate);
+  background: var(--fair-tar);
+}
+
+.level-postcard.is-night {
+  isolation: isolate;
+}
+
+.level-postcard.is-night > svg:not(.level-postcard-stars) {
+  filter: brightness(0.55) saturate(0.7);
+}
+
+.level-postcard-stars {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  fill: var(--fair-cream);
 }
 
 /* Boarded up: planks across the picture, a plain plate, and what opens it. */
@@ -1345,8 +1441,13 @@ canvas {
   transform: scale(1.06);
 }
 
+.level-select.is-launching .level-night {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .level-card,
+  .level-night,
   .level-select.is-launching .level-card,
   .level-select.is-launching .level-card.is-selected,
   .level-card:focus-visible {
@@ -1354,7 +1455,7 @@ canvas {
     transition: opacity 0.3s;
   }
 }
-.reduce-motion :is(.level-card, .level-select.is-launching .level-card, .level-select.is-launching .level-card.is-selected, .level-card:focus-visible) {
+.reduce-motion :is(.level-card, .level-night, .level-select.is-launching .level-card, .level-select.is-launching .level-card.is-selected, .level-card:focus-visible) {
   transform: none;
   transition: opacity 0.3s;
 }
@@ -1381,10 +1482,8 @@ canvas {
     display: none;
   }
 
-  /* Wider than the small board, so a feat takes two lines, not four. */
-  .level-feats {
-    left: -20px;
-    right: -20px;
+  .level-prizes {
+    margin-bottom: 0.8rem;
   }
 
   .level-plate {
@@ -1423,24 +1522,34 @@ canvas {
   }
 
   .level-card {
-    --tilt: -0.4deg;
     flex-direction: column;
     width: 100%;
   }
 
-  .level-feats,
-  .level-card.feats-above .level-feats {
-    position: static;
+  .level-prizes {
+    display: none;
+  }
+
+  .level-card .level-feats {
     display: grid;
     margin: 0 14px;
     border-radius: 0 0 4px 4px;
   }
 
-  .level-card:nth-child(3n + 2) {
+  /* The switch sits on the plate's row, so a long name stops short of it. */
+  .level-slot .level-plate {
+    margin-right: 52px;
+  }
+
+  .level-grid > * {
+    --tilt: -0.4deg;
+  }
+
+  .level-grid > :nth-child(3n + 2) {
     --tilt: 0.35deg;
   }
 
-  .level-card:nth-child(3n) {
+  .level-grid > :nth-child(3n) {
     --tilt: -0.15deg;
   }
 

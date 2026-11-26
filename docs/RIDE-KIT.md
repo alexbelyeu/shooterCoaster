@@ -169,7 +169,8 @@ across the hall all counted. These rules come from that playtest; each says how 
 
 1. **A target counts only if the rider can shoot it** (checked). `__SC_TEST__.sight()` (`src/testing/lineOfSight.ts`)
    counts a live enemy or exposed weak point only when it is inside the view, at least `MIN_ENEMY_PX` and has a clear
-   line from the camera (no opaque mesh in front of it). The `pacing` gate and the review run on that count, played as a
+   line from the camera (no opaque mesh in front of it) to its origin or to the middle of what draws it: a golem's origin
+   is its feet, which a bank of lava hides while its body stands in view (#937). The `pacing` gate and the review run on that count, played as a
    player who lands 3 hits a second on what they can see (`PLAYER_HITS_PER_SECOND`): a stretch only leftovers would fill
    is empty.
 2. **Every element is a shooting moment** (checked by `pacing`): a spin, a roll, a jump, a drop and a lift hill each
@@ -192,6 +193,15 @@ across the hall all counted. These rules come from that playtest; each says how 
 8. **No flicker** (seen in the review's `flicker` list): a region of the screen that jumps in brightness for one step and
    comes straight back is a light popping, z-fighting or a blinking sprite. Find each spike's cause; explained ones (a
    muzzle flash, a kill) go in the PR.
+9. **Something to shoot is not something easy to shoot** (checked: budgets.json `challenge`, `challengeMetrics` in
+   `e2e/pacingMetric.mjs`, #1058): rules 1 and 2 are cheapest met by a cluster parked in front of the camera, and that
+   makes the run easy (Alex, 25 Nov: "perhaps too easy"). Spread, movement and escape keep a run a skill. The model player
+   (`PLAYER_HITS_PER_SECOND` on what it can see) scores at most `baseScoreShareMax` of the level's `maxScore` before the combo
+   multiplier (0.8); in 90% of
+   the run's seconds no more than `bunchingP90Max` shootable enemies (2) share one aim-assist circle (44 px of a 720 px
+   view, the blaster's touch snap), so one sweep never clears a wave; and its boss takes at least `bossSecondsMin` (12 s)
+   to beat. The kill share (enemies killed over enemies that came into play) is reported beside them: an enemy that
+   escapes is part of the challenge.
 
 **Every PR that changes a ride, its waves, a boss or a level's effects runs the ride review and posts it**:
 `npm run build && npm run review -- --level <id>` (`scripts/rideReview.mjs`, about 3 minutes in a cloud session) writes
