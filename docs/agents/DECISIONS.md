@@ -3146,3 +3146,126 @@ budget lowered to match) comes before any further raise, and certainly before wo
 **Consequences:** Don't switch back to `minify: 'esbuild'` (or drop the option) to speed up the build: it costs ~24 KB gz and breaks both budgets. The source-level diet #1026 listed (shared world helpers, packed ride data, dead exports) is still open and comes on top of this.
 
 This lowers `jsTotalGzipKB` to 659 and supersedes #1027's raise to 684 (measured on this PR merged with #1027: total 658 KB gz, startup 377).
+
+## 2026-11-25 — Fold sub-1 KB shared chunks into their importers (builder, #1030)
+
+**Context:** `jsTotalGzipKB` sat at main's own size (659 KB vs 658.98), so level 5's pacing PR (+0.33 KB gz) went red. Rollup split tiny shared modules (bossAim, trackScatter, the score layers, the service worker's registrar) into chunks of 0.1–0.6 KB gz, each paying its own gzip frame and import/export lines.
+**Decision:** `build.rollupOptions.output.experimentalMinChunkSize: 1000` in `vite.config.ts`: 0.59 KB gz less JS in all, +0.08 KB at startup (the registrar joins the entry chunk; it still runs on `load`). Any value from 600 to 1600 gives the same result; 2000 folds more into the startup JS (+0.43 KB there), 4000 pushes startup over its 378 KB budget.
+**Consequences:** Raising the threshold trades startup JS for total; check both `check:bundle` lines before changing it. The portal build's no-service-worker rule still passes (its entry never imports the registrar).
+
+## 2026-11-25 — Total JS budget 659 → 663 KB gz, about 4 KB of standing room (Director, #1034, #1036)
+
+**Context:** #1028 (terser) set `jsTotalGzipKB` to main's size + 1 KB. Main used that up within a day (658.68 KB gz on 3ea55e0), so three finished drafts are blocked on sub-2 KB costs: remappable controls #1002 (#998, +1.63 KB, already approved for the budget by #1001), level 6's dust #1035 (#945, +0.36 KB) and its pacing follow-up #1038 (#1033, stacked on it). Blocking each feature on a Director run costs more than the bytes.
+**Decision:** 663 KB: the three drafts (~2.2 KB) plus ~2 KB for the next change. Trimming those features was ruled out (#998). `startupJsGzipKB` (378) stays tight: that budget is the one players feel at first paint.
+**Consequences:** About 4 KB is the room to keep the total budget at; the Director lowers it toward measured + 4 when a cut (like terser) lands, not to measured + 1. A change of more than ~1 KB gz still needs its own Director raise.
+
+## 2026-11-25 — The Blender crow: a working pipeline, not adopted (Builder, #1040)
+
+**Context:** #381 step 4 asked whether a scripted Blender pipeline makes better enemies than our hand-coded primitives,
+at a cost the game can afford. `tools/art/crow.py` (bpy 5.3.0, run by hand) builds a raven deterministically: a metaball
+body and head, the hand-coded crow's wing and tail outlines as plates, six bones, one `flap` clip sampled from
+`birdWingPose` (so both crows flap alike), AO cast per vertex into its colours, then gltf-transform `quantize`.
+`BlenderCrow.tsx` flies it through `FlapBird` (its `model` and `pose` props). Measured on level 2 (the crows' level; the
+issue said level 1, which has none):
+
+| | hand-coded crow | Blender crow |
+|---|---|---|
+| download | 0 (in the world chunk) | GLB 75 KB raw / 30 KB gz, plus a 46 KB / 13.5 KB gz chunk (GLTFLoader, SkeletonUtils) |
+| triangles | 544 (416 feathers + 128 eyes) | 2 940 (5.4x; 30 crows on screen: +72 000) |
+| draw calls | 2 a crow | 2 a crow (one skinned feather mesh, the eyes) |
+| per-frame CPU | one uniform | an `AnimationMixer` and a 7-bone skeleton a crow |
+| load, Lighthouse mobile (150 ms RTT, 1.6 Mbps, CPU 4x) | — | chunk 224 ms, GLB 516 ms (vite preview, uncompressed), the first wave unseen until both arrive |
+| level 2 ride review, flag on | — | no errors, 120 kills, up to 20 crows shootable at once, nothing shootable 9.6% of the run |
+
+On the turntable (`npm run turntable -- --only crow,blenderCrow`) the Blender crow's body and head are rounder and
+smooth-shaded, the AO darkens the wing roots and the belly; the wings, tail and beak read the same, since they are the
+same outlines. At play distance (a crow is ~40 px) the two are hard to tell apart.
+
+**Decision:** don't adopt it for wave enemies. The look gain is the body's roundness, which a lathe or a subdivided
+three.js geometry can give at a tenth of the triangles; the costs are real: `jsTotalGzipKB` has no room (#1034) for the
+13.5 KB loader, every enemy would add a GLB to fetch before its first wave shows (or a preload to manage), skinned
+programs ShaderWarmup doesn't cover yet, and an art step outside CI. The spike stays behind a build-time gate
+(`__BLENDER_CROW__`: `npm run dev` and `SC_BLENDER_CROW=1` builds only, then `?blenderCrow=1`), so production builds
+carry none of it. Worth reconsidering for a one-off hero model (a boss), where one GLB and loader amortise over a single
+large, close-up subject; that boss would first need its skinned material and skinned hit-flash programs in
+ShaderWarmup (the spike's aren't).
+
+**Consequences:** the game's default builds are unchanged (no chunk, no GLB, the same bundle). Deleting the spike is
+`Crow.tsx`'s two lines, `BlenderCrow.tsx`, `models/`, `tools/art/`, the turntable's `blenderCrow` subject and the
+`__BLENDER_CROW__` define.
+
+## 2026-11-25 — The Daily Run ghost is the day's best run that carries one (Builder, #1042)
+
+**Context:** #1042 has a daily run post its ghost with its score and every daily run ride with "the day's #1 ghost".
+Rows posted before the feature deploys, or before Alex runs `0006_daily_ghost.sql`, and any whose ghost the server
+dropped, have no ghost.
+
+**Decision:** `GET /api/leaderboard?daily=<day>&ghost=1` answers the ghost of the day's highest-scoring run *that has
+one* (`ghost is not null`, the board's order and 60 s ceiling), not strictly the #1 row's. A #1 without a ghost would
+otherwise leave everyone ghostless for the rest of the day. A bad ghost (anything `decodeGhost` would refuse, checked by
+`checkGhost` in `api/_lib/rules.ts`) is dropped and the score kept, never a 400: the score is the board, the ghost is
+decoration. Only a daily POST may carry one, so it alone may be up to 12 KB; a campaign POST keeps the 2 KB cap. The
+client fetches the ghost once per run (keyed by `runId`, so a pause doesn't refetch) through the board's own endpoint,
+same CDN cache, no new host.
+
+**Consequences:** each daily row can hold up to ~9.6 KB, at 5 posts per IP per 10 minutes. Only the best is ever read;
+if the table grows, older days' ghosts can be nulled without touching the boards. The total-JS budget was 133 bytes
+from its ceiling on main; this leaves 17.
+
+## 2026-11-25 — The control center starts every deploy (Alex, #1047, studio-control#2)
+
+**Context:** #1015 gave `deploy.yml` a 05:00 UTC cron and a run after every green CI on `main` while production was
+broken. Neither fired: GitHub ran this repo's crons hours late or not at all (the first daily deploy never ran; the
+06:00 nightly started at 17:09), and CI on `main` started by auto-merge (GITHUB_TOKEN) starts no `workflow_run`.
+**Decision:** `deploy.yml` keeps only `workflow_dispatch`. The control center's autopilot (Vercel cron, every 3 min)
+starts it once a day after 05:00 UTC and at once while the deploy check's own `agent:prod-broken` issue is open (the
+live site is broken), on a green `main` only. A red nightly or red `main` (#707, #991 were open at the switch) waits.
+**Consequences:** If the control center is down, nothing deploys until Alex starts Deploy; its Needs you warns when
+merged PRs wait on a deploy over 26 h old. Don't add a cron back to `deploy.yml`: it fires hours late.
+
+## 2026-11-25 — Challenge limits in their own budgets.json section (Builder, #1058)
+
+**Context:** #1058 measures how easy a run is for the model player (score share, bunching in one aim-assist circle, the boss's
+time to kill) and gates them per level. The issue put the limits in `budgets.json` `pacing`, but a level's `knownOver` there
+turns every pacing problem into a warning, so excusing an easy level would also excuse a gap; and #937's level PRs edit the
+same `pacing` entries in parallel.
+**Decision:** The limits live in a separate `challenge` section: `_default` (`baseScoreShareMax` 0.8, `bunchingP90Max` 2,
+`bossSecondsMin` 12) under each level's own entry, which only needs `knownOver` (or an override). Bunching counts targets
+within 44 px (the blaster's touch snap, `TOUCH_ASSIST_RADIUS_PX`) of one of them in a 720 px tall view, like `MIN_ENEMY_PX`,
+so the review's 960×540 and the smoke's 1280×720 agree. The score ceiling is on the base share (the kills' points before the
+combo multiplier): the final score the issue named runs 1.7–4.3 times `maxScore` for the model player, so 0.8 of it is out of
+any level's reach; it is still reported as `scoreShare`. The base share is what matches Alex's "90–95% of the max is easy"
+(measured 77–100%).
+**Consequences:** A new world needs no `challenge` entry (the default holds it). Levels over the start limits carry
+`knownOver: "#1059"` until #1059 retunes them; the limits are budgets, so only the Director raises them.
+
+## 2026-11-25 — City voices in the arcade palette, and a level's theme never sounds like the title (Sound designer, #1053)
+
+**Context:** Alex turned down all three Neon Metropolis themes of #868 (#900) because they sounded like the title: the
+brief had asked for its supersaw / gated snare / FM bass colours. Round 2 needed a future-city sound the synth didn't
+have: a talking robot voice, a drum & bass bass, metallic bells, an 808, glitch hits and city texture.
+
+**Decision:** Seven voices join the arcade palette (`synth.ts`, `SCORE-FORMAT.md` "Arcade palette"): `vocoder` (saw +
+square through four gliding formant band-passes, no vibrato), `reese` (two saws ±19 cents and a sine sub), `fmbell`
+(FM at an inharmonic 3.5×), `siren` and `rain` (base-layer textures held for their written note), `kick808` and `glitch`
+(a 3-bit WaveShaper staircase). Like the rest of the palette they free their nodes when their last source ends
+(`palette.test.ts`), and each `level` is set from a calibration render against its nearest voice (vocoder vs synbrass,
+reese vs fmbass, fmbell vs bell, kick808 vs bigkick, glitch vs clap909: 0–2 dB louder at the same `vol`). The sound bible
+gains a rule: a level's score takes its genre, lead, kit and texture from its world and never leads with the title's
+signature.
+
+**Why not a real vocoder or a bitcrusher worklet:** a carrier/modulator vocoder needs a second signal and a filter bank
+per voice; an AudioWorklet would be the first one in the engine. Fixed formant glides and a WaveShaper staircase give the
+colour with the same node types the synth already uses.
+
+## 2026-11-26 — level8 ride draw calls 93 → 114 (Director, #1017)
+
+**Context:** #959 set `scene.level8.drawCalls` to 93 from a ride sample read one frame early. Since #1014 the smoke samples the stopped frame itself, where "The Flock!" wave arrives, and level 8 measures 95 on every run (seed 1337); #1014 excused it with `knownOver: "#1017"`.
+**Decision:** 114, the `scene` rule (+20% over the measured frame), and `knownOver` dropped. Not a content change: the same frame, measured correctly. Far under the VISION bar of 250.
+**Consequences:** level 8's ride is gated again; a later wave that adds draws on that frame needs its own raise.
+
+## 2026-11-26 — Total JS budget 663 → 668 KB gz (Director, #998, #945, #1033)
+
+**Context:** #1045 raised `jsTotalGzipKB` to 663 a day ago for remappable controls (#1002, +1.63 KB) and level 6's waves (#1035 / #1038, ~0.5 KB). Main grew 2.7 KB in that day (level retunes, #1059 and others) and measures 661.6 KB gz on 42c8130, so neither draft fits again.
+**Decision:** 668: main (661.6) + the two drafts (~2.2 KB) + the ~4 KB standing room the 663 entry set. The total counts every lazy level chunk, which grows with each world; `startupJsGzipKB` (378, main 377) stays tight because it is what players feel at first paint.
+**Consequences:** Total JS grows ~1–3 KB a day with level work; Monday's plan weighs a cut (the next terser-sized win) against raising it weekly. A single change over ~1 KB gz still needs its own Director raise.

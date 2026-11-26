@@ -43,7 +43,7 @@ const blimpBalloons: WeakPointSpec[] = BLIMP_LAYOUT.balloons.map(([x, y], i) => 
   id: `balloon-${i}`,
   radius: 62,
   offset: [x, y, 0],
-  hp: 2,
+  hp: 4,
   score: GOLDEN_BALLOON_SCORE,
   phase: 0,
 }))
@@ -54,7 +54,7 @@ export const GOLDEN_BLIMP: BossSpec = {
   reward: 400,
   weakPoints: [
     ...blimpBalloons,
-    { id: 'gondola', radius: 60, offset: [BLIMP_LAYOUT.hullX, BLIMP_LAYOUT.gondolaY, 0], hp: 3, score: 0, phase: 1 },
+    { id: 'gondola', radius: 60, offset: [BLIMP_LAYOUT.hullX, BLIMP_LAYOUT.gondolaY, 0], hp: 6, score: 0, phase: 1 },
   ],
 }
 
@@ -119,10 +119,13 @@ export const YETI: BossSpec = {
 
 const titanVent = (id: string, side: 1 | -1): WeakPointSpec => {
   const [x, y, z] = TITAN_BODY.vent
-  return { id, radius: 105, offset: [side * x, y, z], hp: 2, score: 60, phase: 0 }
+  return { id, radius: 105, offset: [side * x, y, z], hp: 3, score: 60, phase: 0 }
 }
 
-/** The vents and the heart first (the heart only while it beats its chest open), then the crown. */
+/**
+ * The vents and the heart first, then the crown: the heart open only on the beat and the vents shut while it is (`titanShut`,
+ * #1059). Hp for a fight of 12 s or more at the pacing step's `PLAYER_HITS_PER_SECOND`.
+ */
 export const MAGMA_TITAN: BossSpec = {
   name: 'The Magma Titan',
   tell: { seconds: 3, label: 'Final Eruption!' },
@@ -130,8 +133,8 @@ export const MAGMA_TITAN: BossSpec = {
   weakPoints: [
     titanVent('vent-l', 1),
     titanVent('vent-r', -1),
-    { id: 'heart', radius: 115, offset: [...TITAN_BODY.heart], hp: 2, score: 60, phase: 0 },
-    { id: 'crown', radius: 120, offset: [...TITAN_BODY.crown], hp: 4, score: 0, phase: 1 },
+    { id: 'heart', radius: 115, offset: [...TITAN_BODY.heart], hp: 6, score: 60, phase: 0 },
+    { id: 'crown', radius: 120, offset: [...TITAN_BODY.crown], hp: 12, score: 0, phase: 1 },
   ],
 }
 

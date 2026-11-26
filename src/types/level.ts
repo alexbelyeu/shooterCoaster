@@ -176,8 +176,12 @@ export interface DarkSectionSpec {
 
 export type DarkLook = 'blacklight' | 'ice'
 
-/** How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. */
-export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring'
+/**
+ * How a wave arrives; anything but `scatter` (the default) is laid out ahead of the rider by `spawnPlacement.ts`. A `column`
+ * is single file down the rails' own line, held there: the one shape that fits a tunnel or a hole the rider sees straight
+ * through (#937: level 5's lava tube and the volcano's exit hole), so it keeps the track's clearance, not the air's.
+ */
+export type Formation = 'scatter' | 'v' | 'line' | 'school' | 'spiral' | 'ring' | 'column'
 
 /** Relative to the rider's track position at activation, in world units. */
 export interface FormationOrigin {
@@ -204,6 +208,8 @@ export interface EnemyWave {
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
+  /** Scales the formation's spacing (default 1): a wider spread puts fewer members in one aim-assist circle (#1059). */
+  formationSpread?: number
   /**
    * Bystanders who come with the wave (#518): people, not targets, so a wall type (`ENEMY_PLACEMENT`) on the level's
    * `walls`. Shooting one costs `BYSTANDER_PENALTY` and the combo; they are never kills, `maxScore` or the kill count.

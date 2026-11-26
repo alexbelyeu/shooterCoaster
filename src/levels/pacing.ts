@@ -45,8 +45,8 @@ export interface PacedLevel {
 /** Whole seconds: the spawner reads the stored timer, which changes once a second. */
 export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel {
   const { waves, boss, finale, branch } = roster
-  if (!waves.length) throw new Error('a level needs at least one wave')
-  if (boss && finale) throw new Error('a level ends on its boss or a finale wave, not both')
+  if (!waves.length) throw new Error('no waves')
+  if (boss && finale) throw new Error('a boss or a finale, not both')
   const { bossAt, waveSpan, lastWaveBy } = pacingTimes(runSeconds)
   const total = waves.reduce((sum, w) => sum + weightOf(w), 0)
   let before = 0
@@ -56,11 +56,11 @@ export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel 
     return { ...wave, spawnDelay }
   })
   const last = enemies[enemies.length - 1].spawnDelay!
-  if (last > lastWaveBy) throw new Error(`the last wave arrives at ${last} s, after ${lastWaveBy} s: give it more weight`)
+  if (last > lastWaveBy) throw new Error(`last wave at ${last} s, after ${lastWaveBy} s`)
   if (finale) enemies.push({ ...finale, spawnDelay: bossAt })
   if (branch) {
     const { at, ...wave } = branch
-    if (!Number.isInteger(at) || at <= 0 || at >= bossAt) throw new Error(`branch wave at ${at} s: a whole second before ${bossAt} s`)
+    if (!Number.isInteger(at) || at <= 0 || at >= bossAt) throw new Error(`branch at ${at} s: a whole second before ${bossAt} s`)
     // Last, so the waves every run meets keep their seeded slots.
     enemies.push({ ...wave, route: 'hard', spawnDelay: at })
   }
@@ -69,6 +69,6 @@ export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel 
 
 function weightOf(wave: { weight?: number }): number {
   const weight = wave.weight ?? 1
-  if (!(weight > 0)) throw new Error(`a wave weight must be positive (got ${weight})`)
+  if (!(weight > 0)) throw new Error(`weight ${weight}: must be positive`)
   return weight
 }

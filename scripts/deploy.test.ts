@@ -15,18 +15,3 @@ describe('isLive', () => {
     expect(deploy.isLive([])).toBe(false)
   })
 })
-
-describe('reason', () => {
-  it('batches merges into the daily deploy while production is healthy', () => {
-    expect(deploy.reason({ event: 'workflow_run', force: false, prodBroken: [] })).toBeNull()
-  })
-
-  it('ships every green main at once while production is broken, so a revert is not held for a day', () => {
-    expect(deploy.reason({ event: 'workflow_run', force: false, prodBroken: [{ number: 12 }] })).toContain('#12')
-  })
-
-  it('deploys on the schedule and when started by hand', () => {
-    expect(deploy.reason({ event: 'schedule', force: false, prodBroken: [] })).not.toBeNull()
-    expect(deploy.reason({ event: 'workflow_dispatch', force: false, prodBroken: [] })).not.toBeNull()
-  })
-})

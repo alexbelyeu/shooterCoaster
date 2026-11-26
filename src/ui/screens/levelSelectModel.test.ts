@@ -10,6 +10,7 @@ import {
   medalsLine,
   navigateCards,
   nextLevelIndex,
+  nightPostcardSky,
   totalStars,
   type CardRect,
   type LevelSelectSource,
@@ -97,6 +98,13 @@ describe('buildLevelCards', () => {
     const all = getAllLevels()
     const cards = buildLevelCards(all, {}, (id) => id === all[0].id, {})
     for (const c of cards.slice(1)) expect(c.unlockedBy, c.id).toBe(getLevelConfig(previousLevel(c.id)!)!.name)
+  })
+})
+
+describe('nightPostcardSky', () => {
+  it("paints a night preset's zenith down to its horizon, and nothing for a biome without one", () => {
+    expect(nightPostcardSky('themePark')).toBe('linear-gradient(180deg, #060a1f 0%, #26305a 100%)')
+    expect(nightPostcardSky('city')).toBeNull()
   })
 })
 

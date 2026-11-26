@@ -1,5 +1,5 @@
 /** No env vars, a paused project or any database error answer a bare 503: never a 500, a stack trace or a secret. */
-import { boardCeiling, checkSubmission, clientIp, hashIp, isCampaignLevel, MAX_BODY_BYTES, rankFrom, rateLimited, windowStart } from './rules.js'
+import { boardCeiling, checkGhost, checkSubmission, clientIp, hashIp, isCampaignLevel, MAX_BODY_BYTES, MAX_DAILY_BODY_BYTES, rankFrom, rateLimited, windowStart } from './rules.js'
 import { dailyError, dayLevel, isDayKey } from './daily.js'
 import { CAMPAIGN, DbError, RATE_LIMITED, type ScoresDb } from './scoresDb.js'
 
@@ -20,58 +20,70 @@ export function json(status: number, body: unknown, cache = 'no-store'): Respons
 export const unavailable = () => json(503, { error: 'unavailable' })
 const tooMany = () => json(429, { error: 'too many submissions' })
 
-/** The parsed JSON body, or the 400 / 413 answer to send instead. */
-export async function readJson(request: Request, maxBytes: number): Promise<{ body: unknown } | { reject: Response }> {
+/** The parsed JSON body and its size, or the 400 / 413 answer to send instead. */
+export async function readJson(request: Request, maxBytes: number): Promise<{ body: unknown; bytes: number } | { reject: Response }> {
   let text: string
   try {
     text = await request.text()
   } catch {
     return { reject: json(400, { error: 'bad body' }) }
   }
-  if (new TextEncoder().encode(text).length > maxBytes) return { reject: json(413, { error: 'too large' }) }
+  const bytes = new TextEncoder().encode(text).length
+  if (bytes > maxBytes) return { reject: json(413, { error: 'too large' }) }
   try {
-    return { body: JSON.parse(text) }
+    return { body: JSON.parse(text), bytes }
   } catch {
     return { reject: json(400, { error: 'bad json' }) }
   }
 }
 
-/** `?level=<id>`, the campaign's top 10, or `?daily=<YYYY-MM-DD>`, that day's daily (its level is the day's). */
+/**
+ * `?level=<id>`, the campaign's top 10, or `?daily=<YYYY-MM-DD>`, that day's daily (its level is the day's);
+ * `?daily=<day>&ghost=1` is `{ ghost }`, the ghost of the day's best run that carries one, or null (#1042).
+ */
 export async function getBoard(request: Request, { db }: Deps): Promise<Response> {
   const params = new URL(request.url).searchParams
   const day = params.get('daily')
   if (day !== null && !isDayKey(day)) return json(400, { error: 'bad daily' })
+  const ghost = params.get('ghost') === '1'
+  if (ghost && day === null) return json(400, { error: 'ghost is daily only' })
   const level = day !== null ? dayLevel(day) : params.get('level')
   if (!isCampaignLevel(level)) return json(400, { error: 'unknown level' })
   if (!db) return unavailable()
   try {
+    if (ghost && day !== null) return json(200, { ghost: await db.ghost(level, boardCeiling(level), day) }, BOARD_CACHE)
     return json(200, { top: await db.top(level, boardCeiling(level), day) }, BOARD_CACHE)
   } catch {
     return unavailable()
   }
 }
 
-/** A run with `daily: '<YYYY-MM-DD>'` goes on that day's daily board, only today's or yesterday's (`dailyError`). */
+/**
+ * A run with `daily: '<YYYY-MM-DD>'` goes on that day's daily board, only today's or yesterday's (`dailyError`), with
+ * its `ghost` when that checks out (`checkGhost`; a bad one is dropped, the score kept). A campaign run stores none.
+ */
 export async function postScore(request: Request, { db, salt, now }: Deps): Promise<Response> {
   if (!db) return unavailable()
-  const read = await readJson(request, MAX_BODY_BYTES)
+  const read = await readJson(request, MAX_DAILY_BODY_BYTES)
   if ('reject' in read) return read.reject
   const checked = checkSubmission(read.body)
   if (!checked.ok) return json(400, { error: checked.error })
   const run = checked.value
-  const { daily } = read.body as { daily?: unknown }
+  const { daily, ghost: sentGhost } = read.body as { daily?: unknown; ghost?: unknown }
+  if (daily === undefined && read.bytes > MAX_BODY_BYTES) return json(413, { error: 'too large' })
   if (daily !== undefined) {
     const error = dailyError(daily, run.level, now())
     if (error) return json(400, { error })
   }
   const day = typeof daily === 'string' ? daily : null
+  const ghost = day ? checkGhost(sentGhost) : null
   try {
     const ipHash = await hashIp(clientIp(request.headers), salt)
     // The count turns most repeats away cheaply; the insert's trigger (0005_rate_limit.sql) is the exact limit under parallel POSTs.
     const recent = await db.count({ ip_hash: `eq.${ipHash}`, created_at: `gte.${windowStart(now())}` })
     if (rateLimited(recent)) return tooMany()
     try {
-      await db.insert(day ? { ...run, ipHash, day } : { ...run, ipHash })
+      await db.insert(day ? { ...run, ipHash, day, ghost: ghost ?? undefined } : { ...run, ipHash })
     } catch (e) {
       if (e instanceof DbError && e.code === RATE_LIMITED) return tooMany()
       throw e

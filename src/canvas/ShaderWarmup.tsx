@@ -4,7 +4,7 @@
  * `precompileShaders` (main.js), Copyright (c) 2026 Mr.doob, MIT License,
  * https://github.com/mrdoob/slop-newyork. Written from its description; no code copied.
  */
-import { useEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import * as enemyAssets from '@/entities/enemies/SharedEnemyAssets'
@@ -131,6 +131,19 @@ function renderWarmupBatch(
 export default function ShaderWarmup({ levelId }: { levelId: string }) {
   const get = useThree((s) => s.get)
 
+  // The frame loop can draw once between the mount's commit and its passive effects (#1051): with no layer mask
+  // yet, the composer drew the whole level and compiled every program it uses in that one frame (20 on level 3,
+  // ~1.9 s under 4x throttling). The scene draws nothing until the effect below has masked the camera; a run
+  // already playing at mount (`?e2e=1`) draws as before.
+  useLayoutEffect(() => {
+    const { scene } = get()
+    if (useGameStore.getState().phase === 'playing') return
+    scene.visible = false
+    return () => {
+      scene.visible = true
+    }
+  }, [get, levelId])
+
   useEffect(() => {
     // Read here, not at render: CoasterCamera's mount effect has made its camera the default by now.
     const { gl, scene, camera } = get()
@@ -173,6 +186,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       camera.layers.mask = leaving || (warming && !reachedPlay) ? 0 : mask
     }
     applyMask()
+    scene.visible = true
     const unsubscribe = useGameStore.subscribe((s) => {
       if (s.phase === 'playing') reachedPlay = true
       applyMask()

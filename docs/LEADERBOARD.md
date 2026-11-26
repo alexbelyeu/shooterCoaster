@@ -8,7 +8,8 @@ shows this device's board (a daily, its local record) as before.
 
 - **Database:** a dedicated Supabase project on Alex's free plan, one table `scores`
   (`supabase/migrations/0001_leaderboard.sql`; `0004_daily_board.sql` adds `day`, a daily
-  run's UTC day, null on every campaign row; `0005_rate_limit.sql` adds the rate limit's trigger). RLS is on with no policies, and only
+  run's UTC day, null on every campaign row; `0005_rate_limit.sql` adds the rate limit's trigger;
+  `0006_daily_ghost.sql` adds `ghost`, a daily run's ghost, #1042). RLS is on with no policies, and only
   `service_role` has grants, so the publishable/anon key can do nothing with it.
 - **API:** `api/leaderboard.ts`, a Vercel Function in this repo, is the only thing that
   talks to Supabase, with the server-side secret key from the Vercel env vars.
@@ -18,6 +19,9 @@ shows this device's board (a daily, its local record) as before.
     (`day is null`).
   - `GET /api/leaderboard?daily=2026-11-23` → that day's Daily Run top 10, same shape and cache
     (the level is the day's `dailyLevel`); 400 unless the day is a real `YYYY-MM-DD` date.
+  - `GET /api/leaderboard?daily=2026-11-23&ghost=1` → `{ ghost }`, the ghost of that day's best
+    run that carries one (`src/combat/ghost.ts`' `1;stepMs;base64`), or `null`; same cache (#1042).
+    The day's #1 posted by a build from before the ghost leaves the best run that has one.
   - `POST /api/leaderboard` `{ level, initials, score, seed, kills, accuracy, version }` →
     `{ rank, top }` (`rank` 1-10, or null off the board). Rejected with 400 unless the level
     is a campaign level, the initials are three letters A-Z and the score is possible for
@@ -31,9 +35,15 @@ shows this device's board (a daily, its local record) as before.
     only. Also 400 unless the day is today or yesterday on the server's clock (UTC; yesterday
     so a run started before midnight still counts) and the level is that day's `dailyLevel`
     (`api/_lib/daily.ts`, which mirrors `src/levels/daily.ts`; `daily.test.ts` checks they agree).
+    A daily run may carry its `ghost` (the body may then be up to 12 KB; a campaign POST stays at
+    2 KB and never stores one). `checkGhost` in `api/_lib/rules.ts` takes only what the game's
+    `decodeGhost` reads (version 1, a step under 60 s, whole samples, at most 2400, 9608
+    characters); any other ghost is dropped and the score stored without it.
   - No env vars, a paused project or any database error: `503 { "error": "unavailable" }`.
     So is every daily call until `0004_daily_board.sql` has run. The campaign board works
     without it: its `day is null` filter retries without the column (`api/_lib/scoresDb.ts`).
+    Until `0006_daily_ghost.sql` has run, a daily POST's ghost is dropped (the insert retries
+    without it on PostgREST's `PGRST204`) and `?ghost=1` answers `{ "ghost": null }`.
   - **Only 60 s runs are on the board** (#458). Runs were 75–120 s long before #452 (merged
     2026-11-09 in #473). Both the board and the `rank` count only rows with `score <=` the
     level's `maxScore` in `api/_lib/levelLimits.ts`. A long run over that limit stays in the table
@@ -55,7 +65,9 @@ shows this device's board (a daily, its local record) as before.
   After a Daily Run there is no initials entry. A new best of the day is sent at once,
   under the player's last initials (from their last campaign board entry, `AAA` before
   one). The results screen then shows the day's World board it gets back ("The world's top
-  10 today"). Any other daily run just fetches that board. On any failure the screen shows
+  10 today"). Any other daily run just fetches that board. The new best goes up with its
+  ghost, and every daily run fetches the day's ghost as it starts (`src/app/dailyGhost.ts`)
+  and draws it as the ghost crosshair, if Settings' "Ghost of your best run" is on. On any failure the screen shows
   the local Daily record alone, as before.
 
 ## Setup (Alex, once)
@@ -68,8 +80,8 @@ shows this device's board (a daily, its local record) as before.
    - automatic RLS **on** (the migration enables RLS on `scores` anyway).
 2. **Table:** open the project's SQL editor, paste
    `supabase/migrations/0001_leaderboard.sql` and run it once, then
-   `0004_daily_board.sql` (the Daily Run's board, #854) and `0005_rate_limit.sql` (the
-   rate limit's trigger, #384) the same way.
+   `0004_daily_board.sql` (the Daily Run's board, #854), `0005_rate_limit.sql` (the
+   rate limit's trigger, #384) and `0006_daily_ghost.sql` (the Daily Run's ghost, #1042) the same way.
 3. **Vercel env vars** on the `shooter-coaster` project, environment **Production** only
    (names also in `.env.example`):
    - `SUPABASE_URL`: Project Settings → Data API → Project URL (`https://<ref>.supabase.co`);

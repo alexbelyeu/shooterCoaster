@@ -9,8 +9,8 @@ import { indexAhead, trackTangent } from '@/entities/spawning/spawnPlacement'
 import { BOSS_SPECS, GIANT_SCORPION } from './bossSpecs'
 import { applyHit, bossMaxScore, createBossState, exposedWeakPoints, isDefeated, type BossState } from './bossModel'
 import {
-  LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
-  lungeAmount, lungeImpactBetween, perchClear, pickPerch, pickSeenPerch, riseOffset, type Perch, type TailPose, type PerchInput,
+  LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SEEN_PERCH, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
+  lungeAmount, lungeImpactBetween, perchBehind, perchClear, pickPerch, pickSeenPerch, riseOffset, type Perch, type TailPose, type PerchInput,
 } from './scorpionMotion.hot'
 
 const tailTopY = (pose: TailPose) => pose.y[pose.count]
@@ -150,6 +150,12 @@ describe('perch (level 2)', () => {
     return { index, avoid, camera: { x: table.x[at], z: table.z[at] }, forwardX: t.x / h, forwardZ: t.z / h }
   }
 
+  it('SEEN_PERCH is PERCH with farther slots after it, so a normal fight keeps to the near sand', () => {
+    expect(SEEN_PERCH.slots.slice(0, PERCH.slots.length)).toEqual(PERCH.slots)
+    const nearest = Math.max(...PERCH.slots.map(([ahead]) => ahead))
+    for (const [ahead] of SEEN_PERCH.slots.slice(PERCH.slots.length)) expect(ahead).toBeGreaterThan(nearest)
+  })
+
   it('pickSeenPerch takes only a slot the rider sees, and leaves the perch be when none is', () => {
     const at = riders[10]
     const perch: Perch = { x: 1, z: 2, slot: 0, sign: 1 }
@@ -220,5 +226,13 @@ describe('perch (level 2)', () => {
     const perch: Perch = { x: 1, z: 2, slot: 3, sign: -1 }
     expect(pickPerch(perch, blocked)).toBe(false)
     expect(perch).toEqual({ x: 1, z: 2, slot: 3, sign: -1 })
+  })
+})
+
+describe('perchBehind', () => {
+  const input = { camera: { x: 10, z: 0 }, forwardX: 0, forwardZ: -1 } as PerchInput
+  it('is true only for a perch the rider has passed', () => {
+    expect(perchBehind({ x: 10, z: -500, slot: 9, sign: 1 }, input)).toBe(false)
+    expect(perchBehind({ x: 400, z: 300, slot: 9, sign: 1 }, input)).toBe(true)
   })
 })

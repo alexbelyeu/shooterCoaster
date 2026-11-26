@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
@@ -20,11 +20,19 @@ const tagFlinch = (mesh: THREE.Mesh | null) => {
   if (mesh) setFlashMaterial(mesh, CROW_FLINCH_MAT)
 }
 
-interface FlapBirdProps extends EnemyProps {
-  /** Its feathers, painted, with the crow's wings (`aWing`), and its unlit eyes. */
-  body: THREE.BufferGeometry
-  eyes: THREE.BufferGeometry
-}
+type FlapBirdProps = EnemyProps & (
+  | {
+      /** Its feathers, painted, with the crow's wings (`aWing`), and its unlit eyes. */
+      body: THREE.BufferGeometry
+      eyes: THREE.BufferGeometry
+    }
+  | {
+      /** A rigged model in their place (the Blender crow, `BlenderCrow.tsx`), posed by `pose` from the flap phase each frame. */
+      model: ReactNode
+      pose: (phase: number) => void
+      onHit?: () => void
+    }
+)
 
 /**
  * A bird with the crow's wings in two draw calls, feathers and eyes (the crow, the toucan); its wings flap in the
@@ -32,7 +40,8 @@ interface FlapBirdProps extends EnemyProps {
  * banking into its sway. One the rider has gone past unshot flies back round in front of it (`flyBack`; every crow and toucan
  * flies in a formation wave, placed ahead of the rider for that stretch alone).
  */
-export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
+export default function FlapBird(props: FlapBirdProps) {
+  const pose = 'model' in props ? props.pose : undefined
   // One speed for the whole flock, or its V stretches apart.
   const { heading, moving } = useMarch(props.motion)
   const own = useEnemyRandom(props.id, (rng) => ({
@@ -72,7 +81,8 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
 
       const dive = 0.5 + 0.5 * Math.sin(time * 0.7 + flapOffset)
       phase.current += delta * (CROW_FLAP_HOVER + (CROW_FLAP_DIVE - CROW_FLAP_HOVER) * dive)
-      birdWingPose(phase.current, flap.value)
+      if (pose) pose(phase.current)
+      else birdWingPose(phase.current, flap.value)
 
       const rig = rigRef.current
       if (rig) {
@@ -82,15 +92,19 @@ export default function FlapBird({ body, eyes, ...props }: FlapBirdProps) {
         rig.position.y = -0.35 * (1 - dive) * Math.cos(phase.current)
       }
     },
-    [moveAngle, moveSpeed, moving, flapOffset, flap, sway, camera, back],
+    [moveAngle, moveSpeed, moving, flapOffset, flap, sway, camera, back, pose],
   )
 
   return (
-    <EnemyBase {...props} updatePosition={updatePosition}>
+    <EnemyBase {...props} updatePosition={updatePosition} onHit={'model' in props ? props.onHit : undefined}>
       <group scale={[8, 8, 8]} rotation={[0, -moveAngle + Math.PI / 2, 0]}>
         <group ref={rigRef}>
-          <mesh ref={tagFlinch} geometry={body} material={featherMat} />
-          <mesh geometry={eyes} material={BIRD_EYE_MAT} />
+          {'model' in props ? props.model : (
+            <>
+              <mesh ref={tagFlinch} geometry={props.body} material={featherMat} />
+              <mesh geometry={props.eyes} material={BIRD_EYE_MAT} />
+            </>
+          )}
         </group>
       </group>
     </EnemyBase>

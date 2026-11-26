@@ -60,6 +60,7 @@ tester.run('sc/no-hot-path-alloc', plugin.rules['no-hot-path-alloc'], {
     { code: frame('if (!ok) throw new Error(`bad ${id}`)') },
     { code: 'function step(dt) { return [dt] }\nonFrame(() => ({ a: [...xs] }))' },
     { code: 'export function step(p, dt) { p.x += dt }', filename: hot },
+    { code: 'for (const [id, part] of parts) part.step(id)\nuseFrame(() => { v.set(0, 0, 0) })' },
     { code: 'const v = new Vector3()\nconst TABLE = [1, 2, 3].map((x) => x * 2)\nexport const step = (p) => { p.x = TABLE[0] }', filename: hot },
     { code: 'export function step() { return [1] }', filename: at('src/combat/thing.test.ts') },
   ],
@@ -76,6 +77,8 @@ tester.run('sc/no-hot-path-alloc', plugin.rules['no-hot-path-alloc'], {
     { code: 'export function step(p) { return { x: p.x } }', filename: hot, errors: [alloc] },
     { code: 'export const step = (xs) => xs.some((x) => x > 0)', filename: hot, errors: [alloc] },
     { code: 'export function step(a) { const v = new Vector3(); return `${a}` }', filename: hot, errors: [alloc, alloc] },
+    { code: frame('for (const [id, part] of parts) part.step(id)'), errors: [alloc] },
+    { code: 'export function step(m) { for (const [k, v] of m) v.x = k }', filename: hot, errors: [alloc] },
   ],
 })
 

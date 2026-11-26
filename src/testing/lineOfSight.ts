@@ -110,3 +110,19 @@ export function countSight(
   }
   return out
 }
+
+/**
+ * Bunching (#1058): the most points (screen px) inside one aim-assist circle of `radius` centred on one of them, the
+ * targets a single sweep of the blaster takes. A cluster parked in front of the camera meets the pacing gate cheaply and
+ * makes the run easy; this is the number that says so.
+ */
+export function largestCluster(points: readonly { x: number; y: number }[], radius: number): number {
+  const r2 = radius * radius
+  let best = 0
+  for (const p of points) {
+    let n = 0
+    for (const q of points) if ((p.x - q.x) ** 2 + (p.y - q.y) ** 2 <= r2) n++
+    best = Math.max(best, n)
+  }
+  return best
+}

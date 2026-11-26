@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from 'react'
 import { BOSS_RUSH, useGameStore } from '@/store/useGameStore'
 import { getAllLevels } from '@/levels/LevelRegistry'
 import { formatRushTime } from '@/levels/bossRush'
@@ -19,8 +19,10 @@ import {
   nextLevelIndex,
   isNavKey,
   navigateCards,
+  nightPostcardSky,
   totalStars,
   type DailyCard,
+  type LevelCard,
 } from './levelSelectModel'
 
 /** Card expand + fade before the run starts. */
@@ -86,9 +88,9 @@ export default function LevelSelectScreen() {
   const [nightPicks, setNightPicks] = useState<ReadonlySet<string>>(() => new Set())
   const [focusIndex, setFocusIndex] = useState(() => nextLevelIndex(cards, useGameStore.getState().lastLevel))
   const cardRefs = useRef<(HTMLButtonElement | null)[]>([])
-  /** The focused card's medal ticket hangs above it when the card sits in the screen's lower half, so it stays on screen. */
-  const [featsAbove, setFeatsAbove] = useState(false)
   const launchTimer = useRef<number | undefined>(undefined)
+  /** The open ride whose medals the prize ticket over the grid shows: the focused card, when it is one. */
+  const prizeCard = cards[focusIndex]?.unlocked ? cards[focusIndex] : null
 
   // Mount only: start keyboard players on the next level to play.
   useEffect(() => {
@@ -96,12 +98,7 @@ export default function LevelSelectScreen() {
     void prepareSfx(null, 'themePark')
   }, [])
 
-  useLayoutEffect(() => {
-    const r = cardRefs.current[focusIndex]?.getBoundingClientRect()
-    setFeatsAbove(!!r && r.top + r.height / 2 > window.innerHeight / 2)
-  }, [focusIndex])
-
-  /** A mouse over a card selects it, as the arrow keys do, so only one card's medal ticket is ever out. */
+  /** A mouse over a card selects it, as the arrow keys do, so the prize ticket shows the card under the pointer. */
   function pointTo(e: PointerEvent<HTMLButtonElement>, i: number) {
     if (e.pointerType !== 'mouse' || launching || i === focusIndex) return
     setFocusIndex(i)
@@ -197,13 +194,23 @@ export default function LevelSelectScreen() {
         </p>
       </header>
 
+      {/* The focused ride's medals (#978) on one prize ticket over the grid, where no card is (#1057); a phone hangs each under its board. */}
+      <div className="level-feats level-prizes" data-level={prizeCard?.id} aria-hidden="true">
+        {prizeCard && (
+          <>
+            <span className="level-prizes-name">{prizeCard.name}</span>
+            <Feats medals={prizeCard.medals} />
+          </>
+        )}
+      </div>
+
       <div className="level-grid" role="group" aria-label="Levels" onKeyDown={onGridKeyDown}>
         {cards.map((card, i) => {
+          const night = card.nightRide && nightPicks.has(card.id)
           const classes = ['level-card']
           if (!card.unlocked) classes.push('locked')
           if (launching === card.id) classes.push('is-selected')
-          if (i === focusIndex) classes.push(featsAbove ? 'is-focused feats-above' : 'is-focused')
-          const night = card.nightRide && nightPicks.has(card.id)
+          if (night) classes.push('is-night')
           const board = (
             <button
               key={card.id}
@@ -227,7 +234,7 @@ export default function LevelSelectScreen() {
               onClick={() => select(i)}
             >
               <FairBoard as="span" className="level-board" shadowClassName="level-board-shadow">
-                <LevelPostcard biome={card.biome} boarded={!card.unlocked} />
+                <LevelPostcard biome={card.biome} boarded={!card.unlocked} nightSky={night ? nightPostcardSky(card.biome) : null} />
                 <span className="level-plate">{card.name}</span>
                 <span className="level-card-body">
                   <span className="level-card-desc">{card.description}</span>
@@ -256,33 +263,30 @@ export default function LevelSelectScreen() {
                 </span>
               </FairBoard>
               {card.unlocked && (
-                // The medals' feats on a prize ticket (#978): under every board on a phone, under the focused one elsewhere.
+                // A phone's prize ticket, under every open board (the desktop's is .level-prizes over the grid).
                 <span className="level-feats" aria-hidden="true">
-                  {card.medals.map((m) => (
-                    <span key={m.id} className="level-feat" data-earned={m.earned}>
-                      <FairMedal earned={m.earned} />
-                      <span className="level-feat-name">{m.name}</span>
-                      <span className="level-feat-line">{m.line}</span>
-                    </span>
-                  ))}
+                  <Feats medals={card.medals} />
                 </span>
               )}
             </button>
           )
           if (!card.nightRide) return board
-          // Its own plate under the board, not inside it: a button can't hold another.
+          // The Night Ride's sun/moon switch (#1057) sits on the board's top corner, beside the button: a button can't hold another.
           return (
             <div key={card.id} className="level-slot">
               {board}
               <button
                 type="button"
-                className="fair-plate level-night"
-                aria-pressed={night}
+                role="switch"
+                className="level-night"
+                aria-checked={night}
+                aria-label="Night Ride"
+                title={night ? 'Night Ride on' : 'Night Ride off'}
                 data-night={card.id}
                 disabled={!!launching}
                 onClick={() => toggleNight(card.id)}
               >
-                Night Ride
+                <SunMoon />
               </button>
             </div>
           )
@@ -310,6 +314,32 @@ export default function LevelSelectScreen() {
         />
       </div>
     </div>
+  )
+}
+
+/** A ride's medals with their feats, as a prize ticket lists them. */
+function Feats({ medals }: { medals: LevelCard['medals'] }) {
+  return medals.map((m) => (
+    <span key={m.id} className="level-feat" data-earned={m.earned}>
+      <FairMedal earned={m.earned} />
+      <span className="level-feat-name">{m.name}</span>
+      <span className="level-feat-line">{m.line}</span>
+    </span>
+  ))
+}
+
+/** The Night Ride switch's two faces: the sun (day) and the moon (night); the one in force sits on a raised tile. */
+function SunMoon() {
+  return (
+    <>
+      <svg className="level-night-sun" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="4.5" />
+        <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+      </svg>
+      <svg className="level-night-moon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M15.5 3.5a8.5 8.5 0 1 0 5 12.5 7 7 0 0 1-5-12.5z" />
+      </svg>
+    </>
   )
 }
 
