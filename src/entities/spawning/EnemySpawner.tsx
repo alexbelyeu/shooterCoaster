@@ -167,7 +167,7 @@ function generateEnemies(
       continue
     }
     if (wave.formation && wave.formation !== 'scatter') {
-      for (const slot of formationSlots(wave.formation, wave.count, rng)) {
+      for (const slot of formationSlots(wave.formation, wave.count, rng, wave.formationSpread)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot, trackside: null, ...base })
       }
       continue
