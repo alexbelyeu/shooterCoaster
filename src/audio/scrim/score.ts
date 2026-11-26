@@ -17,11 +17,12 @@ export const MELODIC = ['steeldrum', 'marimba', 'vibes', 'celesta', 'glock', 'xy
   'harp', 'guitar', 'banjo', 'harpsichord', 'pizz', 'upright', 'fretless', 'synbass', 'timpani',
   'chip', 'sine', 'square', 'saw', 'triangle',
   // ShooterCoaster's arcade palette (SCORE-FORMAT.md)
-  'fmbass', 'supersaw', 'distguitar', 'orchhit', 'synbrass', 'riser', 'downlifter']
+  'fmbass', 'supersaw', 'distguitar', 'orchhit', 'synbrass', 'riser', 'downlifter',
+  'vocoder', 'reese', 'fmbell', 'siren', 'rain']
 export const DRUMS = ['kick', 'snare', 'rim', 'hat', 'ohat', 'ride', 'crash', 'shaker', 'tamb',
   'conga', 'tumba', 'bongo', 'bongolo', 'clave', 'block', 'cowbell', 'guiro',
   'tomlo', 'tommid', 'tomhi', 'bodhran', 'timbale', 'tri', 'clap', 'gong', 'thunder', 'surf',
-  'bigkick', 'gatesnare', 'hat909', 'ohat909', 'clap909']
+  'bigkick', 'gatesnare', 'hat909', 'ohat909', 'clap909', 'kick808', 'glitch']
 
 const PC: Record<string, number> = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 }
 const NOTE_RE = /^([A-Ga-g])(##|bb|#|b)?([0-8])$/

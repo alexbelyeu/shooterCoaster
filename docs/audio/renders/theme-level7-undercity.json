@@ -1,11 +1,13 @@
 {
-  "name": "theme-level7-pixel",
+  "name": "theme-level7-undercity",
   "kind": "music",
   "request": {
-    "kind": "music",
-    "track": "level7.pixel",
-    "layers": "ramp",
-    "seam": false
+    "kind": "score",
+    "seconds": 30,
+    "chain": "game",
+    "seam": false,
+    "score": "src/audio/scores/themes/level7.undercity.scrim",
+    "engine": "port"
   },
   "seed": 1,
   "sampleRate": 44100,
@@ -13,68 +15,52 @@
   "events": [
     {
       "t": 0.15,
-      "name": "level7.pixel score"
+      "name": "render score"
     },
     {
-      "t": 3.4833333333333334,
+      "t": 2.9406976744186046,
       "name": "loop starts"
-    },
-    {
-      "t": 6.783333333333333,
-      "name": "intensity 1 asked"
-    },
-    {
-      "t": 10.583333333333332,
-      "name": "intensity 2 asked"
-    },
-    {
-      "t": 15.183333333333334,
-      "name": "intensity 3 asked"
-    },
-    {
-      "t": 22.883333333333333,
-      "name": "intensity 0 asked"
     }
   ],
   "seams": [],
   "bar": {
-    "startS": 3.4833333333333334,
-    "barS": 1.6666666666666667
+    "startS": 2.9406976744186046,
+    "barS": 1.3953488372093024
   },
   "metrics": {
     "seconds": 30,
-    "integrated": -17.9,
-    "shortTermMax": -17.3,
-    "lra": 0.9,
-    "truePeak": -9.7,
+    "integrated": -17.7,
+    "shortTermMax": -17.2,
+    "lra": 0.6,
+    "truePeak": -9.1,
     "clipped": 0,
     "silence": 0.5,
-    "correlation": 0.982,
-    "below30Db": -36.8,
+    "correlation": 0.973,
+    "below30Db": -31.6,
     "bands": {
       "sub": {
-        "pct": 27.3,
-        "db": -5.6
+        "pct": 20.6,
+        "db": -6.9
       },
       "low": {
-        "pct": 33.7,
-        "db": -4.7
+        "pct": 44,
+        "db": -3.6
       },
       "mid": {
-        "pct": 33.1,
-        "db": -4.8
+        "pct": 30.9,
+        "db": -5.1
       },
       "presence": {
-        "pct": 5,
-        "db": -13
+        "pct": 2.4,
+        "db": -16.2
       },
       "air": {
-        "pct": 0.9,
-        "db": -20.4
+        "pct": 2,
+        "db": -17
       },
       "below30": {
-        "pct": 0,
-        "db": -36.8
+        "pct": 0.1,
+        "db": -31.6
       }
     },
     "seamJumps": [],
@@ -83,7 +69,7 @@
   "targets": [
     {
       "label": "Integrated loudness",
-      "value": -17.9,
+      "value": -17.7,
       "unit": "LUFS",
       "min": -18,
       "max": -16,
@@ -91,13 +77,13 @@
     },
     {
       "label": "Short-term max",
-      "value": -17.3,
+      "value": -17.2,
       "unit": "LUFS",
       "status": "info"
     },
     {
       "label": "True peak",
-      "value": -9.7,
+      "value": -9.1,
       "unit": "dBTP",
       "max": -1,
       "status": "pass"
@@ -111,21 +97,21 @@
     },
     {
       "label": "Energy below 30 Hz",
-      "value": -36.8,
+      "value": -31.6,
       "unit": "dB rel",
       "max": -30,
       "status": "pass"
     },
     {
       "label": "Stereo correlation",
-      "value": 0.982,
+      "value": 0.973,
       "unit": "",
       "min": 0,
       "status": "pass"
     },
     {
       "label": "Loudness range",
-      "value": 0.9,
+      "value": 0.6,
       "unit": "LU",
       "status": "info"
     },

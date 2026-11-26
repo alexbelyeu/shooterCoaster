@@ -99,7 +99,7 @@ import { TITLE_UI, getFrames, ignored, imageStats, looksBlank, tapCentre, waitDr
 import { planLevels, planRun, STEP_LEVELS } from './shards.mjs'
 import { growthMoments, programGateProblem, throttleReport } from './slowPass.mjs'
 import { judgeShardTime, rideMsPerFrame, WATCHDOG_FACTOR } from './shardTime.mjs'
-import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
+import { BOSS_FIGHT_SECONDS, PLAYER_HITS_PER_SECOND, bossFraming, bossFramingProblems, challengeBudget, challengeGate, challengeMetrics, challengeSummary, pacingBudgetProblems, pacingGate, pacingMetrics, pacingSummary, pacingTimeline, samplingCutShort } from './pacingMetric.mjs'
 import { installSettledStepper } from './settledSteps.mjs'
 import { isPlaceholder, placeholderAfterRun, setBudget } from './placeholderBudget.mjs'
 import { buildFingerprint, INCONCLUSIVE_EXIT, redeployVerdict } from './buildFingerprint.mjs'
@@ -2378,7 +2378,9 @@ async function waveCheck(page) {
       problems.push(`the tell came late: the wave tick at ${tickBefore.toFixed(2)} s was already within ${tellS} s of the wave at ${due} s`)
     }
   }
-  const events = log.map((e) => `${e.kind} "${e.label}"`)
+  // Labelled events only: an unlabelled wave's events carry no label, and their `due` is the spawner's next wave, which two
+  // tells fired in one tick share (level2's waves at 6 and 7 s), so they can't be told from a repeat.
+  const events = log.filter((e) => e.label !== 'undefined').map((e) => `${e.kind} "${e.label}"`)
   const repeated = [...new Set(events.filter((e, i) => events.indexOf(e) !== i))]
   if (repeated.length) problems.push(`wave events fired twice after a pause and Resume: ${repeated.join(', ')}`)
   if (flock.length < minOnScreen) problems.push(`only ${flock.length} ${type}s on screen after the wave flew in (want ≥ ${minOnScreen})`)
@@ -2449,6 +2451,9 @@ async function pacingCheck(page, id) {
       const st = s.stats()
       // No step until the level's waves are registered: the scene, its timer and ride mount together, settled.
       if (!w && !run.samples.length) return 'hold'
+      // The challenge measures (#1058) read the run's score and enemies as they stand at its last step.
+      run.score = st.score
+      run.tally = s.runTally()
       if (st.phase === 'playing' && w) {
         run.end ??= w.levelTime + st.timeRemaining
         // What the rider can shoot (#925): in view, readable and in sight, not every enemy whose centre projects on screen.
@@ -2456,13 +2461,14 @@ async function pacingCheck(page, id) {
         run.samples.push({
           t: v.levelTime, targets: v.shootable, hidden: v.occluded, specks: v.tiny, track: s.rideProgress,
           waveTell: w.due != null && v.levelTime >= w.due - s.waveTellSeconds, bossTell: v.bossStage === 'incoming',
-          bossStage: v.bossStage, bossFramed: v.bossFramed,
+          bossStage: v.bossStage, bossFramed: v.bossFramed, bunch: v.bunch,
         })
       } else if (run.samples.length) {
         run.done = true
         return false
       }
     })
+    run.maxScore = s.levels().find((l) => l.id === lid)?.maxScore ?? 0
     s.startLevel(lid, seed)
     return s.frames
   }, [id, SEED, PACING_STEP, PLAYER_HITS_PER_SECOND])
@@ -2498,10 +2504,11 @@ async function pacingCheck(page, id) {
       break
     }
   }
-  const { samples, end, stepper } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
+  const { samples, end, stepper, score, maxScore, tally } = await page.evaluate(() => window.__SC_TEST__.pacingRun)
   if (!samples.length) return { id: 'pacing', level: id, problems: [...problems, 'no playing frame sampled'], pacing: null, timeline: [] }
   const pacing = pacingMetrics(samples, end)
   pacing.boss = bossFraming(samples, end)
+  pacing.challenge = challengeMetrics(samples, { score, maxScore, ...tally }, pacing.boss)
   const shaders = await programsAfterWarmup(page)
   gatePrograms(problems, shaders)
   if (samplingCutShort(samples, end, PACING_STEP)) problems.push(`sampling stopped at ${samples.at(-1).t.toFixed(1)} s of ${end.toFixed(0)} s`)
@@ -2513,6 +2520,10 @@ async function pacingCheck(page, id) {
     : pacingGate(budget, pacingBudgetProblems(id, pacing, budget), bossFramingProblems(pacing.boss, budget))
   if (warn.length) console.log(`     WARN pacing over budget (known, ${budget.knownOver}): ${warn.join('; ')}`)
   problems.push(...fail)
+  const challenge = challengeBudget(BUDGETS, id)
+  const hard = challengeGate(pacing.challenge, challenge)
+  if (hard.warn.length) console.log(`     WARN too easy (known, ${challenge.knownOver}): ${hard.warn.join('; ')}`)
+  problems.push(...hard.fail)
   return { id: 'pacing', level: id, problems, placeholder, samples: samples.length, heldFrames: stepper.heldFrames, pacing, timeline: pacingTimeline(samples), shaders }
 }
 
@@ -5165,7 +5176,7 @@ async function run() {
       : r.id === 'night'
         ? ` ${r.level} skyLuma=${r.skyLuma} draws=${r.drawCalls} tris=${r.triangles}${sceneSummary(r.scene)} enemiesOnScreen=${r.enemies?.onScreen ?? '-'} readable=${r.enemies?.readable ?? '-'} largestPx=${r.enemies?.largestPx ?? '-'}${programGrowthSummary(r.programs)}`
       : r.id === 'pacing'
-        ? ` ${r.pacing ? pacingSummary(r.level, r.pacing) : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)${programGrowthSummary(r.shaders)}`
+        ? ` ${r.pacing ? `${pacingSummary(r.level, r.pacing)}; ${challengeSummary(r.pacing.challenge)}` : r.level} (${r.samples ?? 0} steps, ${r.heldFrames ?? 0} held frames)${programGrowthSummary(r.shaders)}`
       : r.engine
         ? ` title=${r.engine.title} nodes ${r.engine.nodes.join('->')} position ${r.engine.position.map((p) => p.toFixed(1)).join('->')}s` +
           ` sfxNodes ${r.engine.sfxNodes.join('->')} voices ${r.engine.voices ? `peak ${r.engine.voices.peak}/${r.engine.voices.budget} stolen ${r.engine.voices.stolen} dropped ${r.engine.voices.rejected}` : 'none'}` +

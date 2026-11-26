@@ -192,6 +192,15 @@ across the hall all counted. These rules come from that playtest; each says how 
 8. **No flicker** (seen in the review's `flicker` list): a region of the screen that jumps in brightness for one step and
    comes straight back is a light popping, z-fighting or a blinking sprite. Find each spike's cause; explained ones (a
    muzzle flash, a kill) go in the PR.
+9. **Something to shoot is not something easy to shoot** (checked: budgets.json `challenge`, `challengeMetrics` in
+   `e2e/pacingMetric.mjs`, #1058): rules 1 and 2 are cheapest met by a cluster parked in front of the camera, and that
+   makes the run easy (Alex, 25 Nov: "perhaps too easy"). Spread, movement and escape keep a run a skill. The model player
+   (`PLAYER_HITS_PER_SECOND` on what it can see) scores at most `baseScoreShareMax` of the level's `maxScore` before the combo
+   multiplier (0.8); in 90% of
+   the run's seconds no more than `bunchingP90Max` shootable enemies (2) share one aim-assist circle (44 px of a 720 px
+   view, the blaster's touch snap), so one sweep never clears a wave; and its boss takes at least `bossSecondsMin` (12 s)
+   to beat. The kill share (enemies killed over enemies that came into play) is reported beside them: an enemy that
+   escapes is part of the challenge.
 
 **Every PR that changes a ride, its waves, a boss or a level's effects runs the ride review and posts it**:
 `npm run build && npm run review -- --level <id>` (`scripts/rideReview.mjs`, about 3 minutes in a cloud session) writes

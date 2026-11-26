@@ -1,11 +1,13 @@
 {
-  "name": "theme-level7-pixel-seam",
+  "name": "theme-level7-robot-seam",
   "kind": "music",
   "request": {
-    "kind": "music",
-    "track": "level7.pixel",
-    "layers": 3,
-    "seam": true
+    "kind": "score",
+    "seconds": 20,
+    "chain": "game",
+    "seam": true,
+    "score": "src/audio/scores/themes/level7.robot.scrim",
+    "engine": "port"
   },
   "seed": 1,
   "sampleRate": 44100,
@@ -13,69 +15,65 @@
   "events": [
     {
       "t": 0.15,
-      "name": "level7.pixel score from 46.67 s"
-    },
-    {
-      "t": 0.15,
-      "name": "intensity 3"
+      "name": "render score from 50.00 s"
     }
   ],
   "seams": [
     10.149999999999999
   ],
   "bar": {
-    "startS": 0.15000000000000568,
-    "barS": 1.6666666666666667
+    "startS": 1.3264705882352814,
+    "barS": 1.7647058823529411
   },
   "metrics": {
-    "seconds": 30,
-    "integrated": -17.4,
-    "shortTermMax": -17.1,
-    "lra": 0.4,
-    "truePeak": -9.6,
+    "seconds": 20,
+    "integrated": -17.7,
+    "shortTermMax": -17.5,
+    "lra": 0.2,
+    "truePeak": -10.2,
     "clipped": 0,
-    "silence": 0.5,
-    "correlation": 0.97,
-    "below30Db": -36.6,
+    "silence": 1.2,
+    "correlation": 0.95,
+    "below30Db": -45,
     "bands": {
       "sub": {
-        "pct": 27.7,
-        "db": -5.6
+        "pct": 0.1,
+        "db": -30.9
       },
       "low": {
-        "pct": 26.4,
-        "db": -5.8
+        "pct": 21,
+        "db": -6.8
       },
       "mid": {
-        "pct": 38.6,
-        "db": -4.1
+        "pct": 72.3,
+        "db": -1.4
       },
       "presence": {
-        "pct": 5.9,
-        "db": -12.3
+        "pct": 6.3,
+        "db": -12
       },
       "air": {
-        "pct": 1.4,
-        "db": -18.5
+        "pct": 0.3,
+        "db": -25.7
       },
       "below30": {
         "pct": 0,
-        "db": -36.6
+        "db": -45
       }
     },
     "seamJumps": [
       {
         "at": 10.15,
-        "db": -0.23,
-        "vsBars": 0.08
+        "db": -0.02,
+        "vsBars": 0
       }
     ],
-    "seamJumpMax": 0.08
+    "seamJumpMax": 0
   },
   "targets": [
     {
       "label": "Integrated loudness",
-      "value": -17.4,
+      "value": -17.7,
       "unit": "LUFS",
       "min": -18,
       "max": -16,
@@ -83,13 +81,13 @@
     },
     {
       "label": "Short-term max",
-      "value": -17.1,
+      "value": -17.5,
       "unit": "LUFS",
       "status": "info"
     },
     {
       "label": "True peak",
-      "value": -9.6,
+      "value": -10.2,
       "unit": "dBTP",
       "max": -1,
       "status": "pass"
@@ -103,34 +101,34 @@
     },
     {
       "label": "Energy below 30 Hz",
-      "value": -36.6,
+      "value": -45,
       "unit": "dB rel",
       "max": -30,
       "status": "pass"
     },
     {
       "label": "Stereo correlation",
-      "value": 0.97,
+      "value": 0.95,
       "unit": "",
       "min": 0,
       "status": "pass"
     },
     {
       "label": "Loop-seam jump vs bar lines",
-      "value": 0.08,
+      "value": 0,
       "unit": "dB",
       "max": 1,
       "status": "pass"
     },
     {
       "label": "Loudness range",
-      "value": 0.4,
+      "value": 0.2,
       "unit": "LU",
       "status": "info"
     },
     {
       "label": "Digital silence",
-      "value": 0.5,
+      "value": 1.2,
       "unit": "%",
       "status": "info"
     }
