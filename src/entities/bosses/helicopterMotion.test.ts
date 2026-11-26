@@ -3,22 +3,33 @@ import { describe, expect, it } from 'vitest'
 import { bossMaxScore, currentPhase, applyHit, createBossState, exposedWeakPoints } from './bossModel'
 import { HELICOPTER } from './bossSpecs'
 import {
-  BEAM, HELI, HELI_FALL, TAIL_LOST_WOBBLE, anchorAt, beamSpot, dropInHeight, fallDrop, fallSpin, heliPose, lookSlope, spotAt, type BeamSpot,
-  type HeliPose,
+  BEAM, HELI, HELI_FALL, HUB_LUNGE, LUNGE_PITCH, TAIL_LOST_WOBBLE, anchorAt, beamSpot, dropInHeight, fallDrop, fallSpin, heliPose,
+  hubShut, lookSlope, lungePitch, spotAt, type BeamSpot, type HeliPose,
 } from './helicopterMotion.hot'
 
 const pose = (): HeliPose => ({ dy: 0, pitch: 0, roll: 0, yaw: 0, drop: 0 })
 const times = (from: number, to: number, step = 0.05) => Array.from({ length: Math.round((to - from) / step) + 1 }, (_, i) => from + i * step)
 
 describe('the Helicopter spec', () => {
-  it('the searchlight and the tail rotor first (60 each), then the hub (4 hp); 400 for bringing it down', () => {
+  it('the searchlight and the tail rotor first (3 hp, 60 each), then the hub (12 hp); 400 for bringing it down', () => {
     let state = createBossState(HELICOPTER)
     expect(exposedWeakPoints(state).map((w) => w.id).sort()).toEqual(['searchlight', 'tail-rotor'])
-    for (const id of ['searchlight', 'searchlight', 'tail-rotor', 'tail-rotor']) state = applyHit(state, id)
+    for (const id of ['searchlight', 'searchlight', 'searchlight', 'tail-rotor', 'tail-rotor', 'tail-rotor']) state = applyHit(state, id)
     expect(currentPhase(state)).toBe(1)
     expect(exposedWeakPoints(state).map((w) => w.id)).toEqual(['hub'])
-    expect(HELICOPTER.weakPoints.find((w) => w.id === 'hub')!.hp).toBe(4)
+    expect(HELICOPTER.weakPoints.find((w) => w.id === 'hub')!.hp).toBe(12)
     expect(bossMaxScore(HELICOPTER)).toBe(60 + 60 + 400)
+  })
+})
+
+describe('the Helicopter fights back (#1059)', () => {
+  it('shows its hub only in its lunges, nose down', () => {
+    expect(hubShut(0)).toBe(false)
+    expect(hubShut(HUB_LUNGE.openS + 0.01)).toBe(true)
+    expect(hubShut(HUB_LUNGE.period + 0.01)).toBe(false)
+    expect(lungePitch(0)).toBe(0)
+    expect(lungePitch(HUB_LUNGE.openS / 2)).toBeCloseTo(LUNGE_PITCH)
+    expect(lungePitch(HUB_LUNGE.openS + 0.1)).toBe(0)
   })
 })
 

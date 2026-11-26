@@ -168,9 +168,9 @@ export const HELICOPTER: BossSpec = {
   tell: { seconds: 2.5, label: 'Searchlight Incoming!' },
   reward: 400,
   weakPoints: [
-    { id: 'searchlight', radius: 36, offset: [...HELI_LAYOUT.searchlight], hp: 2, score: 60, phase: 0 },
-    { id: 'tail-rotor', radius: 42, offset: [...HELI_LAYOUT.tailRotor], hp: 2, score: 60, phase: 0 },
-    { id: 'hub', radius: 40, offset: [...HELI_LAYOUT.hub], hp: 4, score: 0, phase: 1 },
+    { id: 'searchlight', radius: 36, offset: [...HELI_LAYOUT.searchlight], hp: 3, score: 60, phase: 0 },
+    { id: 'tail-rotor', radius: 42, offset: [...HELI_LAYOUT.tailRotor], hp: 3, score: 60, phase: 0 },
+    { id: 'hub', radius: 40, offset: [...HELI_LAYOUT.hub], hp: 12, score: 0, phase: 1 },
   ],
 }
 
