@@ -10,7 +10,7 @@ import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { RIVER_CONFIGS, RIVER_SEGMENTS, riverRow } from '@/levels/environments/biomes/volcanic/lavaRiverPaths'
 import { VOLCANO, VOLCANO_SITE } from '@/levels/environments/volcanoGeometry'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
-import { currentPhase, hpFraction, weakPointHp, type WeakPointSpec } from './bossModel'
+import { hpFraction, weakPointHp, type WeakPointSpec } from './bossModel'
 import { MAGMA_TITAN } from './bossSpecs'
 import {
   TITAN_ARM_GEO, TITAN_BODY_GEO, TITAN_CRACK_UNIFORMS, TITAN_CROWN_GEO, TITAN_HEAD_GEO, TITAN_HEART_OPEN_GEO,
@@ -18,15 +18,17 @@ import {
 } from './bossAssets'
 import { approachAngle, firstSlot, pickPerch, type Perch, type PerchInput } from './scorpionMotion.hot'
 import { aimAtRider, flatForward } from './bossAim.hot'
-import { inWindow, needsRelocate, windowAmount, windowNowEpoch } from './bossCycle.hot'
+import { needsRelocate, windowAmount } from './bossCycle.hot'
 import {
   TITAN_BEAT, TITAN_BODY, TITAN_BREAK_POINTS, TITAN_DEFEAT, TITAN_PERCH, TITAN_RISE, TITAN_WADE, crackGlow, defeatHeat, defeatSink, pickRiverSpot,
-  poundAmount, poundBetween, riseOffset, strideAngle, wadeStep, type Point2,
+  poundAmount, poundBetween, riseOffset, strideAngle, titanShut, wadeStep, type Point2,
 } from './titanMotion.hot'
 
 const B = TITAN_BODY
-const VENTS = ['vent-l', 'vent-r'] as const
 const SIDES = [1, -1] as const
+const WEAK_POINTS = MAGMA_TITAN.weakPoints
+/** A shut vent sinks into its shoulder. */
+const SHUT_SCALE: [number, number, number] = [0.8, 0.35, 0.8]
 const HIP: [number, number, number] = [170, 420, 0]
 const TURN_TAU = 0.6
 const GLOW_TAU = 0.25
@@ -96,8 +98,6 @@ export default function MagmaTitan(props: BossProps) {
       riseFrom: 0,
       awayFor: 0,
       yaw: 0,
-      beatEpoch: 0,
-      ventsGone: false,
       glow: 0,
       burst: false,
       tell: -1,
@@ -193,16 +193,15 @@ export default function MagmaTitan(props: BossProps) {
         }
       }
 
-      // The heart opens on every beat; it beats at once when its vents are gone.
-      if (!sim.ventsGone && weakPointHp(state, VENTS[0]) <= 0 && weakPointHp(state, VENTS[1]) <= 0) {
-        sim.ventsGone = true
-        if (currentPhase(state) === 0) sim.beatEpoch = windowNowEpoch(TITAN_BEAT, age)
+      // Each weak point opens and shuts on the beat (`titanShut`).
+      const heartLive = weakPointHp(state, 'heart') > 0
+      for (let i = 0; i < WEAK_POINTS.length; i++) {
+        const w = WEAK_POINTS[i].id
+        retract(w, fighting && weakPointHp(state, w) > 0 && titanShut(w, age, heartLive))
       }
-      const beatT = age - sim.beatEpoch
-      retract('heart', fighting && weakPointHp(state, 'heart') > 0 && !inWindow(TITAN_BEAT, beatT))
-      const pound = fighting ? poundAmount(beatT) : 0
-      const open = fighting ? windowAmount(TITAN_BEAT, beatT) : 0
-      if (fighting && poundBetween(beatT - dt, beatT)) eventBus.emit(CAMERA_TRAUMA_EVENT, POUND_TRAUMA[0], POUND_TRAUMA[1])
+      const pound = fighting ? poundAmount(age) : 0
+      const open = fighting ? windowAmount(TITAN_BEAT, age) : 0
+      if (fighting && poundBetween(age - dt, age)) eventBus.emit(CAMERA_TRAUMA_EVENT, POUND_TRAUMA[0], POUND_TRAUMA[1])
 
       // Wades after the rider between beats, once it has climbed out.
       if (fighting && sim.placed && !sim.wading && risen && open === 0) {
@@ -270,7 +269,7 @@ export default function MagmaTitan(props: BossProps) {
   const renderWeakPoint = useCallback((w: WeakPointSpec, exposed: boolean) => {
     if (w.id === 'heart') return <mesh geometry={exposed ? TITAN_HEART_OPEN_GEO : TITAN_HEART_SHUT_GEO} material={TITAN_OBSIDIAN_MAT} />
     if (w.id === 'crown') return <mesh geometry={TITAN_CROWN_GEO} material={TITAN_OBSIDIAN_MAT} />
-    return <mesh geometry={TITAN_VENT_GEO} material={TITAN_OBSIDIAN_MAT} />
+    return <mesh geometry={TITAN_VENT_GEO} material={TITAN_OBSIDIAN_MAT} scale={exposed ? 1 : SHUT_SCALE} />
   }, [])
 
   const body = (
