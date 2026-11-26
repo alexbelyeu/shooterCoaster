@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import {
+  BINDABLE_PAD_BUTTONS,
   BINDINGS_STORAGE_KEY,
   DEFAULT_BINDINGS,
   KEY_ACTIONS,
   PAD_ACTIONS,
-  bindKey,
-  bindPadButton,
   keyLabel,
   loadBindings,
   matchesKey,
-  padLabel,
-  saveBindings,
   type Bindings,
 } from './bindings'
+import { bindKey, bindPadButton, padLabel, saveBindings } from './bindingsEdit'
 import { PAD } from './gamepadMap.hot'
 
 function memoryStorage(initial?: string) {
@@ -62,6 +60,7 @@ describe('defaults', () => {
     expect(keyLabel('s')).toBe('S')
     expect(padLabel(PAD.START)).toBe('Start')
     expect(padLabel(PAD.RT)).toBe('RT')
+    expect(Array.from({ length: BINDABLE_PAD_BUTTONS }, (_, i) => padLabel(i)).every(Boolean)).toBe(true)
   })
 })
 

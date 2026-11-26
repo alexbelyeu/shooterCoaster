@@ -1,17 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import {
-  DEFAULT_BINDINGS,
-  bindKey,
-  bindPadButton,
-  bindings,
-  isDefault,
-  keyLabel,
-  padLabel,
-  setBindings,
-  subscribeBindings,
-  type KeyAction,
-  type PadBindAction,
-} from '@/input/bindings'
+import { DEFAULT_BINDINGS, bindings, keyLabel, subscribeBindings, type KeyAction, type PadBindAction } from '@/input/bindings'
+import { bindKey, bindPadButton, isDefault, padLabel, setBindings } from '@/input/bindingsEdit'
 import { capturePadButton } from '@/input/gamepadInput'
 
 const LABELS: Record<KeyAction | PadBindAction, string> = {
