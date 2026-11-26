@@ -99,8 +99,8 @@ export const GIANT_SCORPION: BossSpec = {
   ],
 }
 
-/** Placed every frame at the ends of its arms (Yeti.tsx); the chest on its body. */
-const yetiFist = (id: string): WeakPointSpec => ({ id, radius: 85, offset: [0, 0, 0], hp: 2, score: 60, phase: 0 })
+/** Placed every frame at the ends of its arms (Yeti.tsx); the chest on its body. Fists 8 and chest 6 keep it fighting ~14 s (#1059). */
+const yetiFist = (id: string): WeakPointSpec => ({ id, radius: 85, offset: [0, 0, 0], hp: 8, score: 60, phase: 0 })
 
 /** Snowballs: a 20-point kill each; ~11 fit in its 20 s fight, the cap is what the server allows. */
 export const YETI_SNOWBALL = { score: 20, max: 16, radius: 65 } as const
@@ -112,7 +112,7 @@ export const YETI: BossSpec = {
   weakPoints: [
     yetiFist('fist-l'),
     yetiFist('fist-r'),
-    { id: 'chest', radius: 95, offset: [...YETI_BODY.chest], hp: 4, score: 0, phase: 1 },
+    { id: 'chest', radius: 95, offset: [...YETI_BODY.chest], hp: 6, score: 0, phase: 1 },
   ],
   projectiles: { score: YETI_SNOWBALL.score, max: YETI_SNOWBALL.max },
 }
