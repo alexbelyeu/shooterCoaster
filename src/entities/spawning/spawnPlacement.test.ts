@@ -295,6 +295,14 @@ describe('tracksideSlots', () => {
       expect(slots.slice(nearCount).some((s) => s.ahead > band.near!.max)).toBe(true)
     }
   })
+
+  it("a wave's spread widens the far side only (#1059)", () => {
+    const { sideMin, sideMax } = tracksideBand('ground')
+    const sides = tracksideSlots(200, 'ground', createRng(3), 2).map((s) => Math.abs(s.side))
+    expect(Math.min(...sides)).toBeGreaterThanOrEqual(sideMin)
+    expect(Math.max(...sides)).toBeGreaterThan(sideMax)
+    expect(Math.max(...sides)).toBeLessThanOrEqual(2 * sideMax)
+  })
 })
 
 /** Arc distance before its slot at which a trackside enemy must be in front of the rider. */
