@@ -25,8 +25,11 @@ import {
 const N = SNAKE.segments
 const SEGMENTS = SNAKE_SLOTS.length * N
 const TELL_SECONDS = MEDUSA.tell.seconds
-/** Phase 0's snakes uncoil as she finishes rising. */
-const FIRST_SNAKES_AT = MEDUSA_RISE.riseS * 0.5
+/**
+ * Phase 0's snakes uncoil as she starts rising, so they are targets while the car comes round the helix to her (#1033):
+ * from halfway through the rise they were targets only once she had risen, 1.8 s into a 10 s fight.
+ */
+const FIRST_SNAKES_AT = 0
 const CROWN_HEAD_SCALE = 1.5
 /** A snake becomes a target once it is this far out of her curls. */
 const SNAKE_TARGET_GROWN = 0.8

@@ -227,6 +227,11 @@ export interface EnemyWave {
    * `DarkSectionSpec.floor`.
    */
   darkFloor?: boolean
+  /**
+   * The wave hangs over the biome's raised top (`BiomeDefinition.perch`, #945: level 6's dust round the Flame through the
+   * roll across it), from just above it to its `rise` (`spawning/perch.ts`): a ground walker, no formation.
+   */
+  perch?: boolean
 }
 
 /** A whale breaching across the ride (Ocean, #793), where and when the level puts it; the breach's own shape is `BREACH` in `biomes/ocean/whaleBreach.ts`. */

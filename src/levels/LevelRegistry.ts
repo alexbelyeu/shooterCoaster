@@ -228,26 +228,29 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 36 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1752 (the V8’s rats included) + the Medusa’s eight snakes and reward (bossSpecs.ts) = 2652
+    maxScore: 36 * 15 + (14 + 24) * 12 + (52 + 8) * 18 + 8 * 50 + 500, // 2076 (the V8’s rats included) + the Medusa’s eight snakes and reward (bossSpecs.ts) = 2976
     message: 'You sent the Climbing Gym!',
     nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
-    // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
-    // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
-    // landing one after another on the Alaska walls beside the climbing car, each where the rider looks as it lands
-    // (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948), the last ones on the Starr
-    // and the Shield the car looks at from the Shield's top and on the auto belay's fall (#957), and the pack in the pit
-    // from 25 s, before the dyno.
+    // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more from
+    // 5 s round the Flame's top and up in its fire's updraft (#945, the gym's `perch`), in sight on the climb to it and all
+    // through the roll across it, rats in the Training Area's dark cave (11 s, as the last of the dust is shot) and on the
+    // mats after it, 22 so some are still ahead on the U-turn out of the cave (#1038), the lanternflies (#575) at 17 s, their swarm in groups landing one after another, the first on the Starr
+    // the car looks at on its way out of the cave, then on the Alaska walls beside the climbing car, each where the
+    // rider looks as it lands (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948),
+    // the last ones on the Starr and the Shield the car looks at from the Shield's top and on the auto belay's fall
+    // (#957), and the pack, 30 of them so more are in sight on the way down into the pit, from 24 s, as the last
+    // lanternflies are shot (#1033).
     // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 19 s, once the sign is shot (it can be
     // until the car reaches it, ~20 s), they line the branch ahead (ridden 20.2–22.5 s), and only that run meets them.
     ...paceLevel({
       waves: [
-        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
-        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 4 },
-        { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 8, bystanders: { type: 'climber', count: 3 } },
-        { type: 'lanternfly', count: 36, waveLabel: 'Lanternflies!', weight: 5 },
-        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
+        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 5, bystanders: { type: 'climber', count: 4 } },
+        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 6, perch: true },
+        { type: 'rat', count: 22, waveLabel: 'Rats on the Mats!', weight: 6, bystanders: { type: 'climber', count: 3 } },
+        { type: 'lanternfly', count: 36, waveLabel: 'Lanternflies!', weight: 7 },
+        { type: 'rat', count: 30, waveLabel: 'The Pack!', weight: 21, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
       branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 19 },
