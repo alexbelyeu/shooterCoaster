@@ -93,6 +93,18 @@ export function poundBetween(prev: number, now: number): boolean {
   return crossedInCycle(a, b, q) || crossedInCycle(a, b, 3 * q)
 }
 
+/**
+ * Whether a weak point is shut at `t` on the beat (#1059): the heart shows only while the chest is open, and the vents choke
+ * shut once the pounding fists have parted it (until the heart is out), so the rider tracks from its shoulders to its chest
+ * and back. The crown never shuts.
+ */
+export function titanShut(id: string, t: number, heartLive: boolean): boolean {
+  const u = windowCycle(TITAN_BEAT, t)
+  if (id === 'heart') return !(u >= 0 && u < TITAN_BEAT.openS)
+  if (id === 'crown') return false
+  return heartLive && u >= TITAN_BEAT.poundS && u < TITAN_BEAT.openS
+}
+
 /** Whether the cycle position passed `at` going from `a` to `b` (b < a: wrapped into a new window). */
 function crossedInCycle(a: number, b: number, at: number): boolean {
   return b < a ? b >= at : a < at && b >= at

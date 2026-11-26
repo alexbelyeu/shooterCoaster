@@ -6,10 +6,15 @@ import type { PerchInput } from './scorpionMotion.hot'
 import { inWindow } from './bossCycle.hot'
 import {
   RIVER_SPOT, TITAN_BEAT, TITAN_DEFEAT, TITAN_RISE, crackGlow, defeatHeat, defeatSink, pickRiverSpot, poundAmount,
-  poundBetween, riseOffset, wadeStep,
+  poundBetween, riseOffset, titanShut, wadeStep,
 } from './titanMotion.hot'
 
 const ids = (state: ReturnType<typeof createBossState>) => exposedWeakPoints(state).map((w) => w.id)
+const hpOf = (id: string) => MAGMA_TITAN.weakPoints.find((w) => w.id === id)!.hp
+const hitDown = (state: ReturnType<typeof createBossState>, id: string) => {
+  for (let i = hpOf(id); i > 0; i--) state = applyHit(state, id)
+  return state
+}
 
 describe('Magma Titan phases', () => {
   it('vents and the heart first (the heart only while open), then the crown', () => {
@@ -17,15 +22,28 @@ describe('Magma Titan phases', () => {
     expect(ids(s)).toEqual(['vent-l', 'vent-r', 'heart'])
     s = setRetracted(s, 'heart', true)
     expect(ids(s)).toEqual(['vent-l', 'vent-r'])
-    for (const id of ['vent-l', 'vent-l', 'vent-r', 'vent-r']) s = applyHit(s, id)
+    s = hitDown(hitDown(s, 'vent-l'), 'vent-r')
     // Its vents gone, the shut heart still holds the first phase.
     expect(currentPhase(s)).toBe(0)
     expect(ids(s)).toEqual([])
-    s = setRetracted(s, 'heart', false)
-    s = applyHit(applyHit(s, 'heart'), 'heart')
+    s = hitDown(setRetracted(s, 'heart', false), 'heart')
     expect(ids(s)).toEqual(['crown'])
-    for (let i = 0; i < 4; i++) s = applyHit(s, 'crown')
+    s = hitDown(s, 'crown')
     expect(currentPhase(s)).toBe(-1)
+  })
+
+  it('shuts on the beat (#1059): the vents while the parted chest shows the heart, never with nothing open', () => {
+    const { first, period, poundS } = TITAN_BEAT
+    for (let t = first; t < first + 2 * period; t += 0.05) {
+      const open = inWindow(TITAN_BEAT, t)
+      const parted = open && (t - first) % period >= poundS
+      expect(titanShut('heart', t, true)).toBe(!open)
+      expect(titanShut('vent-l', t, true)).toBe(parted)
+      expect(titanShut('vent-r', t, true)).toBe(parted)
+      // Its heart out, the vents stay open.
+      expect(titanShut('vent-l', t, false)).toBe(false)
+      expect(titanShut('crown', t, false)).toBe(false)
+    }
   })
 
   it('the finale is worth its vents, heart and a 500 reward', () => {
@@ -67,12 +85,16 @@ describe('crack glow', () => {
     expect(crackGlow(0)).toBe(1)
     let s = createBossState(MAGMA_TITAN)
     let last = crackGlow(hpFraction(s))
-    for (const id of ['vent-l', 'vent-l', 'vent-r', 'vent-r', 'heart', 'heart', 'crown', 'crown', 'crown']) {
+    // Every hit while above the 10% where it saturates.
+    const hits = MAGMA_TITAN.weakPoints.flatMap((w) => Array<string>(w.hp).fill(w.id))
+    for (const id of hits) {
+      if (hpFraction(s) <= 0.1) break
       s = applyHit(s, id)
       const glow = crackGlow(hpFraction(s))
-      expect(glow).toBeGreaterThan(last)
+      if (hpFraction(s) > 0.1) expect(glow).toBeGreaterThan(last)
       last = glow
     }
+    expect(last).toBe(1)
   })
 
   it('goes black on defeat, flashes once, then stays dark', () => {
