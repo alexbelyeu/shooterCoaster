@@ -75,16 +75,20 @@ export interface FormationSlot {
   local: Vec3
 }
 
-/** `count` members in groups no bigger than the spec's (sizes differ by at most one), each slot jittered by `rng`. */
-export function formationSlots(formation: ChoreographedFormation, count: number, rng: Rng): FormationSlot[] {
+/**
+ * `count` members in groups no bigger than the spec's (sizes differ by at most one), each slot jittered by `rng`; `spread`
+ * scales the spec's spacing (a wave's `formationSpread`).
+ */
+export function formationSlots(formation: ChoreographedFormation, count: number, rng: Rng, spread = 1): FormationSlot[] {
   const spec = FORMATIONS[formation]
+  const spacing = spec.spacing * spread
   const groups = Math.max(1, Math.ceil(count / spec.groupSize))
-  const jitter = spec.spacing * 0.15
+  const jitter = spacing * 0.15
   const slots: FormationSlot[] = []
   for (let g = 0; g < groups; g++) {
     const size = Math.floor(count / groups) + (g < count % groups ? 1 : 0)
     for (let i = 0; i < size; i++) {
-      const local = slotOffset(formation, i, size, spec.spacing)
+      const local = slotOffset(formation, i, size, spacing)
       local.x += (rng() - 0.5) * jitter
       local.y += (rng() - 0.5) * jitter
       local.z += (rng() - 0.5) * jitter
