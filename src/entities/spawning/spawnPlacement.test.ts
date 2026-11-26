@@ -295,6 +295,14 @@ describe('tracksideSlots', () => {
       expect(slots.slice(nearCount).some((s) => s.ahead > band.near!.max)).toBe(true)
     }
   })
+
+  it("a wave's spread widens the far side only (#1059)", () => {
+    const { sideMin, sideMax } = tracksideBand('ground')
+    const sides = tracksideSlots(200, 'ground', createRng(3), 2).map((s) => Math.abs(s.side))
+    expect(Math.min(...sides)).toBeGreaterThanOrEqual(sideMin)
+    expect(Math.max(...sides)).toBeGreaterThan(sideMax)
+    expect(Math.max(...sides)).toBeLessThanOrEqual(2 * sideMax)
+  })
 })
 
 /** Arc distance before its slot at which a trackside enemy must be in front of the rider. */
@@ -608,7 +616,7 @@ describe('placeWallSwarm (#516)', () => {
     expect(placed.map((p) => p.seed)).toEqual(slots.map((s) => s.seed))
   })
 
-  it("splits level 6's lanternflies (#768) into groups along the ride: up Alaska beside the climbing car, the last ones on the walls seen from the Shield's top and its drop", () => {
+  it("splits level 6's lanternflies (#768) into groups along the ride: the Starr seen out of the cave, up Alaska beside the climbing car, the last ones on the walls seen from the Shield's top and its drop", () => {
     const { level, table: gym, rideFor } = world(shippedLevels().find((l) => l.id === 'level6')!)
     const wave = level.enemies.find((w) => w.type === 'lanternfly')!
     const profile = rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)
@@ -617,7 +625,9 @@ describe('placeWallSwarm (#516)', () => {
     const ride = rideFor(wave)
     const placed = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarm, ride })
     const walls = placed.map((p) => p.wall.id)
-    expect(walls[0]).toMatch(/alaska/)
+    // At 17 s (#1033) the first group lands on the Starr the car looks at on its way out of the cave, the next ones on Alaska.
+    expect(walls[0]).toBe('w-starr-right')
+    expect([...new Set(walls)][1]).toMatch(/alaska/)
     expect(walls[walls.length - 1]).not.toMatch(/alaska/)
     // The crest (#948): over Alaska's top no wall is in frame, so a group lands on the roof the rider looks up into.
     expect(walls).toContain('roof-alaska')

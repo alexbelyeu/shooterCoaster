@@ -8,6 +8,7 @@ import type { Rng } from '@/utils/rng'
 import type { AtmosphereConfig } from '../atmosphere'
 import type { FogModifiers } from './sceneFog'
 import type { SpotClearer, KeepOff, PlacementBounds } from '@/entities/spawning/spawnPlacement'
+import type { PerchSpec } from '@/entities/spawning/perch'
 import type { HeroShot } from '@/track/introCamera.hot'
 
 /** One stop of a terrain colour ramp. */
@@ -151,6 +152,8 @@ export interface BiomeDefinition {
   clearAir?: (groundFn: HeightFunction, track: ArcTable) => SpotClearer
   /** Moves a ground enemy's trackside spot onto open ground (the city's pavements, #963): `spawnPlacement.ts` `placeTracksideWave`. */
   clearGround?: (groundFn: HeightFunction, track: ArcTable) => SpotClearer
+  /** The raised top a `perch` wave hangs over (`spawning/perch.ts`): the gym's Flame. */
+  perch?: PerchSpec
   /** The hero landmark the intro's tour passes (#675) and the results orbit circles (#328). */
   hero: HeroShot
 }

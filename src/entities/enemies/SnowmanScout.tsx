@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { useSnowSink } from './useSnowSink'
 import { leashedTurnRate, orbitStep } from './wanderLeash.hot'
 import { useMarch } from './useMarch'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -27,6 +28,7 @@ export default function SnowmanScout(props: EnemyProps) {
   const bodyRef = useRef<THREE.Group>(null)
   const camera = useThree((s) => s.camera)
   const heightFn = useContext(TerrainContext)
+  const sink = useSnowSink()
 
   const { heading, moving } = useMarch(props.motion)
 
@@ -39,11 +41,13 @@ export default function SnowmanScout(props: EnemyProps) {
         mesh.position.x += Math.cos(heading) * MARCH_SPEED * dt
         mesh.position.z += Math.sin(heading) * MARCH_SPEED * dt
       }
-      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 18
+      const sunk = sink(mesh.position, time)
+      if (sunk < 0) return 'escaped'
+      mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 18 - sunk
 
       if (bodyRef.current) bodyRef.current.rotation.z = Math.sin(time * 3.5) * 0.06
     },
-    [theta, moveSpeed, heightFn, heading, moving],
+    [theta, moveSpeed, heightFn, sink, heading, moving],
   )
 
   useFrame(() => {

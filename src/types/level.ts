@@ -208,7 +208,7 @@ export interface EnemyWave {
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
-  /** Scales the formation's spacing (default 1): a wider spread puts fewer members in one aim-assist circle (#1059). */
+  /** Scales the formation's spacing, or a trackside wave's far side (default 1): a wider spread puts fewer members in one aim-assist circle (#1059). */
   formationSpread?: number
   /**
    * Bystanders who come with the wave (#518): people, not targets, so a wall type (`ENEMY_PLACEMENT`) on the level's
@@ -227,6 +227,11 @@ export interface EnemyWave {
    * `DarkSectionSpec.floor`.
    */
   darkFloor?: boolean
+  /**
+   * The wave hangs over the biome's raised top (`BiomeDefinition.perch`, #945: level 6's dust round the Flame through the
+   * roll across it), from just above it to its `rise` (`spawning/perch.ts`): a ground walker, no formation.
+   */
+  perch?: boolean
 }
 
 /** A whale breaching across the ride (Ocean, #793), where and when the level puts it; the breach's own shape is `BREACH` in `biomes/ocean/whaleBreach.ts`. */

@@ -1,24 +1,15 @@
 import { useCallback, useRef } from 'react'
-import * as THREE from 'three'
+import type * as THREE from 'three'
 import { useThree } from '@react-three/fiber'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { inRiderSight } from './riderSight'
 import { BALLOON_FLIGHT, balloonEscaped, balloonLift, balloonSway } from './balloonMotion.hot'
 import {
   BALLOON_GEO, BALLOON_STRING_GEO,
   BALLOON_BODY_MATS, BALLOON_STRING_MAT,
   BALLOON_COLOR_COUNT,
 } from './SharedEnemyAssets'
-
-const _look = new THREE.Vector3()
-const _to = new THREE.Vector3()
-
-/** Within `near` of the rider and in front of its look: the rider has seen it. */
-function inSight(p: THREE.Vector3, camera: THREE.Camera): boolean {
-  _to.subVectors(p, camera.position)
-  const d = _to.length()
-  return d < BALLOON_FLIGHT.near && _to.dot(camera.getWorldDirection(_look)) > BALLOON_FLIGHT.seenCos * d
-}
 
 /**
  * Realistic balloon: teardrop body (scaled sphere), hanging string, varied bright colors, slight specular shine.
@@ -36,7 +27,7 @@ export default function Balloon(props: EnemyProps) {
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
       const c = clock.current
       if (c.settledAt < 0) c.settledAt = time
-      if (c.nearAt < 0 && inSight(mesh.position, camera)) c.nearAt = time
+      if (c.nearAt < 0 && inRiderSight(mesh.position, camera, BALLOON_FLIGHT.near, BALLOON_FLIGHT.seenCos)) c.nearAt = time
       const age = time - c.settledAt
       const near = c.nearAt < 0 ? 0 : time - c.nearAt
       if (balloonEscaped(near)) return 'escaped'

@@ -29,7 +29,7 @@ export interface EnemyProps {
   wall?: WallSlot
   /** A swimmer's circle through `spawnPosition`, placed clear of the world (`spawning/swimOrbit.ts`). */
   orbit?: SwimOrbit
-  /** Stands on this floor (a dark section's, `spawning/darkFloor.ts`) instead of the terrain, facing down it. */
+  /** Stands on this floor (a dark section's, `spawning/darkFloor.ts`, facing down it; or a perch's height, `spawning/perch.ts`) instead of the terrain. */
   floor?: EnemyFloor
   /** It got away unshot (a climber topped out): gone, unscored. */
   onEscape?: (id: string) => void

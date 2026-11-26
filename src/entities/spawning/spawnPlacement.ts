@@ -685,12 +685,17 @@ export interface TracksideSlot {
   side: number
 }
 
-/** A spread band's slots are one per even step of it (jittered within the step), so the stretch has no empty run. */
-export function tracksideSlots(count: number, surface: Surface, rng: Rng): TracksideSlot[] {
-  const { aheadMin, aheadMax, sideMin, sideMax, near, spread } = tracksideBand(surface)
+/**
+ * A spread band's slots are one per even step of it (jittered within the step), so the stretch has no empty run. `spread`
+ * (a wave's `formationSpread`) widens the band's far side, so fewer stand in one aim-assist circle down the track (#1059).
+ */
+export function tracksideSlots(count: number, surface: Surface, rng: Rng, spread = 1): TracksideSlot[] {
+  const band = tracksideBand(surface)
+  const { aheadMin, aheadMax, sideMin, near } = band
+  const sideMax = band.sideMax * spread
   const nearCount = near ? Math.ceil(count * near.share) : 0
   return Array.from({ length: count }, (_, i) => {
-    const ahead = spread
+    const ahead = band.spread
       ? aheadMin + ((i + rng()) / count) * (aheadMax - aheadMin)
       : rng.range(aheadMin, i < nearCount ? near!.max : aheadMax)
     const side = rng.range(sideMin, sideMax) * (rng() < 0.5 ? -1 : 1)

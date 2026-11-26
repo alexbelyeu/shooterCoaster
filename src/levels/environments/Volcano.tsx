@@ -37,6 +37,21 @@ function cutHoles(material: THREE.MeshPhongMaterial, holes: readonly { x: number
   material.customProgramCacheKey = () => 'terrain-glow-holes'
 }
 
+/** The rock's raycast, minus the hits its shader cuts away: a ray through a hole meets nothing there, as the eye sees (#937). */
+function raycastPastHoles(holes: readonly { x: number; y: number; z: number }[]): THREE.Mesh['raycast'] {
+  const radiusSq = CONE_HOLE.radius * CONE_HOLE.radius
+  return function (this: THREE.Mesh, raycaster, intersects) {
+    const from = intersects.length
+    THREE.Mesh.prototype.raycast.call(this, raycaster, intersects)
+    let kept = from
+    for (let i = from; i < intersects.length; i++) {
+      const p = intersects[i].point
+      if (!holes.some((h) => (p.x - h.x) ** 2 + (p.y - h.y) ** 2 + (p.z - h.z) ** 2 < radiusSq)) intersects[kept++] = intersects[i]
+    }
+    intersects.length = kept
+  }
+}
+
 /** Emissive colour of the rock's `glow` attribute. */
 const ROCK_GLOW = { color: 0xff7a2a, intensity: 1 }
 
@@ -56,6 +71,7 @@ export default function Volcano({ position, lavaMaterial, holes }: VolcanoProps)
     if (holes?.length) cutHoles(material, holes)
     return material
   }, [holes])
+  const rockRaycast = useMemo(() => (holes?.length ? raycastPastHoles(holes) : undefined), [holes])
   const streakGeo = useMemo(buildLavaStreaks, [])
 
   useEffect(() => () => {
@@ -70,7 +86,7 @@ export default function Volcano({ position, lavaMaterial, holes }: VolcanoProps)
 
   return (
     <group position={position}>
-      <mesh geometry={rockGeo} material={rockMat} />
+      <mesh geometry={rockGeo} material={rockMat} {...(rockRaycast && { raycast: rockRaycast })} />
       <mesh position={[0, VOLCANO.height - 30, 0]}>
         <sphereGeometry args={[VOLCANO.rimRadius - 40, 12, 8]} />
         <meshStandardMaterial ref={coreRef} color="#ff5a10" emissive="#ff4a10" emissiveIntensity={2.5} />
