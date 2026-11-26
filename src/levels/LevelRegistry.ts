@@ -228,7 +228,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 36 * 15 + (14 + 24) * 12 + (52 + 8) * 18 + 8 * 50 + 500, // 2076 (the V8’s rats included) + the Medusa’s eight snakes and reward (bossSpecs.ts) = 2976
+    maxScore: 42 * 15 + (14 + 27) * 12 + (56 + 8) * 18 + 8 * 50 + 500, // 2274 (the V8’s rats included) + the Medusa’s eight snakes and reward (bossSpecs.ts) = 3174
     message: 'You sent the Climbing Gym!',
     nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
@@ -236,7 +236,7 @@ const LEVELS: LevelConfig[] = [
     // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more from
     // 5 s round the Flame's top and up in its fire's updraft (#945, the gym's `perch`), in sight on the climb to it and all
     // through the roll across it, rats in the Training Area's dark cave (11 s, as the last of the dust is shot) and on the
-    // mats after it, 22 so some are still ahead on the U-turn out of the cave (#1038), the lanternflies (#575) at 17 s, their swarm in groups landing one after another, the first on the Starr
+    // mats after it, 26 so some are still ahead on the U-turn out of the cave (#1038, #1039), the lanternflies (#575) at 17 s, their swarm in groups landing one after another, the first on the Starr
     // the car looks at on its way out of the cave, then on the Alaska walls beside the climbing car, each where the
     // rider looks as it lands (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948),
     // the last ones on the Starr and the Shield the car looks at from the Shield's top and on the auto belay's fall
@@ -247,9 +247,9 @@ const LEVELS: LevelConfig[] = [
     ...paceLevel({
       waves: [
         { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 5, bystanders: { type: 'climber', count: 4 } },
-        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 6, perch: true },
-        { type: 'rat', count: 22, waveLabel: 'Rats on the Mats!', weight: 6, bystanders: { type: 'climber', count: 3 } },
-        { type: 'lanternfly', count: 36, waveLabel: 'Lanternflies!', weight: 7 },
+        { type: 'dustBunny', count: 27, waveLabel: 'Dust Bunnies!', weight: 6, perch: true },
+        { type: 'rat', count: 26, waveLabel: 'Rats on the Mats!', weight: 6, bystanders: { type: 'climber', count: 3 } },
+        { type: 'lanternfly', count: 42, waveLabel: 'Lanternflies!', weight: 7 },
         { type: 'rat', count: 30, waveLabel: 'The Pack!', weight: 21, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
