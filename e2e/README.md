@@ -200,7 +200,7 @@ played as a player (#925): `autoFire(true, PLAYER_HITS_PER_SECOND)` lands 3 hits
 `sight()` counts shootable, on the game clock (each through `processHit`, the only path that hits; the shot's look is `showShotAtNDC`, no colliding bullet), so a stretch a player clears goes empty as it would for them (unfired, the
 leftovers of earlier waves filled the gym's empty stretches). Every step the page records level time (unrounded), `sight()` (#925, `src/testing/lineOfSight.ts`:
 the live enemies and exposed boss weak points the rider can shoot, inside the view, at least `MIN_ENEMY_PX` and with a clear
-line from the camera; those hidden behind the world and the specks too small to read are counted apart, `hidden` / `specks`),
+line from the camera to its origin or to the middle of what draws it (a ground enemy's origin is its feet, #937); those hidden behind the world and the specks too small to read are counted apart, `hidden` / `specks`),
 `rideProgress`, the boss's stage and whether it is framed, and whether a wave tell (the 1 s before a wave) or the boss tell is
 on. (Until #925 it counted `stats().onScreenEnemies`, every live enemy whose centre projects into the viewport, and passed
 the gym's ride with stretches where every enemy was behind a wall or a speck across the hall.) Pure `pacingMetric.mjs` (`pacingMetric.test.ts`) turns that into `noTargetShare` (share of
