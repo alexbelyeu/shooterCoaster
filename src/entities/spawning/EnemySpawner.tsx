@@ -6,7 +6,9 @@ import { indexAtT, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress.hot'
 import type { RideSpeeds } from '@/track/ridePhysics'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { nothingLeft } from '@/levels/bossWin'
+import { FOLLOWS_RIDER, nothingLeft, outOfReach, runReach } from '@/levels/bossWin'
+import { getCollisionTargets } from '@/combat/CollisionManager'
+import { ENEMY_SILHOUETTE, maxReadableDistance } from '../enemies/enemyReadability'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -379,6 +381,11 @@ export default function EnemySpawner({
   const bossBeaten = useRef(false)
   /** `run:cleared` went out this run (#961). */
   const cleared = useRef(false)
+  /** Level time of the next boss-win check, every quarter second once the boss is beaten (#983). */
+  const nextClearCheck = useRef(0)
+  const reach = useMemo(() => runReach(trackTable, rideSpeeds), [trackTable, rideSpeeds])
+  /** The counted enemies' kinds by id, to find them among the collision targets. */
+  const enemyTypes = useMemo(() => new Map(enemies.flatMap((e) => (e.bystander ? [] : [[e.id, e.type as EnemyType] as const]))), [enemies])
   // A hard-route wave's members join the count when it arrives (`joinedEnemies`): an easy-route run never meets them.
   const totalEnemyCount = useMemo(() => enemies.filter((e) => !e.bystander && !waves[e.waveIndex].route).length, [enemies, waves])
   const joinedEnemies = useRef(0)
@@ -401,6 +408,7 @@ export default function EnemySpawner({
     goneGolden.current.clear()
     bossBeaten.current = false
     cleared.current = false
+    nextClearCheck.current = 0
     joinedEnemies.current = 0
     useGameStore.getState().setEnemyCounts(totalEnemyCount, totalEnemyCount)
     setGeneration((g) => g + 1)
@@ -484,8 +492,18 @@ export default function EnemySpawner({
     tickWaves(waveDelays, levelTime, waveProgress.current, tellWave, activateWave)
     lastWaveTick.current = levelTime
     // The boss beaten with nothing left to shoot or still to come: GameTimer ends the run after the defeat's hold (#961).
-    if (cleared.current) return
-    const left = enemiesLeft(totalEnemyCount + joinedEnemies.current, goneEnemies.current.size, escapedEnemies.current.size)
+    // An enemy the rest of the run never has in range, in view and in sight counts as gone (#983); a follower never does.
+    if (cleared.current || !bossBeaten.current || levelTime < nextClearCheck.current) return
+    nextClearCheck.current = levelTime + 0.25
+    const targets = getCollisionTargets()
+    const eye = getThree().camera.position
+    const t = rideProgress()
+    const eyeLift = Math.max(0, eye.y - trackTable.y[indexAtT(trackTable, t)])
+    let left = enemiesLeft(totalEnemyCount + joinedEnemies.current, goneEnemies.current.size, escapedEnemies.current.size)
+    for (let i = 0; i < targets.length; i++) {
+      const type = enemyTypes.get(targets[i].id)
+      if (type && !FOLLOWS_RIDER.has(type) && outOfReach(targets[i].getPosition(), ENEMY_SILHOUETTE[type], reach, groundFn, eyeLift, t, levelTime, maxReadableDistance(type))) left--
+    }
     if (!nothingLeft(bossBeaten.current, left, goldenBalloons.length - goneGolden.current.size, nextWaveDue(waveDelays, waveProgress.current))) return
     cleared.current = true
     eventBus.emit('run:cleared')
