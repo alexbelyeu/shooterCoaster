@@ -89,6 +89,16 @@ describe('formationSlots', () => {
     expect(a).not.toEqual(c)
   })
 
+  it('scales every slot by the wave spread (#1059)', () => {
+    const a = formationSlots('spiral', 12, createRng(1337))
+    const b = formationSlots('spiral', 12, createRng(1337), 2)
+    for (let i = 0; i < a.length; i++) {
+      expect(b[i].local.x).toBeCloseTo(a[i].local.x * 2)
+      expect(b[i].local.y).toBeCloseTo(a[i].local.y * 2)
+      expect(b[i].local.z).toBeCloseTo(a[i].local.z * 2)
+    }
+  })
+
   it.each(Object.keys(FORMATIONS) as ChoreographedFormation[])('%s: keeps the count, groups no larger than the spec', (f) => {
     for (const count of [1, 7, 25, 50]) {
       const slots = formationSlots(f, count, createRng(1))

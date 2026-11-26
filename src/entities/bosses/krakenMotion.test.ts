@@ -10,7 +10,7 @@ import { indexAhead, trackTangent } from '@/entities/spawning/spawnPlacement'
 import { KRAKEN, BOSS_SPECS } from './bossSpecs'
 import { createBossState, applyHit, exposedWeakPoints } from './bossModel'
 import {
-  KRAKEN_HEAD, KRAKEN_TENTACLE, SLAM_IMPACT_S, SPOTS, createChain, headFrame, layChain, pickSpot, slamBend, slamImpactBetween,
+  KRAKEN_HEAD, KRAKEN_TENTACLE, SLAM_IMPACT_S, SPOTS, createChain, headFrame, layChain, padShut, pickSpot, slamBend, slamImpactBetween,
   tentacleFrame, type Spot,
 } from './krakenMotion'
 
@@ -58,6 +58,20 @@ describe('tentacle cycle', () => {
     }
   })
 
+  it('shuts the pad from each wind-up until the slam lifts off the water, and only for slams before it sinks (#1059)', () => {
+    const start = T.slams[0] + T.slamSpread
+    expect(padShut(start - 0.01, sinkAt, 1)).toBe(false)
+    expect(padShut(start, sinkAt, 1)).toBe(true)
+    expect(padShut(start + SLAM_IMPACT_S + T.holdS - 0.01, sinkAt, 1)).toBe(true)
+    expect(padShut(start + SLAM_IMPACT_S + T.holdS, sinkAt, 1)).toBe(false)
+    expect(padShut(start, start, 1)).toBe(false)
+    // Open more than half of the time it is up.
+    let shut = 0
+    let samples = 0
+    for (let t = T.riseS; t < sinkAt; t += 0.05, samples++) if (padShut(t, sinkAt, 0)) shut++
+    expect(shut / samples).toBeLessThan(0.5)
+  })
+
   it('a slam brings the tip down to the water, beside the base', () => {
     const chain = layChain(createChain(), 1, T.slam)
     const tipY = chain.y[T.segments]
@@ -93,7 +107,7 @@ describe('Kraken spec', () => {
     expect(exposedWeakPoints(state).map((w) => w.id)).toEqual(['pad-0', 'pad-1', 'pad-2', 'pad-3', 'pad-4'])
     for (const w of KRAKEN.weakPoints.filter((p) => p.phase === 0)) for (let h = 0; h < w.hp; h++) state = applyHit(state, w.id)
     expect(exposedWeakPoints(state).map((w) => w.id)).toEqual(['eye'])
-    expect(KRAKEN.weakPoints.find((w) => w.id === 'eye')!.hp).toBe(3)
+    expect(KRAKEN.weakPoints.find((w) => w.id === 'eye')!.hp).toBe(12)
     expect(BOSS_SPECS.kraken).toBe(KRAKEN)
   })
 })
