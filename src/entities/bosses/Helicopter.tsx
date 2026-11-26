@@ -5,7 +5,7 @@ import { gameClockStep } from '@/core/gameClock'
 import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { BOSS_DEFEAT_DEATH_STYLE, HELI_CRASH_DEATH_STYLE, HELI_PART_DEATH_STYLE, HELI_SMOKE_DEATH_STYLE } from '@/effects/deathStyles'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
-import { isExposed, weakPointHp, type WeakPointSpec } from './bossModel'
+import { currentPhase, isExposed, weakPointHp, type WeakPointSpec } from './bossModel'
 import { HELICOPTER, HELI_LAYOUT } from './bossSpecs'
 import {
   BEAM_SPREAD, HELI_BEAM_GEO, HELI_BEAM_MAT, HELI_BLADES_GEO, HELI_BODY_GEO, HELI_HUB_GEO, HELI_HUB_MAT, HELI_MAT,
@@ -15,7 +15,8 @@ import {
 import { flatForward } from './bossAim.hot'
 import { followHeading, smooth } from './bossCycle.hot'
 import {
-  HELI, HELI_FALL, anchorAt, beamSpot, dropInHeight, heliPose, lookSlope, spotAt, type BeamSpot, type HeliPose,
+  HELI, HELI_FALL, anchorAt, beamSpot, dropInHeight, heliPose, hubShut, lookSlope, lungePitch, spotAt,
+  type BeamSpot, type HeliPose,
 } from './helicopterMotion.hot'
 
 /** The beam's opacity once it has swept in; it fades in over the tell. */
@@ -65,7 +66,9 @@ function renderWeakPoint(w: WeakPointSpec) {
  */
 export default function Helicopter(props: BossProps) {
   const { incoming, active, groundFn } = props
-  const motion = useRef({ placed: false, heading: { x: 0, z: -1 }, tell: 0, fallFrom: 0, nextSmoke: 0, crashed: false }).current
+  const motion = useRef({
+    placed: false, heading: { x: 0, z: -1 }, tell: 0, fallFrom: 0, nextSmoke: 0, crashed: false, exposedAt: -1,
+  }).current
   const rotor = useRef<THREE.Group>(null)
   const beam = useRef<THREE.Group>(null)
   const cone = useRef<THREE.Mesh>(null)
@@ -90,10 +93,15 @@ export default function Helicopter(props: BossProps) {
   })
 
   const move = useCallback(
-    ({ root, parts, camera, state, dt, age, sinceDefeat }: BossFrame) => {
+    ({ root, parts, camera, state, retract, dt, age, sinceDefeat }: BossFrame) => {
       const fighting = sinceDefeat < 0
       const tailLost = weakPointHp(state, 'tail-rotor') <= 0
       heliPose(_pose, age, tailLost, sinceDefeat)
+      // It fights back (#1059): the hub only in its lunges.
+      if (fighting && motion.exposedAt < 0 && currentPhase(state) === 1) motion.exposedAt = age
+      const lunging = fighting && motion.exposedAt >= 0
+      if (lunging) _pose.pitch += lungePitch(age - motion.exposedAt)
+      retract('hub', lunging && hubShut(age - motion.exposedAt))
       const slope = lookSlope(camera.getWorldDirection(_fwd))
       flatForward(camera, _fwd)
       followHeading(motion.heading, _fwd.x, _fwd.z, dt, !motion.placed, HELI.headingTau)
