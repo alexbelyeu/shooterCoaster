@@ -46,7 +46,7 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | What | Original | ShooterCoaster |
 |---|---|---|
 | Where scores live | pasted into the page | `src/audio/scores/<id>.scrim`: `title`, one per level id (`level1`…), `results-win` and `results-lose`; listed in `scores/index.ts` |
-| Theme options | — | `scores/themes/<slot>.<name>.scrim`: candidate themes for a slot, waiting on Alex's pick (sound bible "taste gate"; now level7's three, #868: the folder is read by glob, so a listening round only adds files and their `SCORE_KEYS` rows). `?theme=<name>[,<name>]` plays each named option in its slot's place (`themesFromQuery`, `scoreIdFor`), arcade SFX included (each option has its own `SCORE_KEYS` entry); the default never changes. Render one with `--music <slot>.<name>` |
+| Theme options | — | `scores/themes/<slot>.<name>.scrim`: candidate themes for a slot, waiting on Alex's pick (sound bible "taste gate"; now level7's three of round 2, #1053: the folder is read by glob, so a listening round only adds files and their `SCORE_KEYS` rows). `?theme=<name>[,<name>]` plays each named option in its slot's place (`themesFromQuery`, `scoreIdFor`), arcade SFX included (each option has its own `SCORE_KEYS` entry); the default never changes. Render one with `--music <slot>.<name>` |
 | Where it plays | its own `AudioContext`, to the speakers | the game's one `AudioContext` (`AudioEngine.ts`), into its own stereo music channel (`scoreChannel`): music volume, the slow-mo low-pass duck, the pause mix and the master limiter apply |
 | Mix bus | `jukebox` voicing: master 0.72 → +2 dB low shelf @180 Hz → −2.5 dB high shelf @7.5 kHz → compressor (−15 dB, 3.2:1) → limiter (−3 dB) → out 1.0 (≈ −9.5 LUFS) | `game` voicing (`GAME_VOICING` in `synth.ts`): 24 dB/oct high-pass at 32 Hz first, the same EQ and compressor, then a −6 dB limiter and out 0.53, so a score lands at −18…−16 LUFS through the music channel with true peaks near −9 dBTP. Each voice's panner takes a mono voice up to stereo before panning (`upmixPanner`: no 3 dB centre dip), as the scores were mixed (#416) |
 | Track changes | stop with a 60 ms fade | 1 s crossfade on a `musicBus` gain |
@@ -55,7 +55,7 @@ voiced around the voice's `center`, `x X o .` a drum lane. Every bar must add up
 | Loading | — | the engine and scores are a separate chunk, loaded after the first gesture unlocks audio |
 | Plucked strings | built on demand, `warm()` in idle slices | the same; a track warms its whole score when it starts (the countdown, for a level) |
 | Randomness | `Math.random` | the same in play; offline renders seed it (`createRng`), so the original page and the port render the same score near bit-identically (`renders/parity-*`) |
-| Instruments | 38 melodic, 27 drums | the same, plus the arcade palette below (7 melodic, 5 drums) |
+| Instruments | 38 melodic, 27 drums | the same, plus the arcade palette below (12 melodic, 7 drums) |
 | Intensity layers | — | `layer=base\|drums\|lead\|frenzy` on a voice (untagged = `base`): the level's music follows the combo tier (see below) |
 | Boss section | — | `boss X Y` (a loop, like `loop`) and `sting S` (once, like `play`) on a level score (#598): on `boss:spawn` `LevelAudio` moves the score to the boss loop at its next bar line (`player.ts` `playSection`, the bar line past the scheduler's look-ahead, so nothing of the old section overlaps it), on `boss:defeated` to the sting (every layer, like the intro) and then the loop from its top; a restart goes back to the loop. The same voices play every section (declare the boss's extra ones, e.g. an `orchhit`, with the others); every level score needs both lines, on the loop's bar length, its boss loop layered like the loop and a 2-bar sting (`scores.test.ts`; `lintRanges` and `lintLayers` cover them). A score without a `boss` line (a theme option) just keeps playing. Hear it: `npm run audio:render -- --mix <level> --boss` (`renders/mix-level{1,4}-boss`) |
 
@@ -142,11 +142,18 @@ docs/audio/palette/palette-groove.scrim --chain game` renders one through the ga
 | `synbrass` | melodic | E2–E6 | 90s synth brass: two saws (±7 cents) and a sub square, a 3% scoop into the pitch, a resonant filter that swells over 70 ms; late vibrato. Stabs and pads | reverb 0.25, attack 25 ms, release 0.14 s. `bright` scales the filter swell |
 | `riser` | melodic | C3–C7 | Transition sweep as long as the written note: band-passed noise plus a saw climbing from half the note to 8× it, getting louder, cut at the end. `C6-------` is a one-bar riser at 8 steps | reverb 0.45. `bright` scales the top of the sweep |
 | `downlifter` | melodic | C3–C7 | The riser backwards: starts loud at 8× the note and falls to half of it over the written length | reverb 0.45. `bright` scales the start of the sweep |
+| `vocoder` | melodic | C3–C6 | Robot voice (#1053): a saw and a square, no vibrato, through four formant band-passes that glide "oo" → "ah" in the note's first 120 ms, plus a little high-passed buzz. A talking lead or stabs | reverb 0.18. `bright` raises the vowel it lands on and the buzz |
+| `reese` | melodic | E1–E4 | Reese bass (#1053): two saws ±19 cents beating against each other under a low-pass that bites open on the attack, and a sine sub. Drum & bass; write it in octaves 1–2 | reverb 0.06. `bright` scales the filter's bite |
+| `fmbell` | melodic | C4–C7 | Metallic FM bell (#1053): a sine carrier and a modulator at an inharmonic 3.5×, the index falling as it rings (~0.6 s at C5, longer lower down), and a 2.76× ping. Arpeggios, pings and a metallic lead | reverb 0.35. `bright` scales the index and the ping |
+| `siren` | melodic | C4–C6 | City texture (#1053): a distant siren held for the written note, a triangle wailing from the note up a fourth and back every ~1.7 s, band-limited to 280 Hz–2.6 kHz and wet, fading in and out. One long note every few bars in base | reverb 0.5. `bright` scales the low-pass |
+| `rain` | melodic | C4–C7 | City texture (#1053): rain hiss held for the written note, banded at 4–12× its pitch, with droplets ticking through it; fades in and out. Write it on the tonic (it counts toward the key) | reverb 0.4. `bright` scales the top of the band |
 | `bigkick` | drum | — | Sine diving 210 → 60 Hz in 45 ms and settling at 50 Hz, damped by 0.3 s, with a knock and a click. Bigger than `kick`; keep the bass off its notes' lowest octave | reverb 0.04 |
 | `gatesnare` | drum | — | Snare with a gated-reverb tail: dense noise held ~220 ms, then shut. Has its own room, so keep `rev` low | reverb 0.08 |
 | `hat909` | drum | — | Tight, bright 909-style closed hat: more noise than ring | reverb 0.08 |
 | `ohat909` | drum | — | The open version, ~0.6 s. There is no choke group: a closed hat doesn't cut it | reverb 0.12 |
 | `clap909` | drum | — | Four quick taps and a short tail around 1.2 kHz | reverb 0.2 |
+| `kick808` | drum | — | 808-style kick (#1053): a sine diving 150 → 52 Hz and booming at 48 Hz for ~0.45 s, with a click. Keep the bass off its notes | reverb 0.03 |
+| `glitch` | drum | — | Bitcrushed glitch hit (#1053): a square chirp jumping octaves and a noise burst through a 3-bit staircase, ~70 ms | reverb 0.1 |
 
 ## House rules for game scores
 

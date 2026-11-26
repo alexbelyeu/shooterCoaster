@@ -1,0 +1,100 @@
+title    Robot Boulevard
+composer Claude (ShooterCoaster)
+about    Neon Metropolis (level7) option, round 2 (#1053): electro robot funk in D Dorian at 136. A talking vocoder hook over a syncopated FM bass, a 16th-note FM-bell sequence and a cowbell, with a distant siren in the opening and every eighth bar. The A section vamps Dm7-G7 (the Dorian B natural), the B section climbs Bbmaj7-C-Am7 to A7. The last eight bars lift a tone, to E Dorian. Layers: hook, bass, bells, cowbell and siren from the start, then a broken 808 kick, claps, eighth hats and glitch fills at 2x, the hook pinged on the bell an octave up at 3x, sixteenth hats and glitch stutters at FRENZY. The helicopter's boss section turns D Phrygian (E flat) under a low-tom rotor and orchestra hits, the bass chopping in sixteenths; the sting is D major.
+tempo    136
+beats    4
+steps    4
+reverb   0.2
+
+# untagged voices are the base layer, the hook among them (layers only add); the intro plays every layer
+voice talk   vocoder  vol=0.95
+voice bass   fmbass   vol=0.78 gate=0.6
+voice seq    fmbell   vol=0.19 pan=0.35 gate=0.5 oct=1
+voice cow    cowbell  vol=0.2 pan=-0.3
+voice siren  siren    vol=0.2 pan=-0.5
+voice stab   orchhit  vol=0.44 pan=0.1
+voice rotor  tomlo    vol=0.55 pan=0.15
+voice kick   kick808  vol=0.4 layer=drums
+voice clap   clap909  vol=0.46 layer=drums
+voice hat    hat909   vol=0.36 pan=0.3 layer=drums
+voice zap    glitch   vol=0.3 pan=0.2 layer=drums
+voice ping   fmbell   vol=0.18 pan=-0.3 oct=1 layer=lead
+voice fhat   hat909   vol=0.28 pan=-0.35 layer=frenzy
+voice fzap   glitch   vol=0.26 pan=-0.2 layer=frenzy
+
+pattern intro
+talk  | D4- .- D4- .- F4- .- G4- A4- | C5--- .--- C#5------- |
+ping  | D4- .- D4- .- F4- .- G4- A4- | C5--- .--- C#5------- |
+bass  | D2--- .--- D2--- .--- | A2--- .--- A2--- A2- A2- |
+siren | A4--------------- | _ |
+kick  | X... .... X... .... | X... .... X... X.X. |
+clap  | .... .... .... .... | .... .... XxXx XXXX |
+zap   | .... .... .... x.x. | x... x... xxxx xxxx |
+
+pattern A
+talk  | D5- .- D5 C5 .- A4--- C5- D5- | .- F5- D5 .- B4- .--- A4 B4 . | D5- .- D5 C5 .- A4--- G4- A4- | C5--- A4- G4 .- E4- G4 .- A4- |
+ping  | D5- .- D5 C5 .- A4--- C5- D5- | .- F5- D5 .- B4- .--- A4 B4 . | D5- .- D5 C5 .- A4--- G4- A4- | C5--- A4- G4 .- E4- G4 .- A4- |
+bass  | D2 . . D3 . . D2 . . . C3 . D3 . A2 C3 | G2 . . G3 . . G2 . . . F3 . G3 . D3 F3 | D2 . . D3 . . D2 . . . C3 . D3 . A2 C3 | A2 . . A3 . . A2 . . . G3 . A3 . E3 G3 |
+seq   | D4 F4 A4 C5 D5 C5 A4 F4 D4 F4 A4 C5 D5 C5 A4 F4 | D4 F4 G4 B4 D5 B4 G4 F4 D4 F4 G4 B4 D5 B4 G4 F4 | D4 F4 A4 C5 D5 C5 A4 F4 D4 F4 A4 C5 D5 C5 A4 F4 | C4 E4 G4 A4 C5 A4 G4 E4 C4 E4 G4 A4 C5 A4 G4 E4 |
+cow   | ..x. ..x. .x.. x.x. | % | % | ..x. ..x. .x.. xxx. |
+kick  | X... ...x ..X. .... | % | % | X... ...x ..X. .xX. |
+clap  | .... X... .... X... | % | % | .... X... .... X.xx |
+hat   | x.X. x.X. x.X. x.X. | % | % | % |
+zap   | .... .... .... .... | .... .... .... ..x. | .... .... .... .... | .... .... x... x.xx |
+fhat  | xxxx xxxx xxxx xxxx | % | % | % |
+fzap  | .... ..x. .... x... | % | % | .... ..x. xx.. xxxx |
+
+pattern A2 from A
+talk  | D5- .- D5 C5 .- A4--- C5- D5- | .- F5- D5 .- B4- .--- A4 B4 . | D5- .- D5 C5 .- A4--- G4- A4- | C5--- D5- E5 .- F5- E5 .- D5- |
+ping  | D5- .- D5 C5 .- A4--- C5- D5- | .- F5- D5 .- B4- .--- A4 B4 . | D5- .- D5 C5 .- A4--- G4- A4- | C5--- D5- E5 .- F5- E5 .- D5- |
+siren | _ | A4--------------- | _ | _ |
+
+pattern B from A
+talk  | F5--- .- F5 E5 D5- .- C5- D5- | E5--- .- E5 D5 C5- .- G4- C5- | A4- .- C5 .- E5- .- D5 C5 A4- . | C#5------- E5--- C#5- A4- |
+ping  | F5--- .- F5 E5 D5- .- C5- D5- | E5--- .- E5 D5 C5- .- G4- C5- | A4- .- C5 .- E5- .- D5 C5 A4- . | C#5------- E5--- C#5- A4- |
+bass  | A#1 . . A#2 . . A#1 . . . A2 . A#2 . F2 A2 | C2 . . C3 . . C2 . . . A#2 . C3 . G2 A#2 | A2 . . A3 . . A2 . . . G3 . A3 . E3 G3 | A2 . . A3 . . A2 . . . G3 . A3 . E3 C#3 |
+seq   | D4 F4 A4 A#4 D5 A#4 A4 F4 D4 F4 A4 A#4 D5 A#4 A4 F4 | C4 E4 G4 A#4 C5 A#4 G4 E4 C4 E4 G4 A#4 C5 A#4 G4 E4 | C4 E4 G4 A4 C5 A4 G4 E4 C4 E4 G4 A4 C5 A4 G4 E4 | C#4 E4 G4 A4 C#5 A4 G4 E4 C#4 E4 G4 A4 C#5 A4 G4 E4 |
+
+pattern B2 from B
+talk  | F5--- .- F5 E5 D5- .- C5- D5- | E5--- .- E5 D5 C5- .- G4- C5- | A4- .- C5 .- E5- .- D5 C5 A4- . | C#5--- D5--- E5--- A4--- |
+ping  | F5--- .- F5 E5 D5- .- C5- D5- | E5--- .- E5 D5 C5- .- G4- C5- | A4- .- C5 .- E5- .- D5 C5 A4- . | C#5--- D5--- E5--- A4--- |
+zap   | .... .... .... .... | .... .... .... ..x. | .... .... .... .... | x.x. x.x. xxxx xxxx |
+
+play intro
+loop A A2 B B2 A A2 A+2 A2+2
+
+# Boss section: the police helicopter. A low-tom rotor chops under the bass's sixteenths, the hook turns D Phrygian
+# (E flat) over Dm / Eb, orchestra hits land in base and the siren wails every other bar; in Y the hook climbs. The sting is D major.
+pattern X
+talk  | D5- .- D5 D#5 .- D5--- C5- A4- | .- G5- D#5 .- D5- .--- C5 A#4 . | D5- .- D5 D#5 .- D5--- F5- D5- | C#5------- E5--- G5- C#5- |
+ping  | D5- .- D5 D#5 .- D5--- C5- A4- | .- G5- D#5 .- D5- .--- C5 A#4 . | D5- .- D5 D#5 .- D5--- F5- D5- | C#5------- E5--- G5- C#5- |
+bass  | D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 | D#2 D#2 D#3 D#2 D#2 D#2 D#3 D#2 D#2 D#2 D#3 D#2 D#2 D#2 D#3 D#2 | D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 D2 D2 D3 D2 | A2 A2 A3 A2 A2 A2 A3 A2 A2 A2 A3 A2 A2 A2 A3 A2 |
+seq   | D4 F4 A4 D5 D4 F4 A4 D5 D4 F4 A4 D5 D4 F4 A4 D5 | D#4 G4 A#4 D#5 D#4 G4 A#4 D#5 D#4 G4 A#4 D#5 D#4 G4 A#4 D#5 | D4 F4 A4 D5 D4 F4 A4 D5 D4 F4 A4 D5 D4 F4 A4 D5 | C#4 E4 G4 A4 C#4 E4 G4 A4 C#4 E4 G4 A4 C#4 E4 G4 A4 |
+stab  | [Dm]!--- .------- [Dm]!--- | [D#]!--- .----------- | [Dm]!--- .------- [Dm]!--- | [A]!--- [A]!--- [A7]!------- |
+rotor | X.x. X.x. X.x. X.x. | % | % | % |
+siren | _ | D5--------------- | _ | D5--------------- |
+cow   | ..x. ..x. .x.. x.x. | % | % | ..x. ..x. .x.. xxx. |
+kick  | X..x ..X. X..x ..X. | % | % | X..x ..X. X.X. xxxx |
+clap  | .... X... .... X... | % | % | .... X... ..X. XXXX |
+hat   | x.X. x.X. x.X. x.X. | % | % | % |
+zap   | .... .... .... ..x. | % | % | .... .... x.x. xxxx |
+fhat  | xxxx xxxx xxxx xxxx | % | % | % |
+fzap  | .... ..x. .... x... | % | % | % |
+
+pattern Y from X
+talk  | D5--- D#5--- D5--- A4--- | A#4------- G4--- D#5--- | D5--- F5--- A5--- G5--- | A5------- C#5- E5- G5- A5- |
+ping  | D5--- D#5--- D5--- A4--- | A#4------- G4--- D#5--- | D5--- F5--- A5--- G5--- | A5------- C#5- E5- G5- A5- |
+
+pattern S
+talk  | D4--- F#4--- A4--- D5--- | D5------- .------- |
+ping  | D4--- F#4--- A4--- D5--- | D5------- .------- |
+stab  | [D]!--- .--- [D]!--- [G]!--- | [D]!------- .--- [D]!--- |
+bass  | D2--- D2--- D2--- D2--- | D2- D3- D2- D3- D2- D3- D2- D3- |
+seq   | D4 F#4 A4 D5 D4 F#4 A4 D5 D4 F#4 A4 D5 D4 F#4 A4 D5 | D5------- .------- |
+kick  | X... X... X... X... | X... X... X... x.xx |
+clap  | .... .... xxxx XXXX | .... X... .... xxxx |
+hat   | x.X. x.X. x.X. x.X. | % |
+zap   | .... .... .... .... | .... .... .... x.xx |
+
+boss  X Y
+sting S

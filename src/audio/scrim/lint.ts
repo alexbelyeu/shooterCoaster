@@ -17,7 +17,7 @@ export const INSTRUMENT_RANGES: Readonly<Record<string, readonly [number, number
   chip: [24, 108], sine: [24, 108], square: [24, 108], saw: [24, 108], triangle: [24, 108],
   // arcade palette (SCORE-FORMAT.md, "Instruments")
   fmbass: [28, 62], supersaw: [48, 96], distguitar: [40, 76], orchhit: [36, 84], synbrass: [40, 88],
-  riser: [48, 96], downlifter: [48, 96],
+  riser: [48, 96], downlifter: [48, 96], vocoder: [48, 84], reese: [28, 64], fmbell: [60, 96], siren: [60, 84], rain: [60, 96],
 }
 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
