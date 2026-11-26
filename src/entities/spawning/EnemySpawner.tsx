@@ -173,7 +173,7 @@ function generateEnemies(
       continue
     }
     if (scatter === 'trackside') {
-      for (const trackside of tracksideSlots(wave.count, surface, rng)) {
+      for (const trackside of tracksideSlots(wave.count, surface, rng, wave.formationSpread)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside, ...base })
       }
       continue
