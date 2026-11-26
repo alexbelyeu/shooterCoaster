@@ -43,7 +43,7 @@ const blimpBalloons: WeakPointSpec[] = BLIMP_LAYOUT.balloons.map(([x, y], i) => 
   id: `balloon-${i}`,
   radius: 62,
   offset: [x, y, 0],
-  hp: 2,
+  hp: 4,
   score: GOLDEN_BALLOON_SCORE,
   phase: 0,
 }))
@@ -54,7 +54,7 @@ export const GOLDEN_BLIMP: BossSpec = {
   reward: 400,
   weakPoints: [
     ...blimpBalloons,
-    { id: 'gondola', radius: 60, offset: [BLIMP_LAYOUT.hullX, BLIMP_LAYOUT.gondolaY, 0], hp: 3, score: 0, phase: 1 },
+    { id: 'gondola', radius: 60, offset: [BLIMP_LAYOUT.hullX, BLIMP_LAYOUT.gondolaY, 0], hp: 6, score: 0, phase: 1 },
   ],
 }
 
