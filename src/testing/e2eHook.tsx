@@ -73,7 +73,7 @@ import { RIG_MAX_PITCH_DEG, RIG_MAX_ROLL_DEG } from '@/track/cameraRig.hot'
 import { STREAK_SPEED_THRESHOLD } from '@/track/windStreaks'
 import { MAX_FOV_KICK_DEG } from '@/track/cameraFov.hot'
 import { programsAfterWarmup } from '@/core/hitchLog'
-import { collectOccluders, countSight, largestCluster, type SightCounts, type SightTarget } from './lineOfSight'
+import { collectOccluders, countSight, drawnCentre, largestCluster, type SightCounts, type SightTarget } from './lineOfSight'
 import { TOUCH_ASSIST_RADIUS_PX } from '@/combat/aimAssist'
 import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
@@ -1000,8 +1000,16 @@ function readSight(): E2ESight {
   for (const t of getCollisionTargets()) {
     if (!isLive(t)) continue
     const radius = Math.sqrt(t.radiusSq)
-    const type = enemyRegistry.get(t.id)?.type
-    targets.push({ id: t.id, position: t.getPosition().clone(), size: type ? (ENEMY_SILHOUETTE[type] ?? 2 * radius) : 2 * radius, radius })
+    const enemy = enemyRegistry.get(t.id)
+    const type = enemy?.type
+    const body = enemy ? drawnCentre(enemy.object, new THREE.Vector3()) : null
+    targets.push({
+      id: t.id,
+      position: t.getPosition().clone(),
+      size: type ? (ENEMY_SILHOUETTE[type] ?? 2 * radius) : 2 * radius,
+      radius,
+      ...(body ? { body } : {}),
+    })
   }
   const counts = countSight(targets, cam, collectOccluders(scene, cam, skip))
   const bossFramed = e2eBoss.stage === 'active' && counts.ids.some((id) => isBossId(id))
