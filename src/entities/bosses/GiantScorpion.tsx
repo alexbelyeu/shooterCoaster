@@ -53,6 +53,8 @@ const _seen = new THREE.Vector3()
 const SEEN_NDC = 0.75
 const CLAW_HEIGHT = 80
 const STINGER_HEIGHT = 480
+/** The stinger on the bare stub, its last phase: low enough that a near slot, in front of a dune the rider looks across, frames it (#1059). */
+const STUB_HEIGHT = 140
 /** No weak point in the frame this long, it burrows and bursts out again in it. */
 const BURROW_AFTER_S = 0.5
 const WEAK_POINT_NDC = 0.9
@@ -70,9 +72,9 @@ function pointInFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number,
   return sightClear(groundFn, _cam.x, _cam.y, _cam.z, x, y, z, samples, SIGHT_MARGIN)
 }
 
-function inFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number): boolean {
+function inFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number, top: number): boolean {
   const ground = groundFn(x, z)
-  return pointInFrame(camera, groundFn, x, ground + CLAW_HEIGHT, z, SEEN_NDC) && pointInFrame(camera, groundFn, x, ground + STINGER_HEIGHT, z, SEEN_NDC)
+  return pointInFrame(camera, groundFn, x, ground + CLAW_HEIGHT, z, SEEN_NDC) && pointInFrame(camera, groundFn, x, ground + top, z, SEEN_NDC)
 }
 
 const _wp = new THREE.Vector3()
@@ -119,11 +121,6 @@ export default function GiantScorpion(props: BossProps) {
     }),
     [track, groundFn],
   )
-  /** The same slots, only those in the frame: for when its perch has left the frame. */
-  const seenInput = useMemo<PerchInput>(
-    () => ({ ...input, camera: { x: 0, z: 0 }, seen: (x, z) => inFrame(camera, groundFn, x, z) }),
-    [input, camera, groundFn],
-  )
 
   const [tellStep] = useState(gameClockStep)
   const sim = useMemo(
@@ -137,6 +134,8 @@ export default function GiantScorpion(props: BossProps) {
       /** Its age when it last burst out of the sand, and how long no weak point has been in the rider's frame. */
       riseFrom: 0,
       unseen: 0,
+      /** How tall it stands for `inFrame`: the raised tail, or the bare stub once only the stinger is left. */
+      top: STINGER_HEIGHT,
       yaw: 0,
       gait: 0,
       lastX: 0,
@@ -155,6 +154,12 @@ export default function GiantScorpion(props: BossProps) {
     [],
   )
 
+  /** The same slots, only those in the frame: for when its perch has left the frame. */
+  const seenInput = useMemo<PerchInput>(
+    () => ({ ...input, camera: { x: 0, z: 0 }, seen: (x, z) => inFrame(camera, groundFn, x, z, sim.top) }),
+    [input, camera, groundFn, sim],
+  )
+
   /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. True when it should
    * burrow and burst out again at a new perch: none of its exposed weak points has been in the rider's frame for
    * `BURROW_AFTER_S` and a slot in the frame, against the rider's look as it is now, is clear (#937: on level 2's final
@@ -165,6 +170,7 @@ export default function GiantScorpion(props: BossProps) {
       sim.unseen = !frame || !sim.placed || weakPointSeen(camera, groundFn, frame) ? 0 : sim.unseen + dt
       const risen = frame !== null && frame.age - sim.riseFrom > SCORPION_RISE.riseS
       if (risen && sim.unseen > BURROW_AFTER_S) {
+        sim.top = currentPhase(frame.state) > 0 ? STUB_HEIGHT : STINGER_HEIGHT
         const lagX = sim.heading.x
         const lagZ = sim.heading.z
         sim.headed = false
