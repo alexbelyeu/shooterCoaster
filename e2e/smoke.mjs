@@ -3311,6 +3311,24 @@ async function startDailyFromCard(page, savedScores) {
 }
 
 /**
+ * Kill up to three of the nearest enemies, again every half second until the run has a score (at most `timeoutMs`), so a
+ * run ended next is a New best. The daily's level opens with nothing in reach on a slow runner sometimes; a 0 score is
+ * no record and sends nothing (the 2026-11-26 nightly's `record null, 0 submission(s)`, #1074). Returns the score.
+ */
+async function scoreSomething(page, timeoutMs = 20000) {
+  const until = Date.now() + timeoutMs
+  for (;;) {
+    const score = await page.evaluate(() => {
+      const s = window.__SC_TEST__
+      if (s.stats().score <= 0) s.killNearest(3)
+      return s.stats().score
+    })
+    if (score > 0 || Date.now() > until) return score
+    await page.waitForTimeout(500)
+  }
+}
+
+/**
  * Daily Run (#184): the card starts today's level on today's seed in daily mode, two loads spawn the same,
  * the results say Daily Run / New best with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
  */
@@ -3339,11 +3357,9 @@ async function dailyCheck(newPage) {
     problems.push(`daily ghost: fetched for ${JSON.stringify(online.ghostGets)}, expected once for ${run?.dateKey}`)
 
   // Score something so the day's first result is a new best, then end the run: it goes on the (stubbed) day's World board (#854).
-  await first.page.evaluate(() => {
-    const s = window.__SC_TEST__
-    s.setLeaderboards({}, 'DAY')
-    s.killNearest(3)
-  })
+  await first.page.evaluate(() => window.__SC_TEST__.setLeaderboards({}, 'DAY'))
+  const firstScore = await scoreSomething(first.page)
+  if (!(firstScore > 0)) problems.push(`the daily's first run scored nothing in 20 s (killNearest found no enemy), so its results can't be a New best`)
   await waitFrames(first.page, 2, { maxMs: 20000 })
   await first.page.evaluate(() => window.__SC_TEST__.endLevel())
   const resultsShown = await first.page
@@ -3407,7 +3423,8 @@ async function dailyCheck(newPage) {
   // No ghost from a board that's down, and nothing errors.
   const noGhost = await readGhost(second.page)
   if (noGhost.shown || down.ghostGets.length !== 1) problems.push(`daily ghost with the board's API down: ${down.ghostGets.length} fetch(es), ring ${noGhost.shown ? 'shown' : 'hidden'}; expected 1, hidden`)
-  await second.page.evaluate(() => window.__SC_TEST__.killNearest(3))
+  const secondScore = await scoreSomething(second.page)
+  if (!(secondScore > 0)) problems.push(`the daily's second load scored nothing in 20 s (killNearest found no enemy), so its results can't be a New best`)
   await waitFrames(second.page, 2, { maxMs: 20000 })
   await second.page.evaluate(() => window.__SC_TEST__.endLevel())
   await second.page
