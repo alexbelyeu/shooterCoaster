@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { CROW_FLEE, SAND_BURROW, SNOW_SINK, TOUCAN_FLEE, slipOffset, slipped } from './slipAway.hot'
+import { CROW_FLEE, DRONE_FLEE, SAND_BURROW, SNOW_SINK, STREET_DROP, TOUCAN_FLEE, slipOffset, slipped } from './slipAway.hot'
 
 describe('enemies slip away once seen (#1059)', () => {
-  it.each([['snow', SNOW_SINK], ['sand', SAND_BURROW], ['crow', CROW_FLEE], ['toucan', TOUCAN_FLEE]] as const)(
+  it.each([['snow', SNOW_SINK], ['sand', SAND_BURROW], ['crow', CROW_FLEE], ['toucan', TOUCAN_FLEE], ['drone', DRONE_FLEE], ['bot', STREET_DROP]] as const)(
     '%s: stays while it lingers, then goes its whole distance and is gone, unscored',
     (_, s) => {
       const { linger, goS, distance } = s

@@ -5,13 +5,16 @@ import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { DRONE_BOB, DRONE_SWING } from './hoverDroneMotion'
 import { DRONE_GEO, DRONE_MAT } from './SharedEnemyAssets'
+import { DRONE_FLEE } from './slipAway.hot'
+import { useSlipAway } from './useSlipAway'
 
 /** Radians of figure-eight per game second. */
 const FIGURE_EIGHT_RATE = 0.9
 
 /**
  * A hover drone (brief: docs/art/ENEMIES.md, #323): a dark quad-drone with cyan rotor rings and eye, turned to watch
- * the rider. It hovers where it was placed, bobbing, and drifts a figure-eight round it, nose dipped into the drift.
+ * the rider. It hovers where it was placed, bobbing, and drifts a figure-eight round it, nose dipped into the drift. One
+ * left too long once the rider has seen it climbs out of the canyon, unscored (`DRONE_FLEE`, #1059).
  */
 export default function HoverDrone(props: EnemyProps) {
   const { phase, bobRate, tiltSign } = useEnemyRandom(props.id, (rng) => ({
@@ -21,13 +24,16 @@ export default function HoverDrone(props: EnemyProps) {
   }))
   const modelRef = useRef<THREE.Group>(null)
   const camera = useThree((s) => s.camera)
+  const flee = useSlipAway(DRONE_FLEE)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
+      const fled = flee(mesh.position, time)
+      if (fled < 0) return 'escaped'
       const f = time * FIGURE_EIGHT_RATE + phase
       mesh.position.x = spawnPos.x + Math.sin(f) * DRONE_SWING.x
       mesh.position.z = spawnPos.z + Math.sin(2 * f) * DRONE_SWING.z
-      mesh.position.y = spawnPos.y + Math.sin(time * bobRate + phase) * DRONE_BOB
+      mesh.position.y = spawnPos.y + Math.sin(time * bobRate + phase) * DRONE_BOB + fled
       const model = modelRef.current
       if (model) {
         // Banks into the swing's velocity
@@ -35,7 +41,7 @@ export default function HoverDrone(props: EnemyProps) {
         model.rotation.x = 0.12 + Math.cos(2 * f) * 0.1
       }
     },
-    [phase, bobRate, tiltSign],
+    [phase, bobRate, tiltSign, flee],
   )
 
   useFrame(() => {
