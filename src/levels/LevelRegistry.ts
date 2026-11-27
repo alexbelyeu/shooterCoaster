@@ -33,9 +33,13 @@ function flyingFish(count: number, weight: number, waveLabel?: string): PacedWav
   return { type: 'flyingFish', count, waveLabel, formation: 'school', formationSpread: 3, weight }
 }
 
-/** Level 4's waves (#937): nine snowmen beside the track every ~2 s, spread wide of it (#1059). */
+/**
+ * Level 4's waves (#937): nine snowmen (eight scouts, which hold the scene's draw calls at 10 s) every ~2 s, standing in lines across the rider's view at three times a line's
+ * spacing (#1059). Strung out along the track instead, the far ones of a wave stacked up down the valley in one aim-assist
+ * circle (13 at the ice cave's exit, 12 on the ridge).
+ */
 function snowmen(type: EnemyType, waveLabel?: string, count = 9): PacedWave {
-  return { type, count, waveLabel, formationSpread: 2, weight: 2 }
+  return { type, count, waveLabel, formation: 'line', formationSpread: 3, weight: 2 }
 }
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -46,7 +50,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Fun at the fair',
     order: 1,
     biome: 'themePark',
-    maxScore: 150 * 13 + 5 * 65 + 400, // 1950 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2675
+    maxScore: 160 * 13 + 5 * 65 + 400, // 2080 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2805
     message: 'Well, that was easy...',
     nextLevel: 'level2',
     // The ride kit's classic (#863, `parkTrack.ts`): a station launch, a lift hill, camelbacks, past the Ferris wheel.
@@ -54,13 +58,21 @@ const LEVELS: LevelConfig[] = [
     goldenBalloons: 3,
     ...paceLevel({
       waves: [
-        { type: 'balloon', count: 25, waveLabel: 'Pop em!', formation: 'ring', formationSpread: 2, weight: 5 },
+        { type: 'balloon', count: 20, waveLabel: 'Pop em!', formation: 'ring', formationSpread: 2, weight: 5 },
         // Up the lift hill (5–12 s), a ring every few seconds of the slow climb (a wave's later groups are a lift's length
         // apart): up in the sky it looks at, either side of the lift so its rails hide none of them.
         { type: 'balloon', count: 10, waveLabel: 'Up they go!', formation: 'ring', formationOrigin: LIFT_RINGS, weight: 4 },
         { type: 'balloon', count: 15, formation: 'ring', formationOrigin: LIFT_RINGS, weight: 4 },
-        { type: 'balloon', count: 50, waveLabel: 'More Balloons!', weight: 15 },
-        { type: 'balloon', count: 50, waveLabel: 'Final Wave!', formation: 'ring', formationSpread: 3, weight: 17 },
+        // Then Vs spread wide (#1059): a ring seen edge-on down the track, or rings lined up behind each other, stacked
+        // balloons in one aim circle. More balloons than the model player can pop before they slip away (`BALLOON_FLIGHT`),
+        // and the last waves split so a few Vs are in view at a time, not the whole finale.
+        { type: 'balloon', count: 20, waveLabel: 'More Balloons!', formation: 'v', formationSpread: 4.5, weight: 2 },
+        { type: 'balloon', count: 12, formation: 'v', formationSpread: 3.5, weight: 3 },
+        { type: 'balloon', count: 18, formation: 'v', formationSpread: 4, weight: 5 },
+        { type: 'balloon', count: 15, formation: 'v', formationSpread: 4, weight: 4 },
+        { type: 'balloon', count: 16, waveLabel: 'Final Wave!', formation: 'v', formationSpread: 3.5, weight: 3 },
+        { type: 'balloon', count: 16, formation: 'v', formationSpread: 3.5, weight: 3 },
+        { type: 'balloon', count: 18, formation: 'v', formationSpread: 3.5, weight: 12 },
       ],
       boss: 'goldenBlimp',
     }),
@@ -154,7 +166,7 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: 54 * 15 + 63 * 30 + 28 * 50 + 2 * 60 + 400, // 4100 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 4620
+    maxScore: 48 * 15 + 63 * 30 + 28 * 50 + 2 * 60 + 400, // 4010 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 4530
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
     // The ride kit's (#866, `arcticTrack.ts`).
@@ -164,12 +176,12 @@ const LEVELS: LevelConfig[] = [
         // lift and down into the ice cave, snowmen out of it, through the blizzard's ridge and over the crest, then
         // brutes down the helix to the Yeti. A snowman falls to one hit, but more come than a player can shoot
         // (about four a second against three) and each sinks back into the snow soon after it is seen (#1059).
-        snowmen('snowmanScout', 'Scout Party'),
-        snowmen('snowmanScout'),
-        snowmen('snowmanScout'),
-        snowmen('snowmanScout'),
-        snowmen('snowmanScout'),
-        snowmen('snowmanScout'),
+        snowmen('snowmanScout', 'Scout Party', 8),
+        snowmen('snowmanScout', undefined, 8),
+        snowmen('snowmanScout', undefined, 8),
+        snowmen('snowmanScout', undefined, 8),
+        snowmen('snowmanScout', undefined, 8),
+        snowmen('snowmanScout', undefined, 8),
         snowmen('snowman'),
         snowmen('snowman'),
         { ...snowmen('snowman', 'Snowmen Incoming!'), weather: 'blizzard' },

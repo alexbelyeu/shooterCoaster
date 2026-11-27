@@ -3269,3 +3269,43 @@ colour with the same node types the synth already uses.
 **Context:** #1045 raised `jsTotalGzipKB` to 663 a day ago for remappable controls (#1002, +1.63 KB) and level 6's waves (#1035 / #1038, ~0.5 KB). Main grew 2.7 KB in that day (level retunes, #1059 and others) and measures 661.6 KB gz on 42c8130, so neither draft fits again.
 **Decision:** 668: main (661.6) + the two drafts (~2.2 KB) + the ~4 KB standing room the 663 entry set. The total counts every lazy level chunk, which grows with each world; `startupJsGzipKB` (378, main 377) stays tight because it is what players feel at first paint.
 **Consequences:** Total JS grows ~1–3 KB a day with level work; Monday's plan weighs a cut (the next terser-sized win) against raising it weekly. A single change over ~1 KB gz still needs its own Director raise.
+
+## 2026-11-26 — Level 6's lanternfly swarm runs 2 s longer, in more groups (Builder, #1039)
+
+**Context:** After #1038 the level 6 review still had 1.3 s with nothing shootable as the car tipped over the top of the
+auto belay's fall (30.6 s): the swarm's last group landed at 29.5 s and the pack is out of sight in the pit until 32 s.
+**Decision:** `SWARM_LAST_LATE` 5.5 → 7.5 s and `SWARM_GROUPS` 12 → 14, with level 6's lanternflies 36 → 42, so groups
+of three still land about a second apart and the last one lands on the fall. The perched dust (24 → 27) and the mats'
+rats (22 → 26) hold the cave's entry and the U-turn out of it. Review: 13% → 6% nothing shootable, longest gap 0.7 s.
+**Consequences:** Raising `SWARM_LAST_LATE` without more groups spreads them and opens sub-second gaps through the wave
+(14% in a run with 12 groups). Level 6's bunching p90 went 4 → 5 (the extra rats in the cave; excused by #1059's
+`knownOver`, which retunes it).
+
+## 2026-11-26 — A boss win counts an enemy the run can no longer shoot as gone (Builder, #983)
+
+**Context:** #961 ends the run 3 s after the boss falls only when no enemy is alive. A real run rarely gets there: on
+level 4 the Yeti falls with 16 enemies alive and none shootable, so the run rode out 15 s of empty valley. The Director
+decided (issue #983, comment of 2026-11-26T06:03) that an enemy the rider can no longer reach counts as gone: no point of
+the rest of the run's track within its shootable range (`maxReadableDistance`), followers never gone. Built exactly that
+way, level 4 still ran to 60 s: all 16 were within ~400-1900 units of the rider, inside their 1700-3200 readable range,
+but behind the seat or behind the valley's snow ridges.
+
+**Decision:** `bossWin.ts` `outOfReach` keeps an enemy only when some point of the ride left has it in range, **in view**
+(less than ~78° off the track's heading, cosine 0.2; either way on a backwards stretch) and **in sight** (no terrain over
+the line from the eye to its top, `sightClear`). The rider's own spot is the first point, so an enemy in range and in view
+now is still never gone; one behind the seat or hidden by the ground can be. The ride left is the profile's from the
+current level time plus a quarter. Crows and toucans (`FOLLOWS_RIDER`, `FlapBird`'s fly-back) never count as gone; an
+enemy not yet emerged isn't a collision target, so it never counts either. `EnemySpawner` checks every 0.25 s once the boss
+falls. Walls and buildings are not modelled, so an interior keeps more enemies than it strictly could: it errs toward
+riding on.
+
+**Consequences:** level 4's review run ends at 54 s (the Yeti down at 44.7 s), not 60: the last ~7 s is one snowman scout
+that stays at the edge of readable range ahead, in view, until it marches off. Scores, `maxScore` and stars are unchanged.
+Tightening the cone or dropping the sight test would cut off enemies a player could still shoot.
+
+## 2026-11-27 — Level 6: the Medusa's hp sits in the crown snake, and her snakes shut between strikes (builder, #1059)
+
+**Context:** #1059 asks for a boss fight of 12 s or more. The Medusa arrives at 40 s. From about 51 s the ride turns so her side snakes (phase 1) leave the frame, and only the crown snake stays in view to the end of the run (`gymTrack.test.ts`, #856). When the hp went into her side snakes (4 / 3, crown 5), or she arrived at 39 s, the fight was not beaten. When she arrived at 38 s, the rider missed the first second of her rise (#926's test).
+**Decision:** Her eight side snakes are 2 hp each. The crown snake has 12 hp, the most of any weak point, because it is the one the rider can see until the end. One of her first four snakes is shut (`retract`) while it sways coiled, as long as another of the first four is rearing or striking (`snakeShut`). That rule always leaves one snake open, so shutting never leaves the rider with nothing to shoot. The next four never shut, and neither does the crown snake. The boss stays at the template's 40 s.
+**Why not more:** The first version also shut the next four and gave the first four 3 hp. CI's pacing step kills more slowly than the review (the review beat her in 12.7 s). It still had the next four alive at 49 s, when they leave the frame, so it saw nothing to shoot for 11 s and never beat her.
+**Consequences:** To make her fight longer, add hp to the crown, not to the side snakes. Don't shut the next four, and don't move her arrival earlier than 40 s.

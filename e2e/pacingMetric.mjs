@@ -70,7 +70,7 @@ export function pacingMetrics(samples, end) {
   }
 }
 
-/** One row a level second, for pacing.json. */
+/** One row a level second, for pacing.json (`bunch`: the most shootable enemies in one aim-assist circle that second). */
 export function pacingTimeline(samples) {
   const rows = []
   for (const s of samples) {
