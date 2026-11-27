@@ -5,6 +5,8 @@ import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { DUST_BUNNY_GEO, DUST_BUNNY_MAT, DUST_BUNNY_RADIUS, DUST_BUNNY_REACH, dustBunnyRoll } from './SharedEnemyAssets'
 import { DUST_BUNNY, dustBunnyCirclePose, dustBunnyDrop, dustBunnyPose, newDustBunnyPose } from './dustBunnyMotion.hot'
+import type { SlipAway } from './slipAway.hot'
+import { useSlipAway } from './useSlipAway'
 
 const DUST_BUNNY_SCALE = 8
 /**
@@ -14,6 +16,8 @@ const DUST_BUNNY_SCALE = 8
 const REST_HEIGHT = (dustBunnyDrop(DUST_BUNNY_REACH) + 0.1) * DUST_BUNNY_SCALE
 /** How far out its fluff spreads over the floor at the widest of the squash, world units. */
 const FOOTPRINT = DUST_BUNNY_REACH * (1 + DUST_BUNNY.squash / 2) * DUST_BUNNY_SCALE
+/** A draught lifts it up out of the frame 4 s after the rider first sees it (#1059). */
+export const DUST_DRAUGHT: SlipAway = { near: 1300, seenCos: 0.7, linger: 4, goS: 1.2, distance: 900 }
 
 /**
  * A dust bunny (#515): a fluffy ball of dust and chalk rolling and drifting low over the floor (`dustBunnyMotion.hot.ts`).
@@ -31,6 +35,7 @@ export default function DustBunny(props: EnemyProps) {
   const fluff = useRef<THREE.Mesh>(null)
   // r3f sets the geometry after construction: the mesh only picks up its morph targets here.
   useLayoutEffect(() => fluff.current?.updateMorphTargets(), [])
+  const draught = useSlipAway(DUST_DRAUGHT)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
@@ -46,6 +51,9 @@ export default function DustBunny(props: EnemyProps) {
         heightFn(x, z), heightFn(x + FOOTPRINT, z), heightFn(x - FOOTPRINT, z), heightFn(x, z + FOOTPRINT), heightFn(x, z - FOOTPRINT),
       )
       mesh.position.y = ground + REST_HEIGHT
+      const lifted = draught(mesh.position, time)
+      if (lifted < 0) return 'escaped'
+      mesh.position.y += lifted
       if (heading.current) heading.current.rotation.y = pose.heading
       if (ball.current) {
         ball.current.position.y = pose.lift * DUST_BUNNY_SCALE
@@ -53,7 +61,7 @@ export default function DustBunny(props: EnemyProps) {
       }
       if (fluff.current?.morphTargetInfluences) dustBunnyRoll(fluff.current.morphTargetInfluences, pose.roll)
     },
-    [base, phase, heightFn, pose, floor],
+    [base, phase, heightFn, pose, floor, draught],
   )
 
   return (
