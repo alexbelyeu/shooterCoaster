@@ -13,7 +13,7 @@ const head = () => [pts[N * 3], pts[N * 3 + 1], pts[N * 3 + 2]]
 const dist = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 
 describe('Medusa spec', () => {
-  it('four snakes, four more, then the crown snake; 900 points; a 32 hp fight', () => {
+  it('four snakes, four more, then the crown snake; 900 points; a 28 hp fight', () => {
     expect(MEDUSA.weakPoints.map((w) => w.phase)).toEqual([0, 0, 0, 0, 1, 1, 1, 1, 2])
     expect(MEDUSA.weakPoints[MEDUSA.weakPoints.length - 1].id).toBe('crown')
     expect(MEDUSA.weakPoints.length).toBe(SNAKE_SLOTS.length)
@@ -32,15 +32,13 @@ describe('snakeShut', () => {
     expect(snakeShut(0, -s.offset + 0.1 * s.period, alive)).toBe(true)
     expect(snakeShut(0, -s.offset + 0.6 * s.period, alive)).toBe(false)
   })
-  it('always leaves one of a phase open, alone or with the rest dead; the crown never shuts', () => {
+  it('always leaves one of the first four open, alone or with the rest dead; the next four and the crown never shut', () => {
     for (let t = 0; t < 12; t += 0.05) {
-      for (const phase of [0, 1]) {
-        const ids = SNAKE_SLOTS.flatMap((s, i) => (s.phase === phase ? [i] : []))
-        expect(ids.some((i) => !snakeShut(i, t, alive))).toBe(true)
-        const lastOne = alive.map((h, i) => (i === ids[0] ? h : 0))
-        expect(snakeShut(ids[0], t, lastOne)).toBe(false)
-      }
-      expect(snakeShut(SNAKE_SLOTS.length - 1, t, alive)).toBe(false)
+      const ids = SNAKE_SLOTS.flatMap((s, i) => (s.phase === 0 ? [i] : []))
+      expect(ids.some((i) => !snakeShut(i, t, alive))).toBe(true)
+      const lastOne = alive.map((h, i) => (i === ids[0] ? h : 0))
+      expect(snakeShut(ids[0], t, lastOne)).toBe(false)
+      SNAKE_SLOTS.forEach((s, i) => { if (s.phase > 0) expect(snakeShut(i, t, alive)).toBe(false) })
     }
   })
 })

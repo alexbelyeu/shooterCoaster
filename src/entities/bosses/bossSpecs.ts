@@ -147,7 +147,7 @@ export const MAGMA_TITAN: BossSpec = {
 const medusaSnakes: WeakPointSpec[] = SNAKE_SLOTS.map((s, i) =>
   s.phase === 2
     ? { id: 'crown', radius: 58 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 12, score: 0, phase: 2 }
-    : { id: `snake-${i}`, radius: 42 * MEDUSA_SIZE, offset: [0, 0, 0], hp: s.phase === 0 ? 3 : 2, score: 50, phase: s.phase },
+    : { id: `snake-${i}`, radius: 42 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 2, score: 50, phase: s.phase },
 )
 
 /**
