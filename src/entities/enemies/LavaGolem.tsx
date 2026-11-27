@@ -5,6 +5,8 @@ import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { setFlashMaterial } from './hitFlash'
 import { leashedTurnRate, orbitStep } from './wanderLeash.hot'
+import { LAVA_SINK } from './slipAway.hot'
+import { useSlipAway } from './useSlipAway'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
   LAVA_GOLEM_BODY_GEO, LAVA_GOLEM_FLARE_MAT, LAVA_GOLEM_GLOW, LAVA_GOLEM_HIP, LAVA_GOLEM_LEFT_ARM_GEO,
@@ -27,7 +29,8 @@ const tagFlare = (o: THREE.Object3D) => {
 /**
  * A hulking cracked-rock brute on legs (brief: docs/art/ENEMIES.md), turned to the rider: a slow, heavy two-step
  * walk, dropping onto each foot and leaning over it, arms swinging against the legs, its lava seams pulsing.
- * Five draw calls (body, two legs, two arms), one material and program.
+ * Five draw calls (body, two legs, two arms), one material and program. One left too long once seen sinks back into the
+ * lava crust (`LAVA_SINK`, #1059).
  */
 export default function LavaGolem(props: EnemyProps) {
   const { theta, moveSpeed, stepOffset } = useEnemyRandom(props.id, (rng) => {
@@ -43,12 +46,16 @@ export default function LavaGolem(props: EnemyProps) {
   const rightArmRef = useRef<THREE.Mesh>(null)
   const camera = useThree((s) => s.camera)
   const heightFn = useContext(TerrainContext)
+  const sink = useSlipAway(LAVA_SINK)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
       orbitStep(mesh.position, time, dt, moveSpeed, theta)
       mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 2
+      const under = sink(mesh.position, time)
+      if (under < 0) return 'escaped'
+      mesh.position.y -= under
 
       LAVA_GOLEM_GLOW.value = 1.8 + 0.7 * Math.sin(time * 2.6)
 
@@ -64,7 +71,7 @@ export default function LavaGolem(props: EnemyProps) {
       if (leftArmRef.current) leftArmRef.current.rotation.x = -ARM_SWING * step
       if (rightArmRef.current) rightArmRef.current.rotation.x = ARM_SWING * step
     },
-    [theta, moveSpeed, stepOffset, heightFn],
+    [theta, moveSpeed, stepOffset, heightFn, sink],
   )
 
   useEffect(() => modelRef.current?.traverse(tagFlare), [])
