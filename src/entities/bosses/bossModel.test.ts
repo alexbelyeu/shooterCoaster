@@ -114,9 +114,10 @@ describe('bossSpecs', () => {
     expect(applyHit(setRetracted(createBossState(spec), 'core', true), 'a').retracted.has('core')).toBe(true)
   })
 
-  it('the Golden Blimp: 5 golden balloons, then a 6-hit gondola (#1059)', () => {
+  it('the Golden Blimp: 5 golden balloons of 5 hits, then a 6-hit gondola (#1059)', () => {
     const s = createBossState(GOLDEN_BLIMP)
     expect(ids(s)).toEqual(['balloon-0', 'balloon-1', 'balloon-2', 'balloon-3', 'balloon-4'])
+    expect(exposedWeakPoints(s).map((w) => w.hp)).toEqual([5, 5, 5, 5, 5])
     let t = s
     for (const w of exposedWeakPoints(s)) t = hitAll(t, w.id, w.hp)
     expect(ids(t)).toEqual(['gondola'])

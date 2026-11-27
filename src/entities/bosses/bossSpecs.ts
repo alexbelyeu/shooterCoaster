@@ -43,7 +43,7 @@ const blimpBalloons: WeakPointSpec[] = BLIMP_LAYOUT.balloons.map(([x, y], i) => 
   id: `balloon-${i}`,
   radius: 62,
   offset: [x, y, 0],
-  hp: 4,
+  hp: 5,
   score: GOLDEN_BALLOON_SCORE,
   phase: 0,
 }))
