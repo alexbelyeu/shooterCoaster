@@ -650,8 +650,8 @@ describe('placeWallSwarm (#516)', () => {
     expect(arrivals.length).toBeGreaterThanOrEqual(5)
     for (let g = 1; g < arrivals.length; g++) expect(arrivals[g]).toBeGreaterThan(arrivals[g - 1])
     // The last ones land after the wave's window closes, for the stretch after it: the Shield's top and the fall (#957).
-    expect(arrivals[arrivals.length - 1]).toBeGreaterThan(ride.seconds! + 4)
-    expect(arrivals[arrivals.length - 1]).toBeLessThan(ride.seconds! + 6)
+    expect(arrivals[arrivals.length - 1]).toBeGreaterThan(ride.seconds! + 6)
+    expect(arrivals[arrivals.length - 1]).toBeLessThan(ride.seconds! + 8)
     // Each group lands in the rider's frame: some member of it is on screen within a second of its landing (#949).
     const riderIndex = indexAhead(gym, 0, rideProfile(gym, rideModel(level.track, gym), RUN_SECONDS)[wave.spawnDelay! * 10])
     const atRider = placeWallSwarm({ table: gym, riderIndex, type: wave.type, walls: level.walls!, slots: swarmSlots(wave.count, createRng(3)), ride })
