@@ -22,6 +22,9 @@ export const SAND_BURROW: SlipAway = { near: 1300, seenCos: 0.7, linger: 5, goS:
 /** Level 2's crows climb out of the top of the frame. */
 export const CROW_FLEE: SlipAway = { near: 1500, seenCos: 0.7, linger: 4.5, goS: 1.2, distance: 900 }
 
+/** Level 8's toucans climb out of the top of the frame. */
+export const TOUCAN_FLEE: SlipAway = { near: 1500, seenCos: 0.7, linger: 3, goS: 1.2, distance: 900 }
+
 /** How far it has gone: 0 while it stays, easing in so it starts slowly, then goes. */
 export function slipOffset(s: SlipAway, seen: number): number {
   const u = (seen - s.linger) / s.goS
