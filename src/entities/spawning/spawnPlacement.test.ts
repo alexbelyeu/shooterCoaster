@@ -229,6 +229,7 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
     const groups = slots.reduce((n, s) => Math.max(n, s.group + 1), 0)
     const step = groupStep(table, formation, groups, ride)
     let waiting = 0
+    let beyondReach = 0
     for (const fraction of RIDER_FRACTIONS) {
       const riderIndex = Math.round(fraction * (table.count - 1))
       const camera = trackView(table, riderIndex, trackScale).eye
@@ -238,9 +239,11 @@ describe.each(worlds.map((w) => [w.level.id, w] as const))('%s formation waves',
         const there = trackView(table, indexAhead(table, riderIndex, g * step + ride.entry), trackScale)
         expect(marchMoving(motion, there.eye), `rider ${fraction} group ${g}`).toBe(true)
         if (!marchMoving(motion, camera)) waiting++
+        if (motion?.kind === 'march' && dist(motion.anchor, camera) > maxReadableDistance(wave.type)) beyondReach++
       }
     }
-    if (groups > 1) expect(waiting).toBeGreaterThan(0)
+    // A group placed within reach of where its wave activates may march at once (level 4's lines, #1059).
+    if (groups > 1 && beyondReach > 0) expect(waiting).toBeGreaterThan(0)
   })
 
   it.each(waves.map((w) => [`${w.type} ${w.formation}`, w] as const))('%s: groups spread over the window the rider covers', (_name, wave) => {
