@@ -304,7 +304,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 69 * 15 + 25 * 20 + 60 + 60 + 400, // 69 drones and 25 bots, 1535, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 2055
+    maxScore: 75 * 15 + 25 * 20 + 60 + 60 + 400, // 75 drones and 25 bots, 1625, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 2145
     message: 'You cleared Neon Metropolis!',
     nextLevel: 'level8',
     // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
@@ -314,18 +314,18 @@ const LEVELS: LevelConfig[] = [
     // rider, each drone moved onto the street its approach sees best (`clearOfTowers`): scattered over the whole city, or
     // in the cross streets beside the ride's avenue, the towers hid them (the pacing gate, #950). Rings, not a spiral:
     // a ring's anchor is on the rails ahead, where the rider looks, and a spiral's 260 off to the side, behind the
-    // towers. A skill again (#1059): drones climb out of the canyon and bots drop through the street 3–3.5 s after the
-    // rider first sees them (`DRONE_FLEE`, `STREET_DROP`), so a missed one is a lost score; the bots spread wide, and the
-    // street sweep and lockdown come as rings of six every two seconds from 17 s, 450 ahead (`NEAR_RING`: further off, a
+    // towers. A skill again (#1059): drones climb out of the canyon and bots drop through the street a few seconds after the
+    // rider first sees them (`DRONE_FLEE` 4 s, `STREET_DROP` 3.5 s), so a missed one is a lost score; the bots spread wide, and the
+    // street sweep and lockdown come as nine rings of six every two to three seconds from 15 s to 32 s, 450 ahead (`NEAR_RING`: further off, a
     // ring fits in one aim-assist circle), and a Rooftop Patrol ring on the lift fills its empty stretch.
     // paceLevel reads the weights as shares of `waveSpan`; they sum to it (44 s), so each is the seconds to the next wave.
     ...paceLevel({
       waves: [
-        { type: 'billboardBot', count: 12, waveLabel: 'Billboard Bots!', weight: 3, formationSpread: 3 },
-        { type: 'hoverDrone', count: 7, waveLabel: 'Drones Incoming!', formation: 'v', weight: 4, formationSpread: 1.5 },
-        { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring', weight: 4 },
+        { type: 'billboardBot', count: 12, waveLabel: 'Billboard Bots!', weight: 2.5, formationSpread: 3 },
+        { type: 'hoverDrone', count: 7, waveLabel: 'Drones Incoming!', formation: 'v', weight: 3.5, formationSpread: 1.5 },
+        { type: 'hoverDrone', count: 8, waveLabel: 'Surveillance Ring!', formation: 'ring', weight: 3.5 },
         { type: 'hoverDrone', count: 6, waveLabel: 'Rooftop Patrol!', formation: 'ring', weight: 3 },
-        { type: 'billboardBot', count: 13, waveLabel: 'Street March!', weight: 3, formationSpread: 2 },
+        { type: 'billboardBot', count: 13, waveLabel: 'Street March!', weight: 2.5, formationSpread: 2 },
         { type: 'hoverDrone', count: 6, waveLabel: 'Street Sweep!', formation: 'ring', weight: 3, formationOrigin: NEAR_RING },
         { type: 'hoverDrone', count: 6, formation: 'ring', weight: 2, formationOrigin: NEAR_RING },
         { type: 'hoverDrone', count: 6, formation: 'ring', weight: 2, formationOrigin: NEAR_RING },
@@ -333,7 +333,8 @@ const LEVELS: LevelConfig[] = [
         { type: 'hoverDrone', count: 6, waveLabel: 'Lockdown!', formation: 'ring', weight: 2, formationOrigin: NEAR_RING },
         { type: 'hoverDrone', count: 6, formation: 'ring', weight: 2, formationOrigin: NEAR_RING },
         { type: 'hoverDrone', count: 6, formation: 'ring', weight: 2, formationOrigin: NEAR_RING },
-        { type: 'hoverDrone', count: 6, formation: 'ring', weight: 12, formationOrigin: NEAR_RING },
+        { type: 'hoverDrone', count: 6, formation: 'ring', weight: 2, formationOrigin: NEAR_RING },
+        { type: 'hoverDrone', count: 6, formation: 'ring', weight: 11.5, formationOrigin: NEAR_RING },
       ],
       boss: 'helicopter',
     }),
