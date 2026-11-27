@@ -9,10 +9,13 @@
  * - **11 s, the first drop**: over the top and down at 60° at the Pyramid's foot.
  * - **13–17 s, the dark ride**: in through a doorway in its second tier (its lintel the near miss) and along the passage
  *   through it in the dark, torches on the walls; out of its east face into the sandstorm (the crows' first V, 16 s).
- * - **17–24 s, the turn back**: a wide climbing U-turn round the Pyramid's east side and west along its south.
+ * - **17–24 s, the turn back**: a wide climbing U-turn round the Pyramid's east side and west along its south, a swerve
+ *   out into the storm and back onto the jump's line (21 s).
  * - **24 s, the canyon**: a jump gap between two mesas, the rails broken over the open ground between them.
+ * - **26–29 s, the dune esses**: down to the flats left, right and left again, banked through the dunes.
  * - **31 s, the airtime hill**: a crest you float over as the crows' second V comes in (30 s).
- * - **40 s, the Giant Scorpion**: a slow helix round the flats in the middle, the boss on the sand beside it.
+ * - **34–46 s, the slalom** across the flats, slow, and the Giant Scorpion (32 s) on the sand beside it; then the
+ *   final lift, a climbing turn back towards the station.
  * - **55–60 s, the brake run** into the station: home.
  *
  * `desertTrack.test.ts` holds it to the beats and its clearances (the ground, the Pyramid's passage, the canyon's mesas).
@@ -67,8 +70,14 @@ const DOOR_RUN = 60
 const TURN_BACK = { radius: 300, topY: 320 } as const
 /** The jump takes off from here, west over `CANYON` (`landmarks.ts`) between its two mesas. */
 const JUMP = { fromX: 2150 } as const
-const CAMEL = { toX: 700, y: 80, rise: 110, crest: 220, angle: 40 * DEG } as const
-const FINALE = { homeTurn: 150 } as const
+const CAMEL = { y: 125, rise: 110, crest: 220, angle: 40 * DEG } as const
+/** The esses (#1059): down from the jump through the dunes (left first, away from the arch south of the line), and across the flats. */
+const STORM_ESSES = { angle: 32 * DEG, radius: 260, runIn: 320 } as const
+const DUNE_ESSES = { angle: 55 * DEG, radius: 170 } as const
+const FLAT_ESSES = { angle: -70 * DEG, radius: 150 } as const
+
+/** The finale's turn among the ride's banked turns: after the turn back and the three esses' three each. */
+const FINALE_TURN = 10
 
 /** The storyboard's beats: the second the car reaches the `nth` element of a kind, its start or (`middle`) its middle. */
 const BEATS: { kind: MarkerKind; second: number; nth?: number; at?: 'middle' | 'end' }[] = [
@@ -76,8 +85,8 @@ const BEATS: { kind: MarkerKind; second: number; nth?: number; at?: 'middle' | '
   { kind: 'headChopper', second: 13, at: 'middle' },
   { kind: 'jumpGap', second: 24 },
   { kind: 'airtimeHill', second: 31, at: 'middle' },
-  { kind: 'bankedTurn', nth: 1, second: 44 },
-  { kind: 'bankedTurn', nth: 1, second: 57, at: 'end' },
+  { kind: 'bankedTurn', nth: FINALE_TURN, second: 44 },
+  { kind: 'bankedTurn', nth: FINALE_TURN, second: 57, at: 'end' },
 ]
 
 export interface DesertRide {
@@ -101,6 +110,12 @@ export function buildDesertRide(): DesertRide {
   }
   const y = () => b.position.y
   const turn = (angle: number, radius: number, rise = 0, bank = 30 * DEG) => bankedTurn(b, { angle, radius, rise, bank, ease: 6 * EYE })
+  // An S: `angle` one way, twice it back and `angle` again, so it leaves on its heading; `rise` shared by length.
+  const esses = ({ angle, radius }: { angle: number; radius: number }, rise = 0) => {
+    turn(angle, radius, rise / 4)
+    turn(-2 * angle, radius, rise / 2)
+    turn(angle, radius, rise / 4)
+  }
 
   // 0 s: the station; GO launches it at the Pyramid, a chain takes it up over the dunes.
   mechanics.push(station(b, { speed: SPEED.launch }))
@@ -123,14 +138,18 @@ export function buildDesertRide(): DesertRide {
   // 17 s: out into the sandstorm, a wide climbing U-turn round the Pyramid's east side and back west along its south.
   b.mark('straight', () => straightTo(b, 'x', LOCAL.pyramidX + PASSAGE.half + 100))
   zone('lift', SPEED.turn, () => turn(-Math.PI, TURN_BACK.radius, TURN_BACK.topY - y()))
+  // 21 s: a swerve through the storm on the run to the canyon, out away from the Pyramid and back onto the jump's line.
+  b.mark('straight', () => b.straight(STORM_ESSES.runIn))
+  esses(STORM_ESSES)
   b.mark('straight', () => straightTo(b, 'x', JUMP.fromX))
   // 24 s: the canyon between two mesas, jumped.
   mechanics.push(jumpGap(b, { speed: SPEED.jump, booster: 12 * EYE, ramp: 20 * EYE }))
-  // 31 s: down to the flats and over an airtime hill.
-  b.mark('straight', () => straightTo(b, 'x', CAMEL.toX + 400, { rise: CAMEL.y - y(), ease: 20 * EYE }))
+  // 26 s: down to the flats through the dunes' esses, then over an airtime hill (31 s).
+  esses(DUNE_ESSES, CAMEL.y - y())
   airtimeHill(b, { rise: CAMEL.rise, crestRadius: CAMEL.crest, angle: CAMEL.angle })
-  // 40 s: the Giant Scorpion's arena, a slow wide turn round the flats in the middle, the boss on the sand beside it.
-  b.mark('straight', () => straightTo(b, 'x', STATION.x - FINALE.homeTurn))
+  // 35 s: across the flats in a slow slalom, the Giant Scorpion's arena (it comes at 32 s); then the final lift (~46 s),
+  // a climbing turn back towards the station.
+  esses(FLAT_ESSES)
   zone('lift', SPEED.finale, () => turn(-Math.PI, b.position.z / 2, STATION.y - y()))
   // 58 s: the brake run into the station.
   zone('brake', SPEED.brake, () => b.mark('straight', () => climbingStraight(b, STATION.x - SPACING - b.position.x)))
