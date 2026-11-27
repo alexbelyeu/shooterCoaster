@@ -8,6 +8,7 @@ import { useEffect, useLayoutEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import * as enemyAssets from '@/entities/enemies/SharedEnemyAssets'
+import { EnemyFleet } from '@/entities/enemies/enemyFleet'
 import * as bossAssets from '@/entities/bosses/bossAssets'
 import { useGameStore } from '@/store/useGameStore'
 import { markStartup } from '@/core/startupMarks'
@@ -31,6 +32,10 @@ function enemyMaterials(): THREE.Material[] {
     }
   }
   return out
+}
+
+function enemyFleets(): EnemyFleet[] {
+  return Object.values(enemyAssets).filter((v): v is EnemyFleet => v instanceof EnemyFleet)
 }
 
 const WARMUP_SIZE = 64
@@ -163,6 +168,8 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
     specimens.name = 'shader-warmup'
     specimens.visible = false
     for (const m of enemyMaterials()) specimens.add(new THREE.Mesh(specimenGeo, m))
+    // A fleet draws its enemies instanced (`enemyFleet.ts`): another program of the same material.
+    for (const fleet of enemyFleets()) specimens.add(new THREE.InstancedMesh(specimenGeo, fleet.plain, 1))
     // The dust bunny's roll is a morph: its paint and its hit flash compile a morph variant of their programs.
     for (const m of [enemyAssets.DUST_BUNNY_MAT, enemyAssets.ENEMY_HIT_FLASH_MAT]) specimens.add(new THREE.Mesh(enemyAssets.DUST_BUNNY_GEO, m))
     scene.add(specimens)
@@ -209,6 +216,7 @@ export default function ShaderWarmup({ levelId }: { levelId: string }) {
       warming = false
       applyMask()
       scene.remove(specimens)
+      for (const o of specimens.children) if (o instanceof THREE.InstancedMesh) o.dispose()
       specimenGeo.dispose()
       target.dispose()
     }

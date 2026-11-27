@@ -4,8 +4,9 @@ import type * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { WADDLE_RATE } from './billboardBotMotion'
-import { BOT_GEO, BOT_HEIGHT, BOT_MAT } from './SharedEnemyAssets'
+import { BOT_FLEET, BOT_GEO, BOT_HEIGHT, BOT_MAT } from './SharedEnemyAssets'
 import { STREET_DROP } from './slipAway.hot'
+import { useFleetSeat } from './useFleetSeat'
 import { useSlipAway } from './useSlipAway'
 import { streetAxis } from '@/levels/environments/biomes/city/cityLayout'
 
@@ -48,12 +49,13 @@ export default function BillboardBot(props: EnemyProps) {
     if (!model?.parent) return
     model.rotation.y = Math.atan2(camera.position.x - model.parent.position.x, camera.position.z - model.parent.position.z)
   })
+  const meshRef = useFleetSeat(BOT_FLEET)
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
       {/* Pivots on its feet, so the waddle rocks it foot to foot */}
       <group ref={modelRef} position={[0, -HALF_HEIGHT, 0]}>
-        <mesh geometry={BOT_GEO} material={BOT_MAT} scale={[SCALE, SCALE, SCALE]} />
+        <mesh ref={meshRef} geometry={BOT_GEO} material={BOT_MAT} scale={[SCALE, SCALE, SCALE]} />
       </group>
     </EnemyBase>
   )
