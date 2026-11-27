@@ -208,7 +208,7 @@ export interface EnemyWave {
   formation?: Formation
   /** Overrides the formation's default anchor. */
   formationOrigin?: FormationOrigin
-  /** Scales the formation's spacing, or a trackside wave's far side (default 1): a wider spread puts fewer members in one aim-assist circle (#1059). */
+  /** Scales the formation's spacing, a trackside wave's far side or a swarm's disc (default 1): a wider spread puts fewer members in one aim-assist circle (#1059). */
   formationSpread?: number
   /**
    * Bystanders who come with the wave (#518): people, not targets, so a wall type (`ENEMY_PLACEMENT`) on the level's

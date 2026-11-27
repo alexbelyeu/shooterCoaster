@@ -19,7 +19,7 @@ import {
 } from './bossAssets'
 import {
   MEDUSA_DEFEAT, MEDUSA_DEFEAT_BURST_YS, MEDUSA_RISE, MEDUSA_SIZE, SNAKE, SNAKE_SLOTS, MEDUSA_HUB, bodyPlacement, defeatSink, laughShake, laySnake, yawToward,
-  snakeLength, snakeRadius, strikeLandsBetween,
+  snakeLength, snakeRadius, snakeShut, strikeLandsBetween,
 } from './medusaMotion'
 
 const N = SNAKE.segments
@@ -188,8 +188,8 @@ export default function Medusa(props: BossProps) {
         const w = MEDUSA.weakPoints[i]
         const alive = weakPointHp(state, w.id) > 0
         const grown = alive ? snakeLength(s, s.phase <= phase ? sim.phaseAt[s.phase] : null, age, true) : SNAKE.stub * (1 - sunk)
-        // Still uncoiling inside her curls: not a target yet.
-        retract(w.id, fighting && alive && s.phase === phase && grown < SNAKE_TARGET_GROWN)
+        // Still uncoiling inside her curls, or coiled between strikes (`snakeShut`): not a target.
+        retract(w.id, fighting && alive && s.phase === phase && (grown < SNAKE_TARGET_GROWN || snakeShut(i, age, state.hp)))
         _b.set(_camLocal.x - s.root[0], _camLocal.y - s.root[1], _camLocal.z - s.root[2]).normalize()
         _dir[0] = _b.x
         _dir[1] = _b.y

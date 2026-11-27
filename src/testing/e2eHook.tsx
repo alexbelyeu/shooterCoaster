@@ -413,6 +413,8 @@ export interface E2ESwitch {
   open: boolean
   /** The run's kill-count total: a hard-route wave joins it when it arrives (#720). */
   totalEnemies: number
+  /** Enemies gone unscored so far this run, which the kill count's total leaves out. */
+  escaped: number
   /** The level's hard-route wave (`EnemyWave.route` 'hard', from its roster's `branch`): banner, size and second; null without one. */
   branchWave: { label: string; count: number; at: number } | null
   x: number
@@ -603,12 +605,18 @@ export function registerE2EEnemy(id: string, type: EnemyType | 'goldenBalloon', 
  * points before the combo multiplier (weak points and goldens in), the score `maxScore` is the kill-everything total of. Reset by
  * `startLevel` and `restartLevel`.
  */
-const runTally = { spawned: new Set<string>(), killed: new Set<string>(), basePoints: 0 }
+const runTally = { spawned: new Set<string>(), killed: new Set<string>(), escaped: new Set<string>(), basePoints: 0 }
 const countsInTally = (id: string) => !id.startsWith('bystander-') && !isBossId(id) && enemyRegistry.get(id)?.type !== 'goldenBalloon'
 function resetRunTally() {
   runTally.spawned.clear()
   runTally.killed.clear()
+  runTally.escaped.clear()
   runTally.basePoints = 0
+}
+
+/** An enemy gone unscored (`onEscape`: one that slipped away, a climber topped out): off the kill count's total (#1059). */
+export function recordE2EEscape(id: string) {
+  if (isE2E) runTally.escaped.add(id)
 }
 export function unregisterE2EEnemy(id: string) {
   if (isE2E) enemyRegistry.delete(id)
@@ -774,6 +782,7 @@ function readSwitch(): E2ESwitch | null {
     riding,
     open: s.open(),
     totalEnemies: useGameStore.getState().totalEnemies,
+    escaped: runTally.escaped.size,
     branchWave: readBranchWave(),
     x: ((_v.x + 1) / 2) * probeSize.width,
     y: ((1 - _v.y) / 2) * probeSize.height,
