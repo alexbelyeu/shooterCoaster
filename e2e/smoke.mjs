@@ -2683,9 +2683,15 @@ async function bossCheck(page, check) {
     bulletKills = (await getStats(page)).kills - killsBefore
   }
 
-  // Clear the first phase through processHit: what is left of its hp.
-  const firstHp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
-  const phaseOneHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), firstHp)
+  // Clear the first phase through processHit: what is left of its hp, in rounds while a weak point shut for now (`retract`:
+  // the Kraken's pads while their arm slams, #1059) is no target until it opens again.
+  const openingPhase = (await boss()).phase
+  let phaseOneHits = 0
+  for (let round = 0; round < 8 && (await boss()).phase === openingPhase; round++) {
+    if (round > 0) await stepBoss(page, 0.5, { exposed: 1 })
+    const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
+    phaseOneHits += await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
+  }
   // Phases between the first and the last (the Medusa's second four snakes): each let surface, then cleared.
   let midHits = 0
   let midSurfaced = 0

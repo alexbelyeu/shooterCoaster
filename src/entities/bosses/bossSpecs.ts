@@ -63,16 +63,20 @@ const krakenPads: WeakPointSpec[] = Array.from({ length: KRAKEN_TENTACLE.count }
   id: `pad-${i}`,
   radius: 40,
   offset: [0, 0, 0],
-  hp: 2,
+  hp: 4,
   score: 60,
   phase: 0,
 }))
 
+/**
+ * The pads first (each shut while its arm slams, `padShut`, #1059), then the eye. Hp for a fight of 12 s or more at the pacing
+ * step's `PLAYER_HITS_PER_SECOND`.
+ */
 export const KRAKEN: BossSpec = {
   name: 'The Kraken',
   tell: { seconds: 2, label: 'The Kraken Rises!' },
   reward: 400,
-  weakPoints: [...krakenPads, { id: 'eye', radius: KRAKEN_HEAD.eyeRadius, offset: [0, 0, 0], hp: 3, score: 0, phase: 1 }],
+  weakPoints: [...krakenPads, { id: 'eye', radius: KRAKEN_HEAD.eyeRadius, offset: [0, 0, 0], hp: 7, score: 0, phase: 1 }],
 }
 
 /** Placed every frame on its arm or along the tail (GiantScorpion.tsx), so no offset. */

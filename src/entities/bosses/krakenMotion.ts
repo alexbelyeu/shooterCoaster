@@ -131,6 +131,19 @@ export function slamImpactBetween(prev: number, now: number, sinkAt: number, see
   return false
 }
 
+/**
+ * Whether tentacle `seed`'s sucker pad is shut at `tau` (#1059): from a slam's wind-up until it lifts off the water the arm
+ * rears and turns its pad away, so the rider moves on to another arm and comes back.
+ */
+export function padShut(tau: number, sinkAt: number, seed: number): boolean {
+  const T = KRAKEN_TENTACLE
+  for (const at of T.slams) {
+    const start = at + seed * T.slamSpread
+    if (start < sinkAt && tau >= start && tau < start + SLAM_IMPACT_S + T.holdS) return true
+  }
+  return false
+}
+
 /** Segment k's base (u, y) and angle from vertical (theta); index `segments` is the tip. */
 export interface Chain {
   u: Float32Array

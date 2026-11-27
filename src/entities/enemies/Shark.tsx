@@ -3,7 +3,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { SEA_DIVE } from './seaDive.hot'
 import { SHARK_BODY_GEO, SHARK_MAT, SHARK_TAIL_GEO, SHARK_TAIL_ROOT } from './SharedEnemyAssets'
+import { useSeaDive } from './useSeaDive'
 
 /** Tail beats (radians of swim phase per game second) and the sweep's amplitude; the body yaws against it. */
 const SWIM_RATE = 4.5
@@ -14,7 +16,8 @@ const TURN_ROLL = 0.45
 
 /**
  * A toy shark (brief: docs/art/ENEMIES.md) in two draw calls, body and tail, nose to the rider, circling beside the
- * track: its tail sweeps, the body swaying against it, and it rolls into its turn. Shot, it flinches nose-up.
+ * track: its tail sweeps, the body swaying against it, and it rolls into its turn. Shot, it flinches nose-up; left too
+ * long, it dives (`useSeaDive`).
  */
 export default function Shark(props: EnemyProps) {
   // Its circle through the spawn point, placed clear of the rails, the stacks and the shore (`spawning/swimOrbit.ts`, #922);
@@ -34,6 +37,7 @@ export default function Shark(props: EnemyProps) {
   const rigRef = useRef<THREE.Group>(null)
   const tailRef = useRef<THREE.Mesh>(null)
   const camera = useThree((s) => s.camera)
+  const dive = useSeaDive('shark', props.onEscape !== undefined)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
@@ -42,7 +46,9 @@ export default function Shark(props: EnemyProps) {
       const a = phase + rate * (time - startTime.current)
       mesh.position.x = spawnPos.x + radius * (Math.cos(a) - Math.cos(phase))
       mesh.position.z = spawnPos.z + radius * (Math.sin(a) - Math.sin(phase))
-      mesh.position.y = 2
+      const sunk = dive(mesh, time)
+      if (sunk >= 1) return 'escaped' as const
+      mesh.position.y = 2 - sunk * SEA_DIVE.depth
       const dir = Math.sign(rate)
       heading.current.x = -Math.sin(a) * dir
       heading.current.z = Math.cos(a) * dir
@@ -54,7 +60,7 @@ export default function Shark(props: EnemyProps) {
         rigRef.current.rotation.x = 0.04 * Math.sin(time * SWIM_RATE * 0.5 + swim)
       }
     },
-    [orbit],
+    [orbit, dive],
   )
 
   const onHit = useCallback(() => {

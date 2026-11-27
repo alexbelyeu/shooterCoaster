@@ -666,7 +666,7 @@ export interface TracksideBand {
  */
 export const TRACKSIDE: Record<'ground' | 'water', TracksideBand> = {
   ground: { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400, spread: true },
-  water: { aheadMin: 300, aheadMax: 3600, sideMin: 60, sideMax: 400, near: { share: 0.5, max: 1500 } },
+  water: { aheadMin: 300, aheadMax: 1400, sideMin: 160, sideMax: 400, near: { share: 0.5, max: 900 } },
 }
 
 export const tracksideBand = (surface: Surface): TracksideBand => TRACKSIDE[surface === 'water' ? 'water' : 'ground']

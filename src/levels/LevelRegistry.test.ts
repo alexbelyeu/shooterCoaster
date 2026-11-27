@@ -46,12 +46,12 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 3025, Kraken 3164, Yeti 4620, Magma Titan 3828, Medusa 3174, Helicopter 1875, Jungle Ruins (Blimp placeholder) 1970', () => {
+  it('the finales and maxScores: Blimp 2675, Giant Scorpion 3025, Kraken 3250, Yeti 4620, Magma Titan 3828, Medusa 3174, Helicopter 1965, Jungle Ruins (Blimp placeholder) 1970', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2675],
       ['level2', 'giantScorpion', 3025],
-      ['level3', 'kraken', 3164],
+      ['level3', 'kraken', 3250],
       ['level4', 'yeti', 4620],
       ['level5', 'magmaTitan', 3828],
       ['level6', 'medusa', 3174],
@@ -77,7 +77,8 @@ describe('LevelRegistry', () => {
       const finaleAt = level.boss ? level.boss.at : delays[delays.length - 1]
       const waves = level.boss ? delays : delays.slice(0, -1)
       expect(Math.max(...waves) + ENTRY_SECONDS_MAX).toBeLessThanOrEqual(35)
-      expect(finaleAt).toBe(pacingTimes().bossAt)
+      // The template's second, or sooner where a level's ride leaves the boss too little in view (level3, #1059).
+      expect(finaleAt).toBeLessThanOrEqual(pacingTimes().bossAt)
       expect(RUN_SECONDS - finaleAt).toBeGreaterThanOrEqual(18)
       expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(22)
       if (level.boss) expect(level.boss.at - BOSS_SPECS[level.boss.type].tell.seconds).toBeGreaterThan(Math.max(...waves))
