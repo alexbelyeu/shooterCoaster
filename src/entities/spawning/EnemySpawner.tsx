@@ -18,7 +18,7 @@ import GoldenBalloon from '../enemies/GoldenBalloon'
 import BossSpawner from '../bosses/BossSpawner'
 import { GOLDEN_BALLOON, SCORE_VALUES } from '@/levels/scoring'
 import { createRng, hashString, type Rng } from '@/utils/rng'
-import { recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
+import { recordE2EEscape, recordE2ESpawns, registerE2EWaves } from '@/testing/e2eHook'
 import { requestSlowMo } from '@/combat/slowMo.hot'
 import type { EnemyEntry } from '../enemies/EnemyBase'
 import { HOP } from '../enemies/hopGlideMotion'
@@ -174,7 +174,7 @@ function generateEnemies(
     if (scatter === 'swarm') {
       if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} swarms on a wall: no formation`)
       if (walls.length === 0) throw new Error("wall enemies need the ride's walls (LevelRide.walls)")
-      for (const swarm of swarmSlots(wave.count, rng)) {
+      for (const swarm of swarmSlots(wave.count, rng, wave.formationSpread)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside: null, swarm, ...base })
       }
       continue
@@ -541,6 +541,7 @@ export default function EnemySpawner({
   const onEscape = useCallback(
     (id: string) => {
       escapedEnemies.current.add(id)
+      recordE2EEscape(id)
       publishCounts()
     },
     [publishCounts],

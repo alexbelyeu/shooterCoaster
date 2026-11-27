@@ -2692,15 +2692,20 @@ async function bossCheck(page, check) {
     const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
     phaseOneHits += await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
   }
-  // Phases between the first and the last (the Medusa's second four snakes): each let surface, then cleared.
+  // Phases between the first and the last (the Medusa's second four snakes): each let surface, then cleared, in rounds
+  // while a snake is shut between its strikes (`snakeShut`, #1059).
   let midHits = 0
   let midSurfaced = 0
   for (let i = 0; i < midPhases; i++) {
     await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
     midSurfaced += (await stepBoss(page, midSettleS, { exposed: 1 })) ?? midSettleS
-    const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
-    midHits += hp
-    await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
+    const midPhase = (await boss()).phase
+    for (let round = 0; round < 8 && (await boss()).phase === midPhase; round++) {
+      if (round > 0) await stepBoss(page, 0.5, { exposed: 1 })
+      const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
+      midHits += hp
+      await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
+    }
   }
   const midway = await boss()
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
@@ -3078,7 +3083,9 @@ async function switchCheck(page, { darkShots = false } = {}) {
     const before = await branchArrivals()
     await toLevelTime(branchWave.at)
     if ((await branchArrivals()) === before) problems.push(`the hard route's wave (${branchWave.label}) never arrived at ${branchWave.at} s`)
-    result.totals.hard = (await read()).totalEnemies
+    // The total leaves out the ones that slipped away (#1059), which differ run to run: counted back in.
+    const hardCount = await read()
+    result.totals.hard = hardCount.totalEnemies + hardCount.escaped
     await rideTo(mid)
     sw = await read()
     result.hard = sw.riding
@@ -3104,7 +3111,8 @@ async function switchCheck(page, { darkShots = false } = {}) {
   const before = await branchArrivals()
   await toLevelTime(branchWave.at)
   if ((await branchArrivals()) !== before) problems.push(`the easy route met the hard route's wave (${branchWave.label})`)
-  result.totals.easy = (await read()).totalEnemies
+  const easyCount = await read()
+  result.totals.easy = easyCount.totalEnemies + easyCount.escaped
   if (result.totals.hard != null && result.totals.hard - result.totals.easy !== branchWave.count)
     problems.push(`the hard run's kill count has ${result.totals.hard} enemies, the easy run's ${result.totals.easy}: not ${branchWave.count} apart`)
   return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result }

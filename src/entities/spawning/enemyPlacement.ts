@@ -186,11 +186,11 @@ export interface SwarmSlot {
   seed: number
 }
 
-/** A swarm spreads over a disc of this radius × √count on its wall. */
+/** A swarm spreads over a disc of this radius × √count on its wall, times `spread` (a wave's `formationSpread`, #1059). */
 export const SWARM_SPACING = 34
 
-export function swarmSlots(count: number, rng: Rng): SwarmSlot[] {
-  const radius = SWARM_SPACING * Math.sqrt(count)
+export function swarmSlots(count: number, rng: Rng, spread = 1): SwarmSlot[] {
+  const radius = SWARM_SPACING * Math.sqrt(count) * spread
   return Array.from({ length: count }, () => {
     const r = radius * Math.sqrt(rng())
     const a = rng() * Math.PI * 2

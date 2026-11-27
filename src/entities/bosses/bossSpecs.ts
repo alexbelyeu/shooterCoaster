@@ -146,11 +146,14 @@ export const MAGMA_TITAN: BossSpec = {
 /** Placed every frame at the head of its snake (Medusa.tsx), so no offset; the crown snake (the last slot) is bigger. */
 const medusaSnakes: WeakPointSpec[] = SNAKE_SLOTS.map((s, i) =>
   s.phase === 2
-    ? { id: 'crown', radius: 58 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 4, score: 0, phase: 2 }
-    : { id: `snake-${i}`, radius: 42 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 2, score: 50, phase: s.phase },
+    ? { id: 'crown', radius: 58 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 12, score: 0, phase: 2 }
+    : { id: `snake-${i}`, radius: 42 * MEDUSA_SIZE, offset: [0, 0, 0], hp: s.phase === 0 ? 3 : 2, score: 50, phase: s.phase },
 )
 
-/** Four snakes, four more, then the crown snake: shoot every snake in her hair. */
+/**
+ * Four snakes, four more, then the crown snake: shoot every snake in her hair, each only as it strikes (`snakeShut`, #1059).
+ * Hp for a fight of 12 s or more at the pacing step's `PLAYER_HITS_PER_SECOND`.
+ */
 export const MEDUSA: BossSpec = {
   name: 'Medusa',
   tell: { seconds: 2.5, label: 'The Starr Awakens!' },

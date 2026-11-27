@@ -187,6 +187,22 @@ export function strikePose(s: SnakeSlot, t: number): number {
   return 1 - smooth((f - recoilAt) / (1 - recoilAt))
 }
 
+const coiled = (s: SnakeSlot, t: number): boolean => (((((t + s.offset) / s.period) % 1) + 1) % 1) < SNAKE.windupAt
+
+/**
+ * Whether snake `i` is shut at `t` (#1059): coiled and swaying in her curls while another of its phase still alive
+ * (`hp`, by slot) rears or strikes, so the rider shoots each snake as it strikes. Half a cycle each and taking turns, so
+ * one is open whenever one strikes, and with none striking they all are. The crown snake, alone, never shuts.
+ */
+export function snakeShut(i: number, t: number, hp: readonly number[]): boolean {
+  const s = SNAKE_SLOTS[i]
+  if (s.phase === 2 || !coiled(s, t)) return false
+  for (let j = 0; j < SNAKE_SLOTS.length; j++) {
+    if (j !== i && SNAKE_SLOTS[j].phase === s.phase && hp[j] > 0 && !coiled(SNAKE_SLOTS[j], t)) return true
+  }
+  return false
+}
+
 /** True when the strike lands (reaches full reach) between game seconds `t0` and `t1`. */
 export function strikeLandsBetween(s: SnakeSlot, t0: number, t1: number): boolean {
   if (t1 <= t0) return false

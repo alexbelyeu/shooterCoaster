@@ -210,7 +210,7 @@ export const FLAME_PERCH: PerchSpec = {
   halfLength: FLAME_TOP.halfLength * GYM_SCALE,
   halfWidth: FLAME_TOP.halfWidth * GYM_SCALE,
   lift: 0.3 * GYM_SCALE,
-  rise: 2 * GYM_SCALE,
+  rise: 4 * GYM_SCALE,
   railClear: 1.2 * GYM_SCALE,
 }
 
