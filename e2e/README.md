@@ -132,7 +132,7 @@ When level1 is in the run, a `boss` step summons the Golden Blimp (`summonBoss()
 hull must be ≥ 15% of the frame wide and ≥ 1 balloon on screen (every boss is summoned into a ride frozen where it stands, and
 moved alone until its first phase is on screen, at most 20 s: the blimp places itself off the camera's heading, which riding on
 through its arrival had turned away from on some runners, #905), with the boss bar clear of the HUD (`level1-boss.png`; a bar that never shows prints the phase, the screens mounted and the `runLog`, #938), only the balloons exposed; a real
-bullet must hit one (fired with `bulletsHitOnly: 'boss:'`, so no regular enemy crossing its path from the muzzle can take it: #1046, a bird in the way took the shot), `bossHit` clears them and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
+bullet must hit one (fired with `bulletsHitOnly: 'boss:'`, so no regular enemy crossing its path from the muzzle can take it: #1046, a bird in the way took the shot), `bossHit` clears them (in rounds of 0.5 s while a weak point is shut for now, `retract`: level3's pads while their arm slams, #1059) and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
 `boss:defeated`, one kill per weak point and the big score popup over the confetti (`level1-boss-down.png`). The phone run
 resumes after its Pause tap with the boss summoned: the bar must sit inside the viewport and clear of the HUD in portrait and
 landscape (`mobile-level1-boss.png`).
