@@ -208,7 +208,8 @@ the run with nothing on screen) and the gaps (`longestGapSeconds`, `longestGap` 
 `gaps` of 1 s or more); the first 2 s after GO and the boss tell are meant to be empty, so they count neither way and end a
 gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest gap 2.0 s at 4 s (track 0.03)`) and
 writes `e2e-results/pacing.json`: those metrics per level plus a `timeline`, one row a level second (`t`, fewest and most
-targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. Each step gets a
+targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`, and `bunch`, the most in one aim-assist circle), which is where
+to look for where a gap or a bunch is. Each step gets a
 wall-clock deadline (#535): a step still held after the frame deadline (`--seconds` × 4 s; the first step the level's 60 s
 load on top) fails with `never settled: step N held … frames` (React committing on every held frame) or `the level registered no
 waves` (`nextWave()` still null), and the ride step stops at that same deadline with the same no-waves line instead of

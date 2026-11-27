@@ -5,6 +5,8 @@ import { useEnemyRandom } from './enemyRandom'
 import { setFlashMaterial } from './hitFlash'
 import { DRAKE_GEO, DRAKE_ROAR_MAT, createDrakeMaterial, drakeRestPose } from './SharedEnemyAssets'
 import { poseDrake, type DrakePose } from './drakePose.hot'
+import { DRAKE_FLEE } from './slipAway.hot'
+import { useSlipAway } from './useSlipAway'
 
 /** Wing beats (radians per game second); the hand trails the arm by `HAND_LAG`. */
 const FLAP_RATE = 3
@@ -20,7 +22,8 @@ const tagRoar = (mesh: THREE.Mesh | null) => {
  * A long-necked dragon (brief: docs/art/ENEMIES.md) circling high over the Inferno, in one draw call: torso, neck, jaw,
  * tail and each wing's arm and hand are one geometry, each part moved in the vertex shader by its own matrix
  * (`drakePose.hot.ts`). Its wings beat, the hands trailing, its neck sways and its tail swings; it banks into its
- * circle. Shot, it roars: its hit flash holds the head reared back, jaw open, wings thrown up (`DRAKE_ROAR_MAT`).
+ * circle. Shot, it roars: its hit flash holds the head reared back, jaw open, wings thrown up (`DRAKE_ROAR_MAT`). One left
+ * too long once seen climbs out of the frame (`DRAKE_FLEE`, #1059).
  */
 export default function InfernalDrake(props: EnemyProps) {
   const { orbitSpeed, orbitRadius, orbitOffset, flapOffset } = useEnemyRandom(props.id, (rng) => ({
@@ -36,6 +39,7 @@ export default function InfernalDrake(props: EnemyProps) {
   const joints = useRef<DrakePose>({ neckX: 0, neckY: 0, jaw: 0, tailX: 0, tailY: 0, arm: 0, hand: 0 })
   const headingRef = useRef<THREE.Group>(null)
   const rigRef = useRef<THREE.Group>(null)
+  const flee = useSlipAway(DRAKE_FLEE)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
@@ -43,6 +47,9 @@ export default function InfernalDrake(props: EnemyProps) {
       mesh.position.x = spawnPos.x + Math.cos(angle) * orbitRadius
       mesh.position.z = spawnPos.z + Math.sin(angle) * orbitRadius
       mesh.position.y = spawnPos.y + Math.sin(time * 0.5) * 15
+      const fled = flee(mesh.position, time)
+      if (fled < 0) return 'escaped'
+      mesh.position.y += fled
 
       // Nose along its circle.
       if (headingRef.current) headingRef.current.rotation.y = -angle
@@ -65,7 +72,7 @@ export default function InfernalDrake(props: EnemyProps) {
       j.tailY = 0.3 * Math.sin(time * 1.6 + flapOffset)
       poseDrake(pose.value, j)
     },
-    [orbitSpeed, orbitRadius, orbitOffset, flapOffset, pose],
+    [orbitSpeed, orbitRadius, orbitOffset, flapOffset, pose, flee],
   )
 
   return (

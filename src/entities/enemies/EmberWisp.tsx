@@ -7,6 +7,8 @@ import {
   EMBER_WISP_CORE_GEO, EMBER_WISP_CORE_MAT, EMBER_WISP_FLICKER, EMBER_WISP_HEAT,
   EMBER_WISP_RIBBON_MAT, EMBER_WISP_RIBBON_ROOT, EMBER_WISP_RIBBONS_GEO,
 } from './SharedEnemyAssets'
+import { EMBER_RISE } from './slipAway.hot'
+import { useSlipAway } from './useSlipAway'
 
 /** Radians of figure-eight per game second, and how far the ribbons trail per unit of speed (radians per world unit / s). */
 const FIGURE_EIGHT_RATE = 1.3
@@ -16,7 +18,7 @@ const RIBBON_TRAIL_MAX = 0.9
 /**
  * A drifting flame spirit (brief: docs/art/ENEMIES.md): a teardrop core with coal eyes, turned to the rider, and
  * three ribbon flames that trail its motion, lagging behind it, and flicker in their material's vertex shader.
- * It drifts in a lazy figure-eight. Appears in large swarms.
+ * It drifts in a lazy figure-eight. Appears in large swarms; one left too long once seen rises out of the frame (`EMBER_RISE`).
  */
 export default function EmberWisp(props: EnemyProps) {
   const { driftAngle, driftSpeed, phase } = useEnemyRandom(props.id, (rng) => ({
@@ -28,6 +30,8 @@ export default function EmberWisp(props: EnemyProps) {
   const camera = useThree((s) => s.camera)
   // The velocity the ribbons trail, in the model's frame, eased so they lag behind a turn.
   const trail = useRef({ x: 0, z: 0, px: NaN, pz: NaN })
+  const rise = useSlipAway(EMBER_RISE)
+  const risen = useRef(0)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
@@ -37,6 +41,10 @@ export default function EmberWisp(props: EnemyProps) {
       mesh.position.x += (Math.cos(drift) * driftSpeed + Math.cos(f) * 0.6) * dt
       mesh.position.z += (Math.sin(drift) * driftSpeed) * dt
       mesh.position.y += Math.cos(2 * f) * 0.35 * dt
+      const up = rise(mesh.position, time)
+      if (up < 0) return 'escaped'
+      mesh.position.y += up - risen.current
+      risen.current = up
 
       EMBER_WISP_FLICKER.value = time
       EMBER_WISP_HEAT.value = 1 + 0.12 * Math.sin(time * 9 + phase) * Math.sin(time * 5.3)
@@ -63,7 +71,7 @@ export default function EmberWisp(props: EnemyProps) {
       const pulse = 1 + 0.05 * Math.sin(time * 6 + phase)
       leanRef.current?.scale.set(pulse, 1 / pulse, pulse)
     },
-    [driftAngle, driftSpeed, phase],
+    [driftAngle, driftSpeed, phase, rise],
   )
 
   useFrame(() => {

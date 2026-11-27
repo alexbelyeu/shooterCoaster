@@ -10,6 +10,8 @@ import {
 } from './SharedEnemyAssets'
 import { FIRE_IMP_LIFT, FIRE_IMP_SCALE, HOP_HEIGHT, HOP_RATE, fireImpHop, hopScaleXZ, hopScaleY, type HopPose } from './fireImpHop.hot'
 import { leashedHeading } from './wanderLeash.hot'
+import { LAVA_SINK } from './slipAway.hot'
+import { useSlipAway } from './useSlipAway'
 
 /** The arms' swing about the shoulders (radians, - = forward and up): at the top of a hop, and thrown up when hit. */
 const ARMS_HOP = -1.2
@@ -18,6 +20,7 @@ const ARMS_FLINCH = -2.7
 /**
  * A stocky, grinning gremlin (brief: docs/art/ENEMIES.md) turned to the rider, darting about in hops: it stretches
  * as it leaves the ground and squashes as it lands, its arms pumping and its tail whipping. Shot, it throws its arms up.
+ * One left too long once seen sinks back into the lava crust (`LAVA_SINK`, #1059).
  */
 export default function FireImp(props: EnemyProps) {
   const { moveSpeed, dirChangeInterval, heading, hopOffset, rng } = useEnemyRandom(props.id, (rng) => ({
@@ -32,6 +35,7 @@ export default function FireImp(props: EnemyProps) {
   const pose = useRef<HopPose>({ air: 0, land: 0, stretch: 0 })
   const camera = useThree((s) => s.camera)
   const heightFn = useContext(TerrainContext)
+  const sink = useSlipAway(LAVA_SINK)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number, delta: number) => {
@@ -48,6 +52,9 @@ export default function FireImp(props: EnemyProps) {
       mesh.position.z += Math.sin(dirRef.current) * moveSpeed * dt
       // The group (the hit sphere's centre) sits mid-body; the model's feet are FIRE_IMP_LIFT below it.
       mesh.position.y = heightFn(mesh.position.x, mesh.position.z) + 2 + FIRE_IMP_LIFT
+      const under = sink(mesh.position, time)
+      if (under < 0) return 'escaped'
+      mesh.position.y -= under
 
       const p = (time * HOP_RATE + hopOffset) % 1
       const { air, land } = fireImpHop(p, pose.current)
@@ -64,7 +71,7 @@ export default function FireImp(props: EnemyProps) {
         tailRef.current.rotation.x = -0.3 * air + 0.25 * land
       }
     },
-    [moveSpeed, dirChangeInterval, hopOffset, heightFn, rng],
+    [moveSpeed, dirChangeInterval, hopOffset, heightFn, rng, sink],
   )
 
   const onHit = useCallback(() => {

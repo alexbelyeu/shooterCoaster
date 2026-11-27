@@ -204,32 +204,36 @@ const LEVELS: LevelConfig[] = [
       waves: [
         // A wave to each stretch of the storyboard (weights in seconds of the 45 s wave span), so no element rides empty
         // (#937): the tube, up the lift, its top at the volcano's flank, the drop tower, out of the cone, the camelbacks,
-        // then the turntable, where what is left stands along the track the car faces once it turns. Each spiral and line spread twice its
-        // formation's spacing (the Eruption 1.5x, #1059; a column stays single file on the rails), so no more than two sit in one aim-assist circle. A full group a wave
-        // (12 embers, 7 in a line, 9 in a `v`), so each lasts until the next is in view: a player clears about 3 a second.
+        // then the turntable, where what is left stands along the track the car faces once it turns. Spread so no more than two sit
+        // in one aim-assist circle (#1059): spirals 3x their formation's spacing (the Eruption 3.5x), imp lines 4x,
+        // golem lines 3x, the last drakes' `v` 3x; a column stays single file on the rails, so the tube's and the exit hole's come
+        // as two columns of 4 a second or so apart. Most waves a full group (12 embers, 7 in a line, 9 in a `v`), so each lasts
+        // until the next is in view: a player clears about 3 a second, and what it leaves goes (`slipAway.hot.ts`).
         // The Eruption rises out of the cone over the drop tower, low enough to be seen through the flank's hole, as the last
         // near embers leave the top of the frame on the approach to it (a second sooner than it was, the same spot), and a column
         // runs down the rails into the entry hole between them, the one place the flank leaves in view there; the imps
         // come two seconds before the drop, so they are on the cone's floor as the car falls and stand in the entry hole's view; a spiral straight down the
         // track ahead of the exit hole, then a column through it (single file down the rails, the one shape the rider sees in
         // there), then the imps out on the plain. The tube's own wave is a column too: anything off the rails' line is in the rock.
-        { type: 'emberWisp', count: 8, waveLabel: 'Embers Rise!', formation: 'column', weight: 1 },
-        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, weight: 3 },
-        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, weight: 4 },
-        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, formationOrigin: NEAR_EMBERS, weight: 4 },
+        { type: 'emberWisp', count: 4, waveLabel: 'Embers Rise!', formation: 'column', weight: 0.5 },
+        { type: 'emberWisp', count: 4, formation: 'column', weight: 0.5 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 3, weight: 3 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 3, weight: 4 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 3, formationOrigin: NEAR_EMBERS, weight: 4 },
         { type: 'emberWisp', count: 12, formation: 'column', weight: 2 },
-        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationSpread: 1.5, formationOrigin: { ahead: 300, side: 0, up: 100 }, weight: 3 },
-        { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', formationSpread: 2, weight: 4 },
-        { type: 'emberWisp', count: 10, formation: 'spiral', formationSpread: 2, formationOrigin: EXIT_EMBERS, weight: 1 },
-        { type: 'emberWisp', count: 8, formation: 'column', weight: 1.5 },
-        { type: 'fireImp', count: 7, formation: 'line', formationSpread: 2, weight: 0.5 },
+        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationSpread: 3.5, formationOrigin: { ahead: 300, side: 0, up: 100 }, weight: 3 },
+        { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', formationSpread: 4, weight: 4 },
+        { type: 'emberWisp', count: 10, formation: 'spiral', formationSpread: 3, formationOrigin: EXIT_EMBERS, weight: 1 },
+        { type: 'emberWisp', count: 4, formation: 'column', weight: 0.75 },
+        { type: 'emberWisp', count: 4, formation: 'column', weight: 0.75 },
+        { type: 'fireImp', count: 7, formation: 'line', formationSpread: 4, weight: 0.5 },
         { type: 'infernalDrake', count: 4, waveLabel: 'Drakes Descend!', formation: 'v', weight: 1 },
-        { type: 'lavaGolem', count: 7, waveLabel: 'Golems Awaken!', formation: 'line', formationSpread: 2, weight: 2 },
-        { type: 'fireImp', count: 7, formation: 'line', formationSpread: 2, weight: 2 },
-        { type: 'lavaGolem', count: 6, waveLabel: 'Golems Return!', formation: 'line', formationSpread: 2, weight: 1 },
-        { type: 'lavaGolem', count: 6, formation: 'line', formationSpread: 2, weight: 1 },
-        { type: 'lavaGolem', count: 7, formation: 'line', formationSpread: 2, weight: 1 },
-        { type: 'infernalDrake', count: 9, formation: 'v', weight: 13 },
+        { type: 'lavaGolem', count: 7, waveLabel: 'Golems Awaken!', formation: 'line', formationSpread: 3, weight: 2 },
+        { type: 'fireImp', count: 7, formation: 'line', formationSpread: 4, weight: 2 },
+        { type: 'lavaGolem', count: 6, waveLabel: 'Golems Return!', formation: 'line', formationSpread: 3, weight: 1 },
+        { type: 'lavaGolem', count: 6, formation: 'line', formationSpread: 3, weight: 1 },
+        { type: 'lavaGolem', count: 7, formation: 'line', formationSpread: 3, weight: 1 },
+        { type: 'infernalDrake', count: 9, formation: 'v', formationSpread: 3, weight: 13 },
       ],
       boss: 'magmaTitan',
     }),

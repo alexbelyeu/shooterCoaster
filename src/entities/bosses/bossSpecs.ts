@@ -124,12 +124,14 @@ export const YETI: BossSpec = {
 
 const titanVent = (id: string, side: 1 | -1): WeakPointSpec => {
   const [x, y, z] = TITAN_BODY.vent
-  return { id, radius: 105, offset: [side * x, y, z], hp: 3, score: 60, phase: 0 }
+  return { id, radius: 105, offset: [side * x, y, z], hp: 5, score: 60, phase: 0 }
 }
 
 /**
  * The vents and the heart first, then the crown: the heart open only on the beat and the vents shut while it is (`titanShut`,
- * #1059). Hp for a fight of 12 s or more at the pacing step's `PLAYER_HITS_PER_SECOND`.
+ * #1059). Hp for a fight of 12 s or more at the pacing step's `PLAYER_HITS_PER_SECOND`: the vents outlast the first beat, so
+ * something is open from the first beat on, and the heart goes in one window; a fight much past 14 s runs into the
+ * turntable, where the Titan is out of view.
  */
 export const MAGMA_TITAN: BossSpec = {
   name: 'The Magma Titan',
@@ -138,8 +140,8 @@ export const MAGMA_TITAN: BossSpec = {
   weakPoints: [
     titanVent('vent-l', 1),
     titanVent('vent-r', -1),
-    { id: 'heart', radius: 115, offset: [...TITAN_BODY.heart], hp: 6, score: 60, phase: 0 },
-    { id: 'crown', radius: 120, offset: [...TITAN_BODY.crown], hp: 12, score: 0, phase: 1 },
+    { id: 'heart', radius: 115, offset: [...TITAN_BODY.heart], hp: 4, score: 60, phase: 0 },
+    { id: 'crown', radius: 120, offset: [...TITAN_BODY.crown], hp: 13, score: 0, phase: 1 },
   ],
 }
 
