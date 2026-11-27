@@ -137,9 +137,6 @@
       "bunchingP90Max": 2,
       "bossSecondsMin": 12
     },
-    "level1": {
-      "knownOver": "#1059"
-    },
     "level2": {
       "knownOver": "#1059"
     },
