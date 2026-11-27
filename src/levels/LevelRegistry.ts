@@ -264,7 +264,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 57 * 15 + 25 * 20 + 60 + 60 + 400, // 57 drones and 25 bots, 1355, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1875
+    maxScore: 63 * 15 + 25 * 20 + 60 + 60 + 400, // 63 drones and 25 bots, 1445, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1965
     message: 'You cleared Neon Metropolis!',
     nextLevel: 'level8',
     // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
@@ -282,7 +282,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'hoverDrone', count: 10, waveLabel: 'Surveillance Ring!', formation: 'ring' },
         { type: 'billboardBot', count: 13, waveLabel: 'Street March!' },
         { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'ring' },
-        { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.9 },
+        { type: 'hoverDrone', count: 27, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.9 },
       ],
       boss: 'helicopter',
     }),
