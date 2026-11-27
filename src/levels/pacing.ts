@@ -40,11 +40,6 @@ export interface Roster {
    * branch (after its switch sign, before its merge), and only on a run that took it (`EnemyWave.route`).
    */
   branch?: Omit<EnemyWave, 'spawnDelay' | 'route'> & { at: number }
-  /**
-   * Waves that arrive during the boss's fight, at whole level second `at` (after `bossAt`, before the run's end): something to
-   * shoot while the boss is out of the frame (#1059: level 2's crows over the Giant Scorpion's slalom).
-   */
-  fight?: (Omit<EnemyWave, 'spawnDelay' | 'route'> & { at: number })[]
 }
 
 export interface PacedLevel {
@@ -54,7 +49,7 @@ export interface PacedLevel {
 
 /** Whole seconds: the spawner reads the stored timer, which changes once a second. */
 export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel {
-  const { waves, boss, finale, branch, fight = [] } = roster
+  const { waves, boss, finale, branch } = roster
   if (!waves.length) throw new Error('no waves')
   if (boss && finale) throw new Error('a boss or a finale, not both')
   const times = pacingTimes(runSeconds)
@@ -64,15 +59,13 @@ export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel 
   let before = 0
   const enemies: EnemyWave[] = waves.map(({ weight, ...wave }) => {
     const spawnDelay = Math.round((waveSpan * before) / total)
-    before += weightOf({ weight })
+    before += weight ?? 1 // checked by `total`
     return { ...wave, spawnDelay }
   })
   const last = enemies[enemies.length - 1].spawnDelay!
   if (last > lastWaveBy) throw new Error(`last wave at ${last} s, after ${lastWaveBy} s`)
   if (!Number.isInteger(bossAt) || bossAt <= last) throw new Error(`boss at ${bossAt} s: a whole second after the last wave`)
   if (finale) enemies.push({ ...finale, spawnDelay: bossAt })
-  // Their seconds are checked in LevelRegistry.test.ts, not here at run time (the startup JS budget).
-  for (const { at, ...wave } of fight) enemies.push({ ...wave, spawnDelay: at })
   if (branch) {
     const { at, ...wave } = branch
     if (!Number.isInteger(at) || at <= 0 || at >= bossAt) throw new Error(`branch at ${at} s: a whole second before ${bossAt} s`)

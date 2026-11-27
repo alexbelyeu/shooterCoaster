@@ -46,12 +46,12 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2805, Giant Scorpion 3460, Kraken 3250, Yeti 4530, Magma Titan 3828, Medusa 3174, Helicopter 2505, Jungle Ruins (Blimp placeholder) 2615', () => {
+  it('the finales and maxScores: Blimp 2805, Giant Scorpion 3460, Kraken 3322, Yeti 4530, Magma Titan 3828, Medusa 3174, Helicopter 2505, Jungle Ruins (Blimp placeholder) 2615', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2805],
       ['level2', 'giantScorpion', 3460],
-      ['level3', 'kraken', 3250],
+      ['level3', 'kraken', 3322],
       ['level4', 'yeti', 4530],
       ['level5', 'magmaTitan', 3828],
       ['level6', 'medusa', 3174],
@@ -83,7 +83,7 @@ describe('LevelRegistry', () => {
       // Up to 28 s where the boss comes sooner (level2, #1059: the Giant Scorpion before the final lift turns the view away).
       expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(28)
       if (level.boss) expect(level.boss.at - BOSS_SPECS[level.boss.type].tell.seconds).toBeGreaterThan(Math.max(...waves))
-      // A fight wave (`Roster.fight`) at a whole second of the fight, before the run ends.
+      // A fight wave (`withFight`) at a whole second of the fight, before the run ends.
       for (const fight of level.enemies.filter((w) => inFight(level, w))) expect(Number.isInteger(fight.spawnDelay) && fight.spawnDelay! < RUN_SECONDS).toBe(true)
     },
   )
@@ -277,7 +277,7 @@ describe('nextStar', () => {
   })
 })
 
-/** A wave that arrives during the boss's fight (`Roster.fight`, #1059). */
+/** A wave that arrives during the boss's fight (`withFight` in LevelRegistry.ts, #1059). */
 function inFight(level: LevelConfig, wave: EnemyWave): boolean {
   return !!level.boss && (wave.spawnDelay ?? 0) > level.boss.at
 }

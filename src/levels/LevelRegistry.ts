@@ -1,5 +1,5 @@
 import type { EnemyType, LevelConfig } from '@/types/level'
-import { paceLevel, type PacedWave } from './pacing'
+import { paceLevel, type PacedLevel, type PacedWave } from './pacing'
 // Level 1's ride as plain numbers: the ride elements that build it stay out of the startup JS (#863). Every other generated
 // ride is its world chunk's (`World.rides`), out of the startup JS altogether (#960).
 import { PARK_LEVEL_RIDE } from './environments/biomes/themePark/parkLevel'
@@ -22,18 +22,18 @@ const EXIT_EMBERS = { ahead: 400, side: 0, up: 30 }
  * Level 3's jellyfish (#937): a small line every 2 s, each placed in view where the rider is when it arrives, so one is
  * coming up as the last is shot (a scattered wave of twenty was cleared in 4 s up the lift, and nothing until the sharks).
  */
-function jellyfishLine(count: number, waveLabel?: string): PacedWave {
-  return { type: 'jellyfish', count, waveLabel, formation: 'line', formationOrigin: JELLYFISH_LINE, formationSpread: 2, weight: 2 }
+function jellyfishLine(count: number, waveLabel?: string, formationSpread = 3): PacedWave {
+  return { type: 'jellyfish', count, waveLabel, formation: 'line', formationOrigin: JELLYFISH_LINE, formationSpread, weight: 2 }
 }
 
-/** Level 3's sharks (#1059): a few at a time round the glass tunnel, not one shoal bunched far down the track. */
+/** Level 3's sharks (#1059): five at a time round the glass tunnel, spread wide of it (the water band, `spawnPlacement.ts`). */
 function shoal(count: number, waveLabel?: string): PacedWave {
-  return { type: 'shark', count, waveLabel, formationSpread: 2, weight: 1.5 }
+  return { type: 'shark', count, waveLabel, formationSpread: 3, weight: 1.5 }
 }
 
-/** Level 3's flying fish (#1059): a school spread 3x, so they cross the frame apart instead of in one aim circle. */
+/** Level 3's flying fish (#1059): a school spread 6x, so they cross the frame apart instead of in one aim circle. */
 function flyingFish(count: number, weight: number, waveLabel?: string): PacedWave {
-  return { type: 'flyingFish', count, waveLabel, formation: 'school', formationSpread: 3, weight }
+  return { type: 'flyingFish', count, waveLabel, formation: 'school', formationSpread: 6, weight }
 }
 
 /**
@@ -46,6 +46,16 @@ function snowmen(type: EnemyType, waveLabel?: string, count = 9): PacedWave {
 }
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
+/**
+ * Waves that arrive during the boss's fight, at their own level seconds after the paced ones (#1059: level 2's crows over
+ * the Giant Scorpion's slalom). Not a `Roster` field, to keep `paceLevel` out of the startup JS budget's way; their seconds
+ * are checked in LevelRegistry.test.ts.
+ */
+function withFight(paced: PacedLevel, seconds: number[], wave: PacedWave): PacedLevel {
+  for (const spawnDelay of seconds) paced.enemies.push({ ...wave, spawnDelay })
+  return paced
+}
+
 const LEVELS: LevelConfig[] = [
   {
     id: 'level1',
@@ -95,7 +105,7 @@ const LEVELS: LevelConfig[] = [
     message: 'Ready for this one?',
     nextLevel: 'level3',
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
-    ...paceLevel({
+    ...withFight(paceLevel({
       // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all of
       // them in view (#864: draws); Vs up the lift hill (2, 6 and 7 s: one wave per V of nine, so a second group doesn't
       // fly in with the first), holding the sky to the crest; a small second pack on the sand before the door (9 s, in
@@ -129,8 +139,7 @@ const LEVELS: LevelConfig[] = [
       ],
       boss: 'giantScorpion',
       bossAt: 32,
-      fight: [37, 40, 43, 46].map((at) => ({ type: 'crow' as const, count: 5, formation: 'v' as const, formationSpread: 5, at })),
-    }),
+    }), [37, 40, 43, 46], { type: 'crow', count: 5, formation: 'v', formationSpread: 5 }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {
     },
@@ -141,22 +150,22 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 70 * 18 + 30 * 25 + 45 * 12 + 5 * 60 + 400, // 2550 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3250
+    maxScore: 72 * 18 + 30 * 25 + 48 * 12 + 5 * 60 + 400, // 2622 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3322
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
     ...paceLevel({
       waves: [
         // Up the lift and down the drop (0–10 s; lines of 7 up the lift, so one is still up as the next arrives), the sharks
-        // a few at a time round the glass tunnel (11–15 s, the first before the drop's last line is out of view), then from
-        // the launch's crest past the sea stacks jellyfish lines with a school of flying fish after every two (16–31 s), the
-        // last school on to the Kraken.
-        jellyfishLine(7, 'Into the Deep!'), jellyfishLine(7), jellyfishLine(7), jellyfishLine(7), jellyfishLine(6),
-        { ...jellyfishLine(5), weight: 1 },
-        shoal(6, 'Sharks!'), shoal(6), shoal(6), shoal(6), shoal(6),
-        jellyfishLine(5, 'Jellyfish Bloom!'), jellyfishLine(5), flyingFish(15, 2, 'Flying Fish!'),
-        jellyfishLine(5), { ...jellyfishLine(5), weight: 1 }, flyingFish(15, 2),
-        { ...jellyfishLine(5), weight: 1.5 }, flyingFish(15, 1.5), { ...jellyfishLine(6), weight: 12 },
+        // a few at a time round the glass tunnel (10–17 s, the first before the drop's last line is out of view), a
+        // school over the launch's crest (18 s) with lines of 6 after it, then past the sea stacks jellyfish lines with a school of flying fish after
+        // every two (20–32 s), the last school on to the Kraken. Schools of 12, not 15: a big one filled one aim circle (#1059).
+        jellyfishLine(7, 'Into the Deep!', 2), jellyfishLine(7, undefined, 2), jellyfishLine(7, undefined, 2), jellyfishLine(7, undefined, 2),
+        jellyfishLine(6, undefined, 2), { ...jellyfishLine(5, undefined, 2), weight: 1 },
+        shoal(5, 'Sharks!'), shoal(5), shoal(5), shoal(5), shoal(5), shoal(5), flyingFish(12, 1, 'Flying Fish!'),
+        jellyfishLine(6, 'Jellyfish Bloom!'), jellyfishLine(6), flyingFish(12, 2),
+        jellyfishLine(5), { ...jellyfishLine(5), weight: 1 }, flyingFish(12, 2),
+        { ...jellyfishLine(5), weight: 1.5 }, flyingFish(12, 1.5), { ...jellyfishLine(6), weight: 14 },
       ],
       boss: 'kraken',
       bossAt: 38,
