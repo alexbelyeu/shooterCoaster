@@ -180,7 +180,7 @@ export const HELICOPTER: BossSpec = {
   weakPoints: [
     { id: 'searchlight', radius: 36, offset: [...HELI_LAYOUT.searchlight], hp: 3, score: 60, phase: 0 },
     { id: 'tail-rotor', radius: 42, offset: [...HELI_LAYOUT.tailRotor], hp: 3, score: 60, phase: 0 },
-    { id: 'hub', radius: 40, offset: [...HELI_LAYOUT.hub], hp: 12, score: 0, phase: 1 },
+    { id: 'hub', radius: 40, offset: [...HELI_LAYOUT.hub], hp: 14, score: 0, phase: 1 },
   ],
 }
 

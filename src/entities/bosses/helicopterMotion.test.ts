@@ -17,7 +17,7 @@ describe('the Helicopter spec', () => {
     for (const id of ['searchlight', 'searchlight', 'searchlight', 'tail-rotor', 'tail-rotor', 'tail-rotor']) state = applyHit(state, id)
     expect(currentPhase(state)).toBe(1)
     expect(exposedWeakPoints(state).map((w) => w.id)).toEqual(['hub'])
-    expect(HELICOPTER.weakPoints.find((w) => w.id === 'hub')!.hp).toBe(12)
+    expect(HELICOPTER.weakPoints.find((w) => w.id === 'hub')!.hp).toBe(14)
     expect(bossMaxScore(HELICOPTER)).toBe(60 + 60 + 400)
   })
 })

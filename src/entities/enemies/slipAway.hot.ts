@@ -34,6 +34,12 @@ export const DRAKE_FLEE: SlipAway = { near: 1500, seenCos: 0.7, linger: 6, goS: 
 /** Level 5's imps and golems sink back into the lava crust, past the golem's head (~70 at its scale). */
 export const LAVA_SINK: SlipAway = { near: 1300, seenCos: 0.7, linger: 4, goS: 0.8, distance: 120 }
 
+/** Level 7's hover drones climb out of the street canyon, over the towers and out of the top of the frame. */
+export const DRONE_FLEE: SlipAway = { near: 1500, seenCos: 0.7, linger: 4, goS: 1.2, distance: 900 }
+
+/** Level 7's billboard bots drop through the street (a manhole), past the top of the sign on their back (~60 at their scale of 8). */
+export const STREET_DROP: SlipAway = { near: 1300, seenCos: 0.7, linger: 3.5, goS: 0.6, distance: 90 }
+
 /** How far it has gone: 0 while it stays, easing in so it starts slowly, then goes. */
 export function slipOffset(s: SlipAway, seen: number): number {
   const u = (seen - s.linger) / s.goS
