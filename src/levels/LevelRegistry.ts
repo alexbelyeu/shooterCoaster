@@ -25,7 +25,7 @@ function jellyfishLine(count: number, waveLabel?: string): PacedWave {
 
 /** Level 3's sharks (#1059): a few at a time round the glass tunnel, not one shoal bunched far down the track. */
 function shoal(count: number, waveLabel?: string): PacedWave {
-  return { type: 'shark', count, waveLabel, weight: 1.5 }
+  return { type: 'shark', count, waveLabel, formationSpread: 2, weight: 1.5 }
 }
 
 /** Level 3's flying fish (#1059): a school spread 3x, so they cross the frame apart instead of in one aim circle. */
@@ -117,7 +117,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 64 * 18 + 30 * 25 + 45 * 12 + 5 * 60 + 400, // 2442 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3142
+    maxScore: 70 * 18 + 30 * 25 + 45 * 12 + 5 * 60 + 400, // 2550 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3250
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
@@ -131,10 +131,11 @@ const LEVELS: LevelConfig[] = [
         { ...jellyfishLine(5), weight: 1 },
         shoal(6, 'Sharks!'), shoal(6), shoal(6), shoal(6), shoal(6),
         jellyfishLine(5, 'Jellyfish Bloom!'), jellyfishLine(5), flyingFish(15, 2, 'Flying Fish!'),
-        jellyfishLine(5), jellyfishLine(5), flyingFish(15, 2),
-        { ...jellyfishLine(5), weight: 1.5 }, flyingFish(15, 13),
+        jellyfishLine(5), { ...jellyfishLine(5), weight: 1 }, flyingFish(15, 2),
+        { ...jellyfishLine(5), weight: 1.5 }, flyingFish(15, 1.5), { ...jellyfishLine(6), weight: 12 },
       ],
       boss: 'kraken',
+      bossAt: 38,
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {

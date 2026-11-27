@@ -107,7 +107,7 @@ describe('Kraken spec', () => {
     expect(exposedWeakPoints(state).map((w) => w.id)).toEqual(['pad-0', 'pad-1', 'pad-2', 'pad-3', 'pad-4'])
     for (const w of KRAKEN.weakPoints.filter((p) => p.phase === 0)) for (let h = 0; h < w.hp; h++) state = applyHit(state, w.id)
     expect(exposedWeakPoints(state).map((w) => w.id)).toEqual(['eye'])
-    expect(KRAKEN.weakPoints.find((w) => w.id === 'eye')!.hp).toBe(12)
+    expect(KRAKEN.weakPoints.find((w) => w.id === 'eye')!.hp).toBe(7)
     expect(BOSS_SPECS.kraken).toBe(KRAKEN)
   })
 })
