@@ -28,6 +28,11 @@ export const TITAN_RISE = {
   /** More than its ~1400 height: it climbs out of the lava from below. */
   depth: 1500,
   riseS: 2.2,
+  /**
+   * Climbing out again mid-fight after the rider's view left it (level 5's turntable, #1101): quicker, so its weak points are
+   * back in the frame about a second after it went.
+   */
+  resurfaceS: 1.1,
   /** Knee-deep in the lava, and on the rock once it wades out. */
   wadeDepth: 150,
 } as const
@@ -128,9 +133,9 @@ export function defeatHeat(sinceDefeat: number): number {
   return f < 1 ? 2.5 * Math.sin(f * Math.PI) : 0
 }
 
-/** Below the lava at first, climbing out over `riseS`. */
-export function riseOffset(age: number): number {
-  const t = smooth(age / TITAN_RISE.riseS)
+/** Below the lava at first, climbing out over `riseS` (`resurfaceS` when it climbs out again mid-fight). */
+export function riseOffset(age: number, riseS: number = TITAN_RISE.riseS): number {
+  const t = smooth(age / riseS)
   return -TITAN_RISE.depth * (1 - t) - TITAN_RISE.wadeDepth
 }
 
