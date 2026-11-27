@@ -81,12 +81,12 @@ describe('samplingCutShort', () => {
 })
 
 describe('pacingTimeline', () => {
-  it('has one row a level second with the fewest and most targets, the tell flags and the boss', () => {
-    const rows = pacingTimeline(ride(3, (t) => (t === 1.5 ? 0 : 3), 0.5, (t) => ({ waveTell: t === 2.5 })))
+  it('has one row a level second with the fewest and most targets, the biggest bunch, the tell flags and the boss', () => {
+    const rows = pacingTimeline(ride(3, (t) => (t === 1.5 ? 0 : 3), 0.5, (t) => ({ waveTell: t === 2.5, bunch: t === 1 ? 2 : 1 })))
     expect(rows).toEqual([
-      { t: 0, min: 3, max: 3, track: 0, waveTell: false, bossTell: false, boss: 'none', bossFramed: false },
-      { t: 1, min: 0, max: 3, track: 0.333, waveTell: false, bossTell: false, boss: 'none', bossFramed: false },
-      { t: 2, min: 3, max: 3, track: 0.667, waveTell: true, bossTell: false, boss: 'none', bossFramed: false },
+      { t: 0, min: 3, max: 3, bunch: 1, track: 0, waveTell: false, bossTell: false, boss: 'none', bossFramed: false },
+      { t: 1, min: 0, max: 3, bunch: 2, track: 0.333, waveTell: false, bossTell: false, boss: 'none', bossFramed: false },
+      { t: 2, min: 3, max: 3, bunch: 1, track: 0.667, waveTell: true, bossTell: false, boss: 'none', bossFramed: false },
     ])
   })
 })
