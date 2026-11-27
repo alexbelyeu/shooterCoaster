@@ -19,8 +19,8 @@ const EXIT_EMBERS = { ahead: 400, side: 0, up: 30 }
  * Level 3's jellyfish (#937): a small line every 2 s, each placed in view where the rider is when it arrives, so one is
  * coming up as the last is shot (a scattered wave of twenty was cleared in 4 s up the lift, and nothing until the sharks).
  */
-function jellyfishLine(count: number, waveLabel?: string): PacedWave {
-  return { type: 'jellyfish', count, waveLabel, formation: 'line', formationOrigin: JELLYFISH_LINE, formationSpread: 3, weight: 2 }
+function jellyfishLine(count: number, waveLabel?: string, formationSpread = 3): PacedWave {
+  return { type: 'jellyfish', count, waveLabel, formation: 'line', formationOrigin: JELLYFISH_LINE, formationSpread, weight: 2 }
 }
 
 /** Level 3's sharks (#1059): five at a time round the glass tunnel, spread wide of it (the water band, `spawnPlacement.ts`). */
@@ -121,20 +121,20 @@ const LEVELS: LevelConfig[] = [
     description: 'Aim for the snout!',
     order: 3,
     biome: 'ocean',
-    maxScore: 70 * 18 + 30 * 25 + 45 * 12 + 5 * 60 + 400, // 2550 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3250
+    maxScore: 72 * 18 + 30 * 25 + 48 * 12 + 5 * 60 + 400, // 2622 + the Kraken's 5 sucker pads and reward (bossSpecs.ts) = 3322
     message: 'Have you ever been alone in the middle of nowhere... And surrounded by enemies?',
     nextLevel: 'level4',
     // The ride kit's (#865, `oceanTrack.ts`): a lift, a splashdown into a glass tunnel under the sea, through a sea arch.
     ...paceLevel({
       waves: [
         // Up the lift and down the drop (0–10 s; lines of 7 up the lift, so one is still up as the next arrives), the sharks
-        // a few at a time round the glass tunnel (10–17 s, the first before the drop's last line is out of view), a small
-        // school over the launch's crest (18 s), then past the sea stacks jellyfish lines with a school of flying fish after
-        // every two (20–32 s), the last school on to the Kraken. Schools of 9–12, not 15: a big one filled one aim circle (#1059).
-        jellyfishLine(7, 'Into the Deep!'), jellyfishLine(7), jellyfishLine(7), jellyfishLine(7), jellyfishLine(6),
-        { ...jellyfishLine(5), weight: 1 },
-        shoal(5, 'Sharks!'), shoal(5), shoal(5), shoal(5), shoal(5), shoal(5), flyingFish(9, 1.5, 'Flying Fish!'),
-        jellyfishLine(5, 'Jellyfish Bloom!'), jellyfishLine(5), flyingFish(12, 2),
+        // a few at a time round the glass tunnel (10–17 s, the first before the drop's last line is out of view), a
+        // school over the launch's crest (18 s) with lines of 6 after it, then past the sea stacks jellyfish lines with a school of flying fish after
+        // every two (20–32 s), the last school on to the Kraken. Schools of 12, not 15: a big one filled one aim circle (#1059).
+        jellyfishLine(7, 'Into the Deep!', 2), jellyfishLine(7, undefined, 2), jellyfishLine(7, undefined, 2), jellyfishLine(7, undefined, 2),
+        jellyfishLine(6, undefined, 2), { ...jellyfishLine(5, undefined, 2), weight: 1 },
+        shoal(5, 'Sharks!'), shoal(5), shoal(5), shoal(5), shoal(5), shoal(5), flyingFish(12, 1, 'Flying Fish!'),
+        jellyfishLine(6, 'Jellyfish Bloom!'), jellyfishLine(6), flyingFish(12, 2),
         jellyfishLine(5), { ...jellyfishLine(5), weight: 1 }, flyingFish(12, 2),
         { ...jellyfishLine(5), weight: 1.5 }, flyingFish(12, 1.5), { ...jellyfishLine(6), weight: 14 },
       ],
