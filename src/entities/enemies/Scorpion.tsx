@@ -17,7 +17,8 @@ import {
  * where it was placed (#494: a straight crawl took it hundreds of units out of the view its
  * placement chose within seconds), following terrain height. On a dark section's floor (#937, level 2's passage) it
  * holds its spot between the rails and the wall instead, shuffling to and fro down the passage and facing the car.
- * One left too long once the rider has seen it burrows back into the sand, unscored (`SAND_BURROW`, #1059).
+ * One left too long once the rider has seen it burrows back into the sand, unscored (`SAND_BURROW`, #1059); never off the
+ * passage's stone floor, which it holds while the car is in the dark.
  */
 /** On a floor: how far it shuffles either way down the passage, and how far it turns either side of facing the car (radians). */
 const FLOOR_SHUFFLE = 8
@@ -33,7 +34,8 @@ export default function Scorpion(props: EnemyProps) {
   const bodyRef = useRef<THREE.Group>(null)
   const tailRef = useRef<THREE.Group>(null)
   const heightFn = useContext(TerrainContext)
-  const burrow = useSlipAway(SAND_BURROW)
+  // The Tomb's floor is stone: one there holds its spot through the passage.
+  const burrow = useSlipAway(floor ? undefined : SAND_BURROW)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {

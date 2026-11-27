@@ -10,7 +10,7 @@ import { BOSS_SPECS, GIANT_SCORPION } from './bossSpecs'
 import { applyHit, bossMaxScore, createBossState, exposedWeakPoints, isDefeated, type BossState } from './bossModel'
 import {
   LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SEEN_PERCH, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
-  lungeAmount, lungeImpactBetween, perchBehind, perchClear, pickPerch, pickSeenPerch, riseOffset, scorpionShut, STRIKE_WINDOW, type Perch, type TailPose, type PerchInput,
+  lungeAmount, lungeImpactBetween, perchBehind, perchClear, pickPerch, pickSeenPerch, riseOffset, scorpionShut, leadLook, STRIKE_WINDOW, type Perch, type TailPose, type PerchInput,
 } from './scorpionMotion.hot'
 
 const tailTopY = (pose: TailPose) => pose.y[pose.count]
@@ -255,5 +255,25 @@ describe('perchBehind', () => {
   it('is true only for a perch the rider has passed', () => {
     expect(perchBehind({ x: 10, z: -500, slot: 9, sign: 1 }, input)).toBe(false)
     expect(perchBehind({ x: 400, z: 300, slot: 9, sign: 1 }, input)).toBe(true)
+  })
+})
+
+describe('leadLook', () => {
+  // Looking −z, its right is +x.
+  const out = { x: 0, z: 0, sign: 1 as 1 | -1 }
+  it('turns the look on towards the turn, by half its lag, and says which side', () => {
+    const a = 0.3
+    leadLook(out, 0, -1, Math.sin(a), -Math.cos(a), -1)
+    expect(out.sign).toBe(1)
+    expect(Math.atan2(out.x, -out.z)).toBeCloseTo(a * 1.5)
+    leadLook(out, 0, -1, -Math.sin(a), -Math.cos(a), 1)
+    expect(out.sign).toBe(-1)
+    expect(Math.atan2(out.x, -out.z)).toBeCloseTo(-a * 1.5)
+  })
+  it('keeps the side and the look while it runs straight, and leads at most 0.6 rad', () => {
+    leadLook(out, 0, -1, 0.005, -1, -1)
+    expect(out.sign).toBe(-1)
+    leadLook(out, 0, -1, 1, 0, 1)
+    expect(Math.atan2(out.x, -out.z)).toBeCloseTo(Math.PI / 2 + 0.6)
   })
 })
