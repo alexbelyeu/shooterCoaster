@@ -7,8 +7,8 @@ import { SAND_BURROW } from './slipAway.hot'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { SCUTTLE_RADIUS } from '../spawning/enemyPlacement'
 import {
-  SCORPION_GEO, SCORPION_TAIL_GEO, SCORPION_STINGER_GEO, SCORPION_TAIL_PIVOT,
-  SCORPION_SHELL_MAT, SCORPION_TAIL_MAT, SCORPION_STINGER_MAT,
+  SCORPION_GEO, SCORPION_TAIL_GEO, SCORPION_TAIL_PIVOT,
+  SCORPION_SHELL_MAT, SCORPION_TAIL_MAT,
 } from './SharedEnemyAssets'
 
 /**
@@ -32,7 +32,7 @@ export default function Scorpion(props: EnemyProps) {
     turnRate: (0.6 + rng() * 0.8) * (rng() < 0.5 ? -1 : 1),
   }))
   const bodyRef = useRef<THREE.Group>(null)
-  const tailRef = useRef<THREE.Group>(null)
+  const tailRef = useRef<THREE.Mesh>(null)
   const heightFn = useContext(TerrainContext)
   // The Tomb's floor is stone: one there holds its spot through the passage.
   const burrow = useSlipAway(floor ? undefined : SAND_BURROW)
@@ -67,10 +67,7 @@ export default function Scorpion(props: EnemyProps) {
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group ref={bodyRef} scale={[8, 8, 8]} rotation={[0, -moveAngle, 0]}>
         <mesh geometry={SCORPION_GEO} material={SCORPION_SHELL_MAT} />
-        <group ref={tailRef} position={SCORPION_TAIL_PIVOT}>
-          <mesh geometry={SCORPION_TAIL_GEO} material={SCORPION_TAIL_MAT} />
-          <mesh geometry={SCORPION_STINGER_GEO} material={SCORPION_STINGER_MAT} />
-        </group>
+        <mesh ref={tailRef} position={SCORPION_TAIL_PIVOT} geometry={SCORPION_TAIL_GEO} material={SCORPION_TAIL_MAT} />
       </group>
     </EnemyBase>
   )

@@ -368,13 +368,17 @@ export const SCORPION_GEO = mergePainted([
 
 export const SCORPION_TAIL_PIVOT: [number, number, number] = [0, 0.5, -2.5]
 
-// Chain of spheres curling up and over
-export const SCORPION_TAIL_GEO = placedParts(
-  ([[0, 0.5, 0], [0, 1.5, -0.3], [0, 2.8, -0.2], [0, 3.8, 0.3], [0, 4.5, 1.0]] as Vec3[]).map((at) =>
-    [new THREE.SphereGeometry(0.7, 5, 5), at],
-  ),
-)
-export const SCORPION_STINGER_GEO = new THREE.ConeGeometry(0.6, 2, 4).rotateX(0.5).translate(0, 4.8, 1.8)
+// Chain of spheres curling up and over, tipped by the red stinger: one mesh, so a
+// scorpion is two draw calls (body, tail) in the Desert's 40-strong packs.
+const SCORPION_STINGER_COLOR = '#ff4422'
+export const SCORPION_TAIL_GEO = mergePainted([
+  painted(placedParts(
+    ([[0, 0.5, 0], [0, 1.5, -0.3], [0, 2.8, -0.2], [0, 3.8, 0.3], [0, 4.5, 1.0]] as Vec3[]).map((at) =>
+      [new THREE.SphereGeometry(0.7, 5, 5), at],
+    ),
+  ), SCORPION_HEAD_COLOR),
+  painted(new THREE.ConeGeometry(0.6, 2, 4).rotateX(0.5), SCORPION_STINGER_COLOR, [0, 4.8, 1.8]),
+])
 
 const SCORPION_RIM = { color: '#ffd9a0', intensity: 0.7, power: 2.2 }
 // Lacquered chitin: Standard, so its facets catch the baked sky (scene.environment).
@@ -384,18 +388,14 @@ export const SCORPION_SHELL_MAT = withRim(new THREE.MeshStandardMaterial({
   roughness: 0.35,
   flatShading: true,
 }), SCORPION_RIM)
-export const SCORPION_TAIL_MAT = withRim(new THREE.MeshStandardMaterial({
-  color: SCORPION_HEAD_COLOR,
+// The stinger glows: its red vertex colour (the tail's is near black) lights it.
+const SCORPION_STING_APPLY = /* glsl */ `totalEmissiveRadiance += vec3(1.0, 0.13, 0.0) * 2.2 * step(0.5, vColor.r);`
+export const SCORPION_TAIL_MAT = withEmissivePatch(withRim(new THREE.MeshStandardMaterial({
+  vertexColors: true,
   metalness: 0.3,
   roughness: 0.35,
   flatShading: true,
-}), SCORPION_RIM)
-export const SCORPION_STINGER_MAT = new THREE.MeshStandardMaterial({
-  color: '#ff4422',
-  emissive: '#ff2200',
-  emissiveIntensity: 2.2,
-  toneMapped: false,
-})
+}), SCORPION_RIM), 'scorpion-sting', {}, '', SCORPION_STING_APPLY)
 
 /** A closed mesh from hand-placed `vertices` and triangle `indices`. */
 function makeWingGeo(
