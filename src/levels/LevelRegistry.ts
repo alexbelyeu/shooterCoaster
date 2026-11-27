@@ -39,11 +39,10 @@ function flyingFish(count: number, weight: number, waveLabel?: string): PacedWav
 /**
  * Level 4's waves (#937): nine snowmen (eight scouts, which hold the scene's draw calls at 10 s) every ~2 s, standing in lines across the rider's view at three times a line's
  * spacing (#1059). Strung out along the track instead, the far ones of a wave stacked up down the valley in one aim-assist
- * circle (13 at the ice cave's exit, 12 on the ridge). Snowmen and brutes stand four times apart: at three, the cave's exit
- * and the ridge still put three or four in one circle. Scouts and the blizzard's first two lines stay at three: at four they leave the frame.
+ * circle (13 at the ice cave's exit, 12 on the ridge).
  */
 function snowmen(type: EnemyType, waveLabel?: string, count = 9): PacedWave {
-  return { type, count, waveLabel, formation: 'line', formationSpread: type === 'snowmanScout' ? 3 : 4, weight: 2 }
+  return { type, count, waveLabel, formation: 'line', formationSpread: 3, weight: 2 }
 }
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -180,8 +179,7 @@ const LEVELS: LevelConfig[] = [
         // lift and down into the ice cave, snowmen out of it, through the blizzard's ridge and over the crest, then
         // brutes down the helix to the Yeti. A snowman falls to one hit, but more come than a player can shoot
         // (about four a second against three) and each sinks back into the snow soon after it is seen (#1059).
-        // The first line stands far up the lift, small on screen: wider, or its two groups share one aim circle.
-        { ...snowmen('snowmanScout', 'Scout Party', 8), formationSpread: 4.5 },
+        snowmen('snowmanScout', 'Scout Party', 8),
         snowmen('snowmanScout', undefined, 8),
         snowmen('snowmanScout', undefined, 8),
         snowmen('snowmanScout', undefined, 8),
@@ -189,9 +187,8 @@ const LEVELS: LevelConfig[] = [
         snowmen('snowmanScout', undefined, 8),
         snowmen('snowman'),
         snowmen('snowman'),
-        // The blizzard's first two lines stay at three: at four they leave the frame and the ride goes 3 s with no target at ~21 s.
-        { ...snowmen('snowman', 'Snowmen Incoming!'), weather: 'blizzard', formationSpread: 3 },
-        { ...snowmen('snowman'), formationSpread: 3 },
+        { ...snowmen('snowman', 'Snowmen Incoming!'), weather: 'blizzard' },
+        snowmen('snowman'),
         snowmen('snowman'),
         snowmen('snowman'),
         snowmen('snowman'),
