@@ -267,13 +267,21 @@ const LEVELS: LevelConfig[] = [
     // lanternflies are shot (#1033).
     // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 19 s, once the sign is shot (it can be
     // until the car reaches it, ~20 s), they line the branch ahead (ridden 20.2–22.5 s), and only that run meets them.
+    // A skill again (#1059): the dust and the rats come a few at a time (the perch's 27 in three, the mats' 26 in three),
+    // spread twice to three times as wide, as do the lanternflies' groups, and they leave if not shot in time (`DUST_DRAUGHT`,
+    // `MAT_DIVE`), so a missed one is a lost score.
     ...paceLevel({
       waves: [
-        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 5, bystanders: { type: 'climber', count: 4 } },
-        { type: 'dustBunny', count: 27, waveLabel: 'Dust Bunnies!', weight: 6, perch: true },
-        { type: 'rat', count: 26, waveLabel: 'Rats on the Mats!', weight: 6, bystanders: { type: 'climber', count: 3 } },
-        { type: 'lanternfly', count: 42, waveLabel: 'Lanternflies!', weight: 7 },
-        { type: 'rat', count: 30, waveLabel: 'The Pack!', weight: 21, bystanders: { type: 'climber', count: 3 } },
+        { type: 'dustBunny', count: 7, waveLabel: 'Chalk Dust!', weight: 2.5, formationSpread: 2, bystanders: { type: 'climber', count: 4 } },
+        { type: 'dustBunny', count: 7, weight: 2.5, formationSpread: 2 },
+        { type: 'dustBunny', count: 9, waveLabel: 'Dust Bunnies!', weight: 2, perch: true },
+        { type: 'dustBunny', count: 9, weight: 2, perch: true },
+        { type: 'dustBunny', count: 9, weight: 2, perch: true },
+        { type: 'rat', count: 9, waveLabel: 'Rats on the Mats!', weight: 2, formationSpread: 3, bystanders: { type: 'climber', count: 3 } },
+        { type: 'rat', count: 9, weight: 2, formationSpread: 3 },
+        { type: 'rat', count: 8, weight: 2, formationSpread: 3 },
+        { type: 'lanternfly', count: 42, waveLabel: 'Lanternflies!', weight: 7, formationSpread: 2 },
+        { type: 'rat', count: 30, waveLabel: 'The Pack!', weight: 21, formationSpread: 3, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
       branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 19 },
