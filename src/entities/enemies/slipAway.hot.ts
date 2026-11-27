@@ -17,10 +17,11 @@ export interface SlipAway {
 export const SNOW_SINK: SlipAway = { near: 1300, seenCos: 0.7, linger: 5, goS: 0.8, distance: 220 }
 
 /** Level 2's scorpions burrow into the sand, past the tip of the tail (~70 at its scale of 8). */
-export const SAND_BURROW: SlipAway = { near: 1300, seenCos: 0.7, linger: 5, goS: 0.6, distance: 120 }
+export const SAND_BURROW: SlipAway = { near: 1300, seenCos: 0.7, linger: 3.5, goS: 0.6, distance: 120 }
 
-/** Level 2's crows climb out of the top of the frame. */
-export const CROW_FLEE: SlipAway = { near: 1500, seenCos: 0.7, linger: 4.5, goS: 1.2, distance: 900 }
+/** Level 2's crows climb out of the top of the frame, seen from further than the others (#1059: a V that stays far off,
+ *  edge-on, is a bunch in one aim-assist circle through the boss fight). */
+export const CROW_FLEE: SlipAway = { near: 2600, seenCos: 0.7, linger: 2.5, goS: 1.2, distance: 900 }
 
 /** Level 8's toucans climb out of the top of the frame. */
 export const TOUCAN_FLEE: SlipAway = { near: 1500, seenCos: 0.7, linger: 3, goS: 1.2, distance: 900 }
