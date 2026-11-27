@@ -989,7 +989,6 @@ const RUN_LOG_MAX = 40
 function logRunChanges(api: SCTestApi) {
   useGameStore.subscribe((next, prev) => {
     if (next.phase === prev.phase && next.currentLevel === prev.currentLevel) return
-    // eslint-disable-next-line sc/no-hot-path-alloc -- a phase change, never per frame
     const from = (new Error().stack ?? '').split('\n').slice(2, 6).map((l) => l.trim()).join(' < ')
     api.runLog.push({ ms: Math.round(performance.now()), frame: api.frames, phase: next.phase, level: next.currentLevel, from })
     if (api.runLog.length > RUN_LOG_MAX) api.runLog.shift()

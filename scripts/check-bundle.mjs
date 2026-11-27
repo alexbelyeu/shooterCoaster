@@ -3,6 +3,8 @@
  * Bundle-size guardrail. Run after `npm run build`.
  * Fails if total gzipped JS in dist/, the largest chunk, or the startup JS (what index.html loads before the title, #376)
  * exceeds its budget in budgets.json.
+ * The test hook's chunk (`e2eHook-*.js`, loaded only under `?e2e=1`, #1113) is listed and held to the largest-chunk budget but
+ * left out of the total, which measures what a player can download (#1114); it fails if index.html ever loads it.
  * Raising a budget is a Director decision and must be logged in docs/agents/DECISIONS.md.
  * Also fails if the online leaderboard's server side (api/: Supabase's REST API and its key) reaches the browser,
  * or if one of Alex's notes in the gym blockout does (vite.config.ts strips them, #544), or the blockout is in the startup JS (#589).
@@ -36,6 +38,9 @@ const noteLeaks = []
 const pieceIds = blockout.items.map((item) => item.id).filter((id) => id.includes('-') && !id.startsWith('w-'))
 const blockoutAtStartup = []
 
+/** `window.__SC_TEST__`, which only `?e2e=1` imports (#1113): the one chunk the total leaves out (#1114). Renamed, it counts again. */
+const E2E_HOOK = /^e2eHook-[\w-]+\.js$/
+
 let totalGz = 0
 let largestGz = 0
 let startupGz = 0
@@ -44,23 +49,26 @@ for (const f of fs.readdirSync(dir)) {
   if (!f.endsWith('.js')) continue
   const buf = fs.readFileSync(path.join(dir, f))
   const gz = zlib.gzipSync(buf, { level: 9 }).length
-  totalGz += gz
+  const e2eOnly = E2E_HOOK.test(f)
+  if (!e2eOnly) totalGz += gz
   largestGz = Math.max(largestGz, gz)
   if (startup.has(f)) startupGz += gz
   const text = buf.toString('utf8')
   if (SERVER_ONLY.test(text)) leaks.push(f)
   if (notes.some((note) => text.includes(note))) noteLeaks.push(f)
   if (startup.has(f) && pieceIds.some((id) => text.includes(id))) blockoutAtStartup.push(f)
-  rows.push([f, (buf.length / 1024).toFixed(0), (gz / 1024).toFixed(0)])
+  const tag = startup.has(f) ? '  (startup)' : e2eOnly ? '  (e2e only, not in total)' : ''
+  rows.push([f, (buf.length / 1024).toFixed(0), (gz / 1024).toFixed(0), tag])
 }
 rows.sort((a, b) => Number(b[2]) - Number(a[2]))
-for (const [f, raw, gz] of rows) console.log(`${gz.padStart(6)} KB gz  ${raw.padStart(6)} KB  ${f}${startup.has(f) ? '  (startup)' : ''}`)
+for (const [f, raw, gz, tag] of rows) console.log(`${gz.padStart(6)} KB gz  ${raw.padStart(6)} KB  ${f}${tag}`)
+const hookAtStartup = [...startup].filter((f) => E2E_HOOK.test(f))
 
 const totalKb = totalGz / 1024
 const largestKb = largestGz / 1024
 const startupKb = startupGz / 1024
-console.log(`Startup JS: ${startupKb.toFixed(0)} KB gz (budget ${budgets.startupJsGzipKB} KB; ${startup.size} files from index.html, the rest loads on demand)`)
-console.log(`Total JS: ${totalKb.toFixed(0)} KB gz (budget ${budgets.jsTotalGzipKB} KB); largest chunk ${largestKb.toFixed(0)} KB gz (budget ${budgets.jsLargestChunkGzipKB} KB)`)
+console.log(`Startup JS: ${startupKb.toFixed(0)} KB gz, ${startupGz} B (budget ${budgets.startupJsGzipKB} KB; ${startup.size} files from index.html, the rest loads on demand)`)
+console.log(`Total JS: ${totalKb.toFixed(0)} KB gz, ${totalGz} B, without the e2e hook (budget ${budgets.jsTotalGzipKB} KB); largest chunk ${largestKb.toFixed(0)} KB gz (budget ${budgets.jsLargestChunkGzipKB} KB)`)
 
 let ok = true
 if (totalKb > budgets.jsTotalGzipKB) {
@@ -73,6 +81,10 @@ if (largestKb > budgets.jsLargestChunkGzipKB) {
 }
 if (startupKb > budgets.startupJsGzipKB) {
   console.error(`FAIL: startup JS over budget by ${(startupKb - budgets.startupJsGzipKB).toFixed(0)} KB (index.html loads it before the title; lazy-load what the title doesn't need)`)
+  ok = false
+}
+if (hookAtStartup.length) {
+  console.error(`FAIL: the e2e test hook in the startup JS: ${hookAtStartup.join(', ')} (main.tsx imports it only under ?e2e=1, #1113)`)
   ok = false
 }
 if (leaks.length) {
