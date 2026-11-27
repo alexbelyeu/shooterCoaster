@@ -91,31 +91,35 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: 36 * 20 + 124 * 15 + 2 * 60 + 4 * 40 + 400, // 2580 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 3260
+    maxScore: 31 * 20 + 144 * 15 + 2 * 60 + 4 * 40 + 400, // 2780 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 3460
     message: 'Ready for this one?',
     nextLevel: 'level3',
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
     ...paceLevel({
       // Weights are seconds (45 over the wave span). Two scorpion packs so the straight run to the lift doesn't put all of
       // them in view (#864: draws); Vs up the lift hill (2, 6 and 7 s: one wave per V of nine, so a second group doesn't
-      // fly in with the first), holding the sky to the crest; the second pack on the sand before the door (9 s, in view
-      // over the drop), and four on the passage's floor in the dark (12 s: the passage is straight, so every walker on it
-      // stands in one aim-assist circle); the sandstorm's murder in two wide Vs out of the Pyramid (13 and 17 s), More
-      // Crows over the airtime crest (22 s); then small trackside scorpion packs (23, 26 and 29 s) between wide crow Vs
-      // (25 and 28 s). The Giant Scorpion comes at 32 s, across the flats' slalom: its fight ends before the final lift
-      // (~46 s) turns the view away from it (#1059: at 40 s, a 12 s fight spent its last phase behind the dunes).
+      // fly in with the first), holding the sky to the crest; a small second pack on the sand before the door (9 s, in
+      // view over the drop: a big one is still there as the rider reaches the door, in line with the passage), and two
+      // on the passage's floor in the dark each second from 13 s (the passage is straight and narrow, so walkers further
+      // than the flash lights stand in one aim-assist circle: `darkFloor.ts` places each wave within its reach); the
+      // sandstorm's murder in two wide Vs out of the Pyramid (16 and 17 s), More Crows over the airtime crest (22 s);
+      // then small trackside scorpion packs (23, 26 and 29 s) between wide crow Vs (25 and 28 s). The Giant Scorpion comes
+      // at 32 s, across the flats' slalom: its fight ends before the final lift (~46 s) turns the view away from it
+      // (#1059: at 40 s, a 12 s fight spent its last phase behind the dunes), with a small V of crows every 3 s of it.
       // #1059 (skill): more come than a player can shoot, and they don't wait. Crows fly off (`CROW_FLEE`) and scorpions
       // burrow (`SAND_BURROW`) unscored soon after the rider sees them, so a missed one is a lost score, and every wave
       // stands wide (`formationSpread`) so a shot takes aim, not a sweep down one clump.
       waves: [
-        { type: 'scorpion', count: 9, waveLabel: 'Incoming!', formationSpread: 3, weight: 2 },
+        { type: 'scorpion', count: 9, waveLabel: 'Incoming!', formationSpread: 5, weight: 2 },
         { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', formationSpread: 3, weight: 4 },
         { type: 'crow', count: 9, formation: 'v', formationSpread: 3, weight: 1 },
         { type: 'crow', count: 6, formation: 'v', formationSpread: 3, weight: 2 },
-        { type: 'scorpion', count: 12, waveLabel: 'Out of the Sand!', formationSpread: 4, weight: 3 },
-        { type: 'scorpion', count: 4, waveLabel: 'In the Tomb!', darkFloor: true, weight: 1 },
-        { type: 'crow', count: 26, waveLabel: 'A Murder of Crows!', formation: 'v', formationSpread: 5, weather: 'sandstorm', weight: 4 },
-        { type: 'crow', count: 26, formation: 'v', formationSpread: 5, weight: 5 },
+        { type: 'scorpion', count: 5, waveLabel: 'Out of the Sand!', formationSpread: 5, weight: 4 },
+        { type: 'scorpion', count: 2, waveLabel: 'In the Tomb!', darkFloor: true, weight: 1 },
+        { type: 'scorpion', count: 2, darkFloor: true, weight: 1 },
+        { type: 'scorpion', count: 2, darkFloor: true, weight: 1 },
+        { type: 'crow', count: 26, waveLabel: 'A Murder of Crows!', formation: 'v', formationSpread: 6, weather: 'sandstorm', weight: 1 },
+        { type: 'crow', count: 26, formation: 'v', formationSpread: 6, weight: 5 },
         { type: 'crow', count: 12, waveLabel: 'More Crows!', formation: 'v', formationSpread: 3, weight: 1 },
         { type: 'scorpion', count: 4, formationSpread: 4, weight: 2 },
         { type: 'crow', count: 18, formation: 'v', formationSpread: 5, weight: 1 },
@@ -125,6 +129,7 @@ const LEVELS: LevelConfig[] = [
       ],
       boss: 'giantScorpion',
       bossAt: 32,
+      fight: [37, 40, 43, 46].map((at) => ({ type: 'crow' as const, count: 5, formation: 'v' as const, formationSpread: 5, at })),
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {

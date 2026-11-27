@@ -40,6 +40,11 @@ export interface Roster {
    * branch (after its switch sign, before its merge), and only on a run that took it (`EnemyWave.route`).
    */
   branch?: Omit<EnemyWave, 'spawnDelay' | 'route'> & { at: number }
+  /**
+   * Waves that arrive during the boss's fight, at level second `at` (after `bossAt`, before the run's end): something to
+   * shoot while the boss is out of the frame (#1059: level 2's crows over the Giant Scorpion's slalom).
+   */
+  fight?: (Omit<EnemyWave, 'spawnDelay' | 'route'> & { at: number })[]
 }
 
 export interface PacedLevel {
@@ -49,7 +54,7 @@ export interface PacedLevel {
 
 /** Whole seconds: the spawner reads the stored timer, which changes once a second. */
 export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel {
-  const { waves, boss, finale, branch } = roster
+  const { waves, boss, finale, branch, fight = [] } = roster
   if (!waves.length) throw new Error('no waves')
   if (boss && finale) throw new Error('a boss or a finale, not both')
   const times = pacingTimes(runSeconds)
@@ -66,6 +71,11 @@ export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel 
   if (last > lastWaveBy) throw new Error(`last wave at ${last} s, after ${lastWaveBy} s`)
   if (!Number.isInteger(bossAt) || bossAt <= last) throw new Error(`boss at ${bossAt} s: a whole second after the last wave`)
   if (finale) enemies.push({ ...finale, spawnDelay: bossAt })
+  if (fight.length && !boss) throw new Error('fight waves need a boss')
+  for (const { at, ...wave } of fight) {
+    if (!Number.isInteger(at) || at <= bossAt || at >= runSeconds) throw new Error(`fight wave at ${at} s: a whole second between ${bossAt} and ${runSeconds} s`)
+    enemies.push({ ...wave, spawnDelay: at })
+  }
   if (branch) {
     const { at, ...wave } = branch
     if (!Number.isInteger(at) || at <= 0 || at >= bossAt) throw new Error(`branch at ${at} s: a whole second before ${bossAt} s`)
