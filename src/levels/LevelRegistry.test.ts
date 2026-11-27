@@ -67,7 +67,7 @@ describe('LevelRegistry', () => {
   })
 
   it.each(levels.map((l) => [l.id, l] as const))(
-    '%s: waves from 0 s, the last one shootable by 35 s, then a 18–27 s boss fight (or a finale wave) ending the run',
+    '%s: waves from 0 s, the last one shootable by 35 s, then a 18–28 s boss fight (or a finale wave) ending the run',
     (_id, level) => {
       expect(RUN_SECONDS).toBe(60)
       // A hard-route wave is timed by its junction, outside the waves every run meets.
@@ -80,8 +80,8 @@ describe('LevelRegistry', () => {
       // The template's second, or sooner where a level's ride leaves the boss too little in view (level3, #1059).
       expect(finaleAt).toBeLessThanOrEqual(pacingTimes().bossAt)
       expect(RUN_SECONDS - finaleAt).toBeGreaterThanOrEqual(18)
-      // Up to 27 s where the boss comes sooner (level2, #1059: the Giant Scorpion before the final lift turns the view away).
-      expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(27)
+      // Up to 28 s where the boss comes sooner (level2, #1059: the Giant Scorpion before the final lift turns the view away).
+      expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(28)
       if (level.boss) expect(level.boss.at - BOSS_SPECS[level.boss.type].tell.seconds).toBeGreaterThan(Math.max(...waves))
     },
   )

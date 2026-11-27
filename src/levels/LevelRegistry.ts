@@ -88,8 +88,8 @@ const LEVELS: LevelConfig[] = [
       // second pack on the sand before the door (9 s, in view over the drop: later, the dune hides it until 13 s), and
       // seven on the passage's floor in the dark (13 s: ten bunched where the passage narrows to its vanishing point);
       // the sandstorm's V meets the car out of the Pyramid (15 s, as the last of the dark floor's are shot); More Crows over
-      // the airtime crest (22 s); then only trackside scorpions (23 to 30 s), spread wide so the esses don't line them up,
-      // each pack in view as the one before it is cleared. The Giant Scorpion comes at 33 s, across the flats' slalom: its
+      // the airtime crest (22 s); then only trackside scorpions (23 to 29 s), spread wide so the esses don't line them up,
+      // each pack in view as the one before it is cleared. The Giant Scorpion comes at 32 s, across the flats' slalom: its
       // fight ends before the final lift (~46 s) turns the view away from it (#1059: at 40 s, a 12 s fight spent its last
       // phase behind the dunes). Crows fly off and scorpions burrow unscored soon after the rider sees them, and the Vs
       // spread wider (#1059): a missed one is a lost score.
@@ -102,14 +102,14 @@ const LEVELS: LevelConfig[] = [
         { type: 'scorpion', count: 7, waveLabel: 'In the Tomb!', darkFloor: true, weight: 2 },
         { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', formationSpread: 2, weather: 'sandstorm', weight: 7 },
         { type: 'crow', count: 9, waveLabel: 'More Crows!', formation: 'v', formationSpread: 2, weight: 1 },
-        { type: 'scorpion', count: 5, formationSpread: 2, weight: 3 },
+        { type: 'scorpion', count: 5, formationSpread: 2, weight: 2 },
         { type: 'scorpion', count: 8, formationSpread: 2, weight: 1 },
         { type: 'scorpion', count: 9, formationSpread: 2, weight: 2 },
         { type: 'scorpion', count: 6, formationSpread: 2, weight: 1 },
-        { type: 'scorpion', count: 7, formationSpread: 2, weight: 15 },
+        { type: 'scorpion', count: 7, formationSpread: 2, weight: 16 },
       ],
       boss: 'giantScorpion',
-      bossAt: 33,
+      bossAt: 32,
     }),
     starThresholds: [0.25, 0.55, 0.85],
     environment: {

@@ -41,11 +41,11 @@ describe('Giant Scorpion spec', () => {
     expect(isDefeated(s)).toBe(true)
   })
 
-  it('claws take 4 hits for 60, tail segments 1 for 40, the stinger 6 for the 400 reward (#1059)', () => {
+  it('claws take 3 hits for 60, tail segments 1 for 40, the stinger 5 for the 400 reward (#1059)', () => {
     const wp = (id: string) => GIANT_SCORPION.weakPoints.find((w) => w.id === id)!
-    expect([wp('claw-l').hp, wp('claw-l').score]).toEqual([4, 60])
+    expect([wp('claw-l').hp, wp('claw-l').score]).toEqual([3, 60])
     expect([wp('tail-2').hp, wp('tail-2').score]).toEqual([1, 40])
-    expect([wp('stinger').hp, wp('stinger').score]).toEqual([6, 0])
+    expect([wp('stinger').hp, wp('stinger').score]).toEqual([5, 0])
     expect(bossMaxScore(GIANT_SCORPION)).toBe(2 * 60 + 4 * 40 + 400)
   })
 })

@@ -14,8 +14,8 @@
  * - **24 s, the canyon**: a jump gap between two mesas, the rails broken over the open ground between them.
  * - **26–29 s, the dune esses**: down to the flats left, right and left again, banked through the dunes.
  * - **31 s, the airtime hill**: a crest you float over as the crows' second V comes in (30 s).
- * - **34–44 s, the slalom** across the flats, slow, and the Giant Scorpion (40 s); then a wide turn round the flats in
- *   the middle, the boss on the sand beside it.
+ * - **34–46 s, the slalom** across the flats, slow, and the Giant Scorpion (32 s) on the sand beside it; then the
+ *   final lift, a climbing turn back towards the station.
  * - **55–60 s, the brake run** into the station: home.
  *
  * `desertTrack.test.ts` holds it to the beats and its clearances (the ground, the Pyramid's passage, the canyon's mesas).
@@ -147,8 +147,8 @@ export function buildDesertRide(): DesertRide {
   // 26 s: down to the flats through the dunes' esses, then over an airtime hill (31 s).
   esses(DUNE_ESSES, CAMEL.y - y())
   airtimeHill(b, { rise: CAMEL.rise, crestRadius: CAMEL.crest, angle: CAMEL.angle })
-  // 35 s: across the flats in a slow slalom, and the Giant Scorpion's arena (40 s): a wide turn round the flats in the
-  // middle, the boss on the sand beside it.
+  // 35 s: across the flats in a slow slalom, the Giant Scorpion's arena (it comes at 32 s); then the final lift (~46 s),
+  // a climbing turn back towards the station.
   esses(FLAT_ESSES)
   zone('lift', SPEED.finale, () => turn(-Math.PI, b.position.z / 2, STATION.y - y()))
   // 58 s: the brake run into the station.
