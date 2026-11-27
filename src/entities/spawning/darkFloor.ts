@@ -30,14 +30,15 @@ export const FLOOR_WALL_CLEAR = 17
 /** Above the floor, as `spawnPlacement.ts` stands a ground enemy on the terrain. */
 const FLOOR_OFFSET = 5
 
-/** One per even step of the stretch (jittered inside it), alternating sides, so the passage has no empty run. */
+/** One per even step of the stretch (jittered inside it), alternating sides out by the walls, so the passage has no empty run. */
 export function darkFloorSlots(count: number, rng: Rng): FloorSlot[] {
-  return Array.from({ length: count }, (_, i) => ({ along: (i + rng.range(0.2, 0.8)) / count, side: (i % 2 ? 1 : -1) * rng() }))
+  return Array.from({ length: count }, (_, i) => ({ along: (i + rng.range(0.2, 0.8)) / count, side: (i % 2 ? 1 : -1) * rng.range(0.6, 1) }))
 }
 
 /**
  * The walkers on the floor of the dark section the rider is in or comes to next (the last one with a floor once past
- * them all): spread over the floored stretch from `FLOOR_LEAD` past the rider, or its start if further, to its end.
+ * them all): spread over the floored stretch from `FLOOR_LEAD` past the rider, or its start if further, to its end or
+ * the flash's reach past that start, whichever is nearer.
  */
 export function placeOnDarkFloor(
   table: ArcTable, riderIndex: number, sections: readonly DarkSectionSpec[], slots: readonly FloorSlot[],
@@ -48,7 +49,9 @@ export function placeOnDarkFloor(
   const { below, halfWidth } = section.floor!
   const rider = table.s[riderIndex]
   const start = Math.max(distanceAtT(table, section.from + section.ramp), rider + FLOOR_LEAD)
-  const end = Math.max(start, distanceAtT(table, section.to - section.ramp))
+  // No further than the flash lights from the first: down a narrow passage, walkers further ahead all stand in one
+  // aim-assist circle (#1059), so a long passage takes several small waves, each placed as it arrives.
+  const end = Math.max(start, Math.min(distanceAtT(table, section.to - section.ramp), start + section.flashReach - FLOOR_LEAD))
   const outMax = halfWidth - FLOOR_WALL_CLEAR
   return slots.map(({ along, side }) => {
     const i = indexAhead(table, riderIndex, start + along * (end - start) - rider)

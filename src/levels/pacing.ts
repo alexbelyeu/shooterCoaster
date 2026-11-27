@@ -59,7 +59,7 @@ export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel 
   let before = 0
   const enemies: EnemyWave[] = waves.map(({ weight, ...wave }) => {
     const spawnDelay = Math.round((waveSpan * before) / total)
-    before += weightOf({ weight })
+    before += weight ?? 1 // checked by `total`
     return { ...wave, spawnDelay }
   })
   const last = enemies[enemies.length - 1].spawnDelay!
