@@ -369,8 +369,8 @@ export const SCORPION_GEO = mergePainted([
 export const SCORPION_TAIL_PIVOT: [number, number, number] = [0, 0.5, -2.5]
 
 // Chain of spheres curling up and over, tipped by the red stinger: one mesh, so a
-// scorpion is two draw calls (body, tail) in the Desert's 40-strong packs.
-const SCORPION_STINGER_COLOR = '#ff4422'
+// scorpion is two draw calls (body, tail): the Desert has ~40 enemies on screen at 10 s.
+const SCORPION_STINGER_COLOR = '#d01a0a'
 export const SCORPION_TAIL_GEO = mergePainted([
   painted(placedParts(
     ([[0, 0.5, 0], [0, 1.5, -0.3], [0, 2.8, -0.2], [0, 3.8, 0.3], [0, 4.5, 1.0]] as Vec3[]).map((at) =>
@@ -389,7 +389,7 @@ export const SCORPION_SHELL_MAT = withRim(new THREE.MeshStandardMaterial({
   flatShading: true,
 }), SCORPION_RIM)
 // The stinger glows: its red vertex colour (the tail's is near black) lights it.
-const SCORPION_STING_APPLY = /* glsl */ `totalEmissiveRadiance += vec3(1.0, 0.13, 0.0) * 2.2 * step(0.5, vColor.r);`
+const SCORPION_STING_APPLY = /* glsl */ `totalEmissiveRadiance += vec3(0.8, 0.02, 0.0) * step(0.5, vColor.r);`
 export const SCORPION_TAIL_MAT = withEmissivePatch(withRim(new THREE.MeshStandardMaterial({
   vertexColors: true,
   metalness: 0.3,
