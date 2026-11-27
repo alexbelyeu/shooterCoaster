@@ -24,9 +24,9 @@
  *   - summon the level's boss now, read it (hp, exposed weak points, on-screen box) and hit it through processHit
  *   - read the graphics quality, its preset and the adaptive dpr steps
  *
- * Keep this file tiny and side-effect free when the flag is off: nothing here
- * runs unless `installE2EApi()` finds `?e2e=1`, and <E2EFrameProbe> is only
- * mounted under the same flag.
+ * A lazy chunk, never in the startup JS (#1113): `main.tsx` imports it only under `?e2e=1` and installs the API
+ * before React mounts, and GameCanvas lazy-loads <E2EFrameProbe> under the same flag. The flag and the counters the
+ * game writes live in `e2eState.ts`; game modules import those, never this file.
  */
 import { useEffect } from 'react'
 import { dailyKey, dailyLevel, dailySeed, type DailyStreak } from '@/levels/daily'
@@ -37,12 +37,11 @@ import type { RideVariant, RunMode } from '@/types/game'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { eventBus } from '@/core/EventBus'
 import { ENEMY_SILHOUETTE, REFERENCE_VIEWPORT_H, projectedPx } from '@/entities/enemies/enemyReadability'
-import type { EnemyType, EnemyWave, RideBeat } from '@/types/level'
+import type { EnemyWave, RideBeat } from '@/types/level'
 import { levelWeather, weatherSeconds } from '@/levels/environments/shared/weatherPulse'
 import type { GamePhase, LeaderboardEntry, ScoreEntry } from '@/types/game'
 import { getCollisionTargets, processHit, type CollisionTarget } from '@/combat/CollisionManager'
 import { fireAtNDC, showShotAtNDC } from '@/combat/useShooting'
-import { hashString } from '@/utils/rng'
 import { gameTime } from '@/core/gameClock'
 import { startupTimings, type StartupPhase } from '@/core/startupMarks'
 import { useSettingsStore } from '@/store/useSettingsStore'
@@ -58,15 +57,12 @@ import { droppedSounds } from '@/audio/soundGuard'
 import { musicState, type MusicFade } from '@/audio/musicBus'
 import { scrimPlayer } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
-import { currentPhase, exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
+import { currentPhase, exposedWeakPoints, hpFraction, weakPointHp } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayload } from '@/ui/share'
 import { setOnlineEndpointOverride } from '@/app/onlineLeaderboard'
 import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
 import { renderScoreCard } from '@/ui/scoreCardImage'
 import { activeWeapon, pickupRemaining } from '@/combat/weapons/weaponTypes'
-import type { LivePickup } from '@/combat/pickups/Pickups'
-import type { Junction, SwitchPose } from '@/track/mechanics'
-import type { TrackCurve } from '@/track/curves/TrackCurve'
 import { rideProgress } from '@/track/rideProgress.hot'
 import { WAVE_TELL_SECONDS } from '@/entities/spawning/waveSchedule'
 import { RIG_MAX_PITCH_DEG, RIG_MAX_ROLL_DEG } from '@/track/cameraRig.hot'
@@ -79,9 +75,28 @@ import type { EnemyKilledEvent } from '@/combat/hitFeedback'
 import { LONG_FRAME_MS } from '@/telemetry/telemetryReport'
 import { bystanderCount } from '@/combat/bystanders'
 import { BYSTANDER_PENALTY } from '@/levels/scoring'
-
-export const isE2E =
-  typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('e2e')
+import {
+  BOSS_PROJECTILE_PREFIX,
+  countsInTally,
+  e2eBoss,
+  e2eBullets,
+  e2eDeaths,
+  e2eFireworks,
+  e2eLevelTime,
+  e2eParticles,
+  e2ePickups,
+  e2eRide,
+  e2eSwitch,
+  enemyRegistry,
+  isBossId,
+  isE2E,
+  resetRunTally,
+  runTally,
+  spawnDigest,
+  waveProbe,
+  type E2EBossStage,
+  type WaveProbe,
+} from './e2eState'
 
 /**
  * `?e2e=1&gpuSync=1` (#608): each frame first waits for the GPU to finish the one before. Headless Chromium's old
@@ -456,8 +471,6 @@ export interface E2EFireworks {
   lastBurst: { x: number; y: number; onScreen: boolean } | null
 }
 
-export type E2EBossStage = 'none' | 'waiting' | 'incoming' | 'active' | 'defeated' | 'done'
-
 export interface E2EBoss {
   stage: E2EBossStage
   hpFraction: number | null
@@ -590,46 +603,6 @@ export interface E2EEnemyOnScreen {
   px: number
   distance: number
 }
-
-/** Live enemy objects, registered by EnemyBase only when the e2e flag is on. */
-const enemyRegistry = new Map<string, { type: EnemyType | 'goldenBalloon'; object: THREE.Object3D }>()
-export function registerE2EEnemy(id: string, type: EnemyType | 'goldenBalloon', object: THREE.Object3D) {
-  if (!isE2E) return
-  enemyRegistry.set(id, { type, object })
-  if (countsInTally(id)) runTally.spawned.add(id)
-}
-
-/**
- * The run's enemies (#1058 `killShare`): each that came into play, and each the model player (`autoFire`'s player mode)
- * killed. Golden balloons (outside `maxScore`), bystanders and the boss's weak points are left out. `basePoints`: every kill's
- * points before the combo multiplier (weak points and goldens in), the score `maxScore` is the kill-everything total of. Reset by
- * `startLevel` and `restartLevel`.
- */
-const runTally = { spawned: new Set<string>(), killed: new Set<string>(), escaped: new Set<string>(), basePoints: 0 }
-const countsInTally = (id: string) => !id.startsWith('bystander-') && !isBossId(id) && enemyRegistry.get(id)?.type !== 'goldenBalloon'
-function resetRunTally() {
-  runTally.spawned.clear()
-  runTally.killed.clear()
-  runTally.escaped.clear()
-  runTally.basePoints = 0
-}
-
-/** An enemy gone unscored (`onEscape`: one that slipped away, a climber topped out): off the kill count's total (#1059). */
-export function recordE2EEscape(id: string) {
-  if (isE2E) runTally.escaped.add(id)
-}
-export function unregisterE2EEnemy(id: string) {
-  if (isE2E) enemyRegistry.delete(id)
-}
-
-/** Hash of the current run's spawn positions (all waves + golden balloons), set by EnemySpawner. */
-let spawnDigest: string | null = null
-export function recordE2ESpawns(positions: readonly { x: number; y: number; z: number }[]) {
-  if (!isE2E) return
-  const text = positions.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)}`).join(';')
-  spawnDigest = `${positions.length}:${hashString(text).toString(16)}`
-}
-
 /** One frame that compiled shader programs after its level's warm-up (#536). */
 export interface ProgramGrowth {
   /** Level timer seconds (the last playing frame's). */
@@ -661,103 +634,11 @@ function noteProgramGrowth(api: SCTestApi, programs: number) {
   frameEvents.clear()
 }
 
-/** The level timer's elapsed seconds, reported by GameTimer every playing frame (for `stopAtLevelTime`). */
-let e2eLevelTime = 0
-export function noteE2ELevelTime(seconds: number) {
-  if (isE2E) e2eLevelTime = seconds
-}
-/** This frame's step under `stopAtLevelTime`, worked out once: the timer and the ride read the same one whichever runs first. */
-const stopStep = { frame: NaN, delta: NaN, step: 0 }
-// A hair past the stop, so the timer's remaining seconds round down to the stop's whole second.
-const STOP_EPSILON = 1e-6
-
-/** Level time for a playing frame of `delta` seconds: the frame time, unless a test set `timerStep` / `timerStepMax` / `stopAtLevelTime`. */
-export function levelTimeStep(delta: number): number {
-  const api = isE2E ? window.__SC_TEST__ : undefined
-  const step = api?.timerStep ?? (api?.timerStepMax != null ? Math.min(delta, api.timerStepMax) : delta)
-  if (api?.stopAtLevelTime == null) return step
-  // The animation frame's timestamp is the same for every useFrame callback of one frame.
-  const frame = Number(document.timeline.currentTime)
-  if (frame !== stopStep.frame || delta !== stopStep.delta) {
-    const left = api.stopAtLevelTime - e2eLevelTime
-    stopStep.frame = frame
-    stopStep.delta = delta
-    stopStep.step = left <= 0 ? 0 : Math.min(step, left + STOP_EPSILON)
-  }
-  return stopStep.step
-}
-
-/** True while a test holds the level timer (`holdLevelTime`); never in normal play. */
-export function levelTimeHeld(): boolean {
-  return isE2E && window.__SC_TEST__?.holdLevelTime === true
-}
-
-/** Seconds the coaster rides on a playing frame of `delta` seconds when a test set `rideRate`, else null. */
-export function e2eRideSeconds(delta: number): number | null {
-  const rate = isE2E ? window.__SC_TEST__?.rideRate : null
-  return rate == null ? null : levelTimeStep(delta) * rate
-}
-
-/** Idle ms before the title's attract mode: `idleMs` in the game, the test's `titleAttractIdleMs` under e2e (null: never). */
-export function e2eAttractIdleMs(idleMs: number): number | null {
-  return isE2E ? (window.__SC_TEST__?.titleAttractIdleMs ?? null) : idleMs
-}
-
-/** The title camera's time when a test holds it (`titleTime`), else null. */
-export function e2eTitleTime(): number | null {
-  return isE2E ? (window.__SC_TEST__?.titleTime ?? null) : null
-}
-
-/** The mounted spawner's wave schedule, set by EnemySpawner. */
-interface WaveProbe {
-  levelTime: number
-  due: number | null
-  lastTick: number | null
-}
-let waveProbe: (() => WaveProbe) | null = null
-export function registerE2EWaves(probe: typeof waveProbe) {
-  if (isE2E) waveProbe = probe
-}
-
 /** Camera + viewport captured by <E2EFrameProbe> so non-React test calls can aim/project. */
 let probeCamera: THREE.Camera | null = null
 let probeSize = { width: 1280, height: 720 }
 const _v = new THREE.Vector3()
 const _w = new THREE.Vector3()
-
-/** Written by BulletPool every playing frame when the e2e flag is on; read through `bullets()`. */
-export const e2eBullets = {
-  drawn: 0,
-  screenFrac: 0,
-  maxScreenFrac: 0,
-  hasNewest: false,
-  newest: new THREE.Vector3(),
-}
-
-/** Written by `effects/Fireworks.tsx` when the e2e flag is on; read through `fireworks()`. */
-export const e2eFireworks = {
-  mounted: false,
-  launched: 0,
-  bursts: 0,
-  rocketsLive: 0,
-  burstsLive: 0,
-  hasLast: false,
-  last: new THREE.Vector3(),
-}
-
-/** Written by `shared/ParticleField.tsx` when the e2e flag is on; read through `particles()`. */
-export const e2eParticles = { mounted: false, points: 0, boostPoints: 0, boost: 0 }
-
-/** Written by `canvas/LevelScene.tsx` when the e2e flag is on: the running level's v2 ride beats (its ride is in its world's chunk, #960); read through `rideBeats()`. */
-export const e2eRide: { beats: readonly RideBeat[] } = { beats: [] }
-
-/** Written by `combat/pickups/Pickups.tsx` when the e2e flag is on; read through `pickups()`. */
-export const e2ePickups: { list: readonly LivePickup[] } = { list: [] }
-
-/** Written by `track/TrackSwitch.tsx` when the e2e flag is on; read through `trackSwitch()`. */
-export const e2eSwitch: {
-  state: { pose: SwitchPose; main: TrackCurve; junction: Junction; open: () => boolean } | null
-} = { state: null }
 
 function readSwitch(): E2ESwitch | null {
   const cam = probeCamera
@@ -824,16 +705,6 @@ function readPickups(): E2EPickup[] {
   })
 }
 
-/** Written by `effects/ParticleExplosion.tsx` when the e2e flag is on; read through `deaths()`. */
-export const e2eDeaths = {
-  mounted: false,
-  spawned: 0,
-  live: 0,
-  lastStyle: '',
-  hasLast: false,
-  last: new THREE.Vector3(),
-}
-
 function readDeaths(): E2EDeaths {
   const d = e2eDeaths
   let last: E2EDeaths['last'] = null
@@ -866,16 +737,6 @@ function readBullets(): E2EBullets {
   }
   return { drawn: b.drawn, screenFrac: b.screenFrac, maxScreenFrac: b.maxScreenFrac, newest }
 }
-
-/** Written by BossSpawner / BossBase when the e2e flag is on; read through `boss()`. */
-export const e2eBoss: {
-  /** The run `summonBoss()` was called in, until that run's BossSpawner takes it. */
-  summon: number | null
-  stage: E2EBossStage
-  handle: { body: THREE.Object3D; parts: ReadonlyMap<string, THREE.Object3D>; state: () => BossState } | null
-  /** World positions of its live projectiles, set by a boss that throws them. */
-  projectiles: (() => readonly THREE.Vector3[]) | null
-} = { summon: null, stage: 'none', handle: null, projectiles: null }
 
 const _box = new THREE.Box3()
 const _corner = new THREE.Vector3()
@@ -924,7 +785,6 @@ function readBoss(): E2EBoss {
   return out
 }
 
-const isBossId = (id: string) => id.startsWith('boss:')
 const isBossTarget = (t: CollisionTarget) => isBossId(t.id)
 
 function bossHit(n: number): number {
@@ -946,9 +806,6 @@ function bossHit(n: number): number {
   }
   return landed
 }
-
-/** Target id prefix of a boss's projectiles: not `boss:`, so `bossHit` leaves them and they are shot like enemies. */
-export const BOSS_PROJECTILE_PREFIX = 'boss-projectile:'
 
 function projectileHit(): number {
   const live = [...getCollisionTargets()].filter((t) => t.id.startsWith(BOSS_PROJECTILE_PREFIX))
@@ -977,12 +834,6 @@ function enemiesOnScreen(): E2EEnemyOnScreen[] {
     })
   }
   return out.sort((a, b) => b.px - a.px)
-}
-
-declare global {
-  interface Window {
-    __SC_TEST__?: SCTestApi
-  }
 }
 
 const AUTOFIRE_INTERVAL_MS = 100
@@ -1148,7 +999,7 @@ function logRunChanges(api: SCTestApi) {
 export function installE2EApi() {
   if (!isE2E || window.__SC_TEST__) return
   eventBus.taps.add((event) => frameEvents.add(event))
-  // The medal table loads with the screens, not the startup JS this hook is part of; it has arrived long before a run ends.
+  // The medal table loads with the screens, not with this hook; it has arrived long before a run ends.
   let medals: typeof import('@/levels/medals') | null = null
   void import('@/levels/medals').then((m) => (medals = m))
   // Throw rather than answer "no medals" while the chunk is on its way: a slow runner's failure then says so.
@@ -1556,7 +1407,7 @@ function readView(): E2EView | null {
 }
 
 /** Mount inside <Canvas>. Counts frames and samples renderer stats. */
-export function E2EFrameProbe() {
+export default function E2EFrameProbe() {
   const gl = useThree((s) => s.gl)
   const scene = useThree((s) => s.scene)
   useEffect(() => {

@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useGameStore } from '@/store/useGameStore'
 import { isFeedbackHeld } from '@/combat/hitFeedback'
-import { e2eDeaths, isE2E } from '@/testing/e2eHook'
+import { e2eDeaths, isE2E } from '@/testing/e2eState'
 import { setExplosionPool } from './explosionPoolHandle'
 import {
   CHUNKS_PER_SLOT,

@@ -20,11 +20,10 @@ import { markStartup } from './core/startupMarks'
 import { useGameStore } from './store/useGameStore'
 import { installStaleReload } from './app/staleReload'
 import { installTelemetry } from './telemetry/playerTelemetry'
-import { installE2EApi } from './testing/e2eHook'
+import { isE2E } from './testing/e2eState'
 import { perfRequested } from './perf/perfFlag'
 
 markStartup('boot')
-installE2EApi()
 installStaleReload()
 if (perfRequested()) void import('./perf/perfRecorder').then((m) => m.startPerfRecorder())
 
@@ -54,9 +53,21 @@ if (analyticsOn) {
   installTelemetry(__APP_VERSION__, storage)
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-    {analyticsOn && <Analytics beforeSend={dropInternalEvents(storage)} />}
-  </StrictMode>,
-)
+const mount = () =>
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+      {analyticsOn && <Analytics beforeSend={dropInternalEvents(storage)} />}
+    </StrictMode>,
+  )
+
+// The test hook is a lazy chunk players never load (#1113); under ?e2e=1 it is installed before React mounts, as the
+// smoke and `npm run clip` expect.
+if (isE2E) {
+  void import('./testing/e2eHook').then((m) => {
+    m.installE2EApi()
+    mount()
+  })
+} else {
+  mount()
+}

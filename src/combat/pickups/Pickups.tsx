@@ -6,7 +6,7 @@ import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/Col
 import { WEAPONS, type PickupWeaponId } from '@/combat/weapons/weaponTypes'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
-import { e2ePickups, isE2E } from '@/testing/e2eHook'
+import { e2ePickups, isE2E } from '@/testing/e2eState'
 import {
   PICKUP_BOB, PICKUP_GEM_RADIUS, PICKUP_HIT_RADIUS, PICKUP_RING_RADIUS, PICKUP_RING_TUBE, placePickups,
 } from './pickupPlacement'

@@ -9,7 +9,7 @@ import { getExplosionPool } from '@/effects/explosionPoolHandle'
 import { BOSS_DEFEAT_BURST_OFFSETS, BOSS_PART_DEATH_STYLE, type DeathStyle } from '@/effects/deathStyles'
 import { flashMesh, restoreMesh } from '@/entities/enemies/hitFlash'
 import { createKillPop, finishKillPop, startKillPop, tickKillPop, type KillPop } from '@/entities/enemies/killPop'
-import { e2eBoss, isE2E } from '@/testing/e2eHook'
+import { e2eBoss, isE2E } from '@/testing/e2eState'
 import type { ArcTable } from '@/track/arcLength'
 import type { HeightFunction } from '@/utils/terrainNoise'
 import {

@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { registerCollisionTarget, unregisterCollisionTarget } from '@/combat/CollisionManager'
 import { sfx } from '@/audio/sfx'
 import { useGameStore } from '@/store/useGameStore'
-import { e2eSwitch, isE2E } from '@/testing/e2eHook'
+import { e2eSwitch, isE2E } from '@/testing/e2eState'
 import type { TrackCurve } from './curves/TrackCurve'
 import { type Junction, type SwitchPose, SWITCH_BOARD_H, SWITCH_BOARD_W, SWITCH_HIT_RADIUS, switchOpen, switchPose } from './mechanics'
 import { rideProgress } from './rideProgress.hot'

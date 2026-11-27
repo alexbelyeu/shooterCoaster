@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { recordFrame, type FrameSample } from '@/core/hitchLog'
 import { useGameStore } from '@/store/useGameStore'
-import { isE2E } from '@/testing/e2eHook'
+import { isE2E } from '@/testing/e2eState'
 import { rendererName } from '@/telemetry/playerTelemetry'
 import { frameTime, hitchLog, noteContextLoss, perfContext } from './perfRecorder'
 

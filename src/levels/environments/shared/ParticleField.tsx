@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { eventBus } from '@/core/EventBus'
 import { useGameStore } from '@/store/useGameStore'
 import { isCoarsePointer, useQualityProfile } from '@/canvas/useRenderBudget'
-import { e2eParticles, isE2E } from '@/testing/e2eHook'
+import { e2eParticles, isE2E } from '@/testing/e2eState'
 import type { ParticleFieldPreset } from './types'
 import { newBoostTrack, particleCounts, resetBoost, stepBoost } from './particlePresets'
 

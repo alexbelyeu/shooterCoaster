@@ -11,7 +11,7 @@ import {
   type RideState,
 } from './ridePhysics'
 import { planFastestLeadT } from './rideV2'
-import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eHook'
+import { e2eRideSeconds, levelTimeStep } from '@/testing/e2eState'
 import { useGameStore } from '@/store/useGameStore'
 import { sfx } from '@/audio/sfx'
 import { eventBus } from '@/core/EventBus'

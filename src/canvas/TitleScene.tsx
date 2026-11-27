@@ -20,7 +20,7 @@ import { audioNow } from '@/audio/AudioEngine'
 import { titleBeatGrid } from '@/audio/titleMusic'
 import { isUiTarget } from '@/input/pointerInput'
 import { markStartup } from '@/core/startupMarks'
-import { e2eTitleTime } from '@/testing/e2eHook'
+import { e2eTitleTime } from '@/testing/e2eState'
 
 const BALLOON_DRIFT_RAD_S = 0.04
 const CROSSING_LIVERY: CoasterLivery = { rail: [0.92, 0.95, 1], spine: [0.15, 0.55, 1], body: '#2f6fd6', seat: '#1d4a9a' }

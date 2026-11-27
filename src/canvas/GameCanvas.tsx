@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import SceneManager from './SceneManager'
 import { useSettingsStore } from '@/store/useSettingsStore'
 import { useGameStore } from '@/store/useGameStore'
-import { isE2E, E2EFrameProbe } from '@/testing/e2eHook'
+import { isE2E } from '@/testing/e2eState'
 import { adaptiveDprTick, createAdaptiveDpr } from './adaptiveDpr'
 import { getAdaptiveSteps, setAdaptiveSteps, useCanvasDpr } from './useRenderBudget'
 import TelemetryFrameProbe from '@/telemetry/TelemetryFrameProbe'
@@ -19,6 +19,8 @@ import { installAerialFog } from '@/levels/environments/shared/aerialFog'
 installAerialFog()
 
 const PerfProbe = lazy(() => import('@/perf/PerfProbe'))
+// Already loaded under ?e2e=1: main.tsx imports the hook before React mounts (#1113).
+const E2EFrameProbe = lazy(() => import('@/testing/e2eHook'))
 
 /** Frames the canvas draws under the poster before it fades: the first can still be compiling its shaders. */
 const POSTER_FRAMES = 2
@@ -88,7 +90,11 @@ export default function GameCanvas() {
       {poster && <PosterHandoff onDone={() => setPoster(false)} />}
       {adaptive && <AdaptiveDpr />}
       {showFPS && <Stats />}
-      {isE2E && <E2EFrameProbe />}
+      {isE2E && (
+        <Suspense fallback={null}>
+          <E2EFrameProbe />
+        </Suspense>
+      )}
       {telemetryActive() && <TelemetryFrameProbe />}
       {perfRequested() && (
         <Suspense fallback={null}>
