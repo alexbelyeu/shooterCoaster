@@ -4,7 +4,7 @@ import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import { DUST_BUNNY_GEO, DUST_BUNNY_MAT, DUST_BUNNY_RADIUS, DUST_BUNNY_REACH, dustBunnyRoll } from './SharedEnemyAssets'
-import { DUST_BUNNY, dustBunnyDrop, dustBunnyPose, newDustBunnyPose } from './dustBunnyMotion.hot'
+import { DUST_BUNNY, dustBunnyCirclePose, dustBunnyDrop, dustBunnyPose, newDustBunnyPose } from './dustBunnyMotion.hot'
 
 const DUST_BUNNY_SCALE = 8
 /**
@@ -17,9 +17,11 @@ const FOOTPRINT = DUST_BUNNY_REACH * (1 + DUST_BUNNY.squash / 2) * DUST_BUNNY_SC
 
 /**
  * A dust bunny (#515): a fluffy ball of dust and chalk rolling and drifting low over the floor (`dustBunnyMotion.hot.ts`).
- * The fluff rolls; the eyes stay on its front (one mesh, `DUST_BUNNY_GEO`'s morph targets).
+ * The fluff rolls; the eyes stay on its front (one mesh, `DUST_BUNNY_GEO`'s morph targets). Given a `floor` (a perch's height,
+ * `spawning/perch.ts`), it drifts round a small circle at that height instead.
  */
 export default function DustBunny(props: EnemyProps) {
+  const { floor } = props
   const { base, phase } = useEnemyRandom(props.id, (rng) => ({ base: rng() * Math.PI * 2, phase: rng() * 2 }))
   const heightFn = useContext(TerrainContext)
   const pose = useRef(newDustBunnyPose()).current
@@ -33,15 +35,17 @@ export default function DustBunny(props: EnemyProps) {
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, spawnPos: THREE.Vector3, time: number) => {
       startedAt.current ??= time
-      dustBunnyPose(base, DUST_BUNNY_RADIUS * DUST_BUNNY_SCALE, time - startedAt.current + phase, pose)
+      const t = time - startedAt.current + phase
+      if (floor) dustBunnyCirclePose(base, DUST_BUNNY_RADIUS * DUST_BUNNY_SCALE, t, pose)
+      else dustBunnyPose(base, DUST_BUNNY_RADIUS * DUST_BUNNY_SCALE, t, pose)
       mesh.position.x = spawnPos.x + pose.x
       mesh.position.z = spawnPos.z + pose.z
       // The highest floor under its footprint, not just under its centre: on a slope or at the pit's edge.
       const { x, z } = mesh.position
-      const floor = Math.max(
+      const ground = floor ? floor.y : Math.max(
         heightFn(x, z), heightFn(x + FOOTPRINT, z), heightFn(x - FOOTPRINT, z), heightFn(x, z + FOOTPRINT), heightFn(x, z - FOOTPRINT),
       )
-      mesh.position.y = floor + REST_HEIGHT
+      mesh.position.y = ground + REST_HEIGHT
       if (heading.current) heading.current.rotation.y = pose.heading
       if (ball.current) {
         ball.current.position.y = pose.lift * DUST_BUNNY_SCALE
@@ -49,7 +53,7 @@ export default function DustBunny(props: EnemyProps) {
       }
       if (fluff.current?.morphTargetInfluences) dustBunnyRoll(fluff.current.morphTargetInfluences, pose.roll)
     },
-    [base, phase, heightFn, pose],
+    [base, phase, heightFn, pose, floor],
   )
 
   return (

@@ -169,7 +169,8 @@ across the hall all counted. These rules come from that playtest; each says how 
 
 1. **A target counts only if the rider can shoot it** (checked). `__SC_TEST__.sight()` (`src/testing/lineOfSight.ts`)
    counts a live enemy or exposed weak point only when it is inside the view, at least `MIN_ENEMY_PX` and has a clear
-   line from the camera (no opaque mesh in front of it). The `pacing` gate and the review run on that count, played as a
+   line from the camera (no opaque mesh in front of it) to its origin or to the middle of what draws it: a golem's origin
+   is its feet, which a bank of lava hides while its body stands in view (#937). The `pacing` gate and the review run on that count, played as a
    player who lands 3 hits a second on what they can see (`PLAYER_HITS_PER_SECOND`): a stretch only leftovers would fill
    is empty.
 2. **Every element is a shooting moment** (checked by `pacing`): a spin, a roll, a jump, a drop and a lift hill each

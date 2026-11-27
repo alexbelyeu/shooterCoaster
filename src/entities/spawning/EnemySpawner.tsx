@@ -6,7 +6,9 @@ import { indexAtT, type ArcTable } from '@/track/arcLength'
 import { rideProgress } from '@/track/rideProgress.hot'
 import type { RideSpeeds } from '@/track/ridePhysics'
 import { RUN_SECONDS } from '@/levels/pacing'
-import { nothingLeft } from '@/levels/bossWin'
+import { FOLLOWS_RIDER, nothingLeft, outOfReach, runReach } from '@/levels/bossWin'
+import { getCollisionTargets } from '@/combat/CollisionManager'
+import { ENEMY_SILHOUETTE, maxReadableDistance } from '../enemies/enemyReadability'
 import { useGameStore } from '@/store/useGameStore'
 import { eventBus } from '@/core/EventBus'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
@@ -35,6 +37,7 @@ import type { HardRoute } from '@/track/mechanics'
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { ORBITS, placeOrbit, type SwimOrbit } from './swimOrbit'
 import { darkFloorSlots, placeOnDarkFloor, type EnemyFloor, type FloorSlot } from './darkFloor'
+import { perchSlots, placeOnPerch, type PerchSlot, type PerchSpec } from './perch'
 
 interface EnemySpawnerProps {
   waves: EnemyWave[]
@@ -60,6 +63,8 @@ interface EnemySpawnerProps {
   hardRoute?: HardRoute | null
   /** The track's dark sections: a `darkFloor` wave stands on one's floor. */
   darkSections?: readonly DarkSectionSpec[]
+  /** The raised top a `perch` wave hangs over (`BiomeDefinition.perch`). */
+  perch?: PerchSpec
 }
 
 interface SpawnedEnemy {
@@ -74,6 +79,8 @@ interface SpawnedEnemy {
   swarm?: SwarmSlot
   /** A `darkFloor` wave's member: its spot on the floor is picked when the wave activates. */
   floorSlot?: FloorSlot
+  /** A `perch` wave's member: its spot over the perch, placed when the wave activates. */
+  perchSlot?: PerchSlot
   scoreValue: number
   radius: number
   waveIndex: number
@@ -150,6 +157,12 @@ function generateEnemies(
       }
       continue
     }
+    if (wave.perch) {
+      for (const perchSlot of perchSlots(wave.count, rng)) {
+        enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside: null, perchSlot, ...base })
+      }
+      continue
+    }
     if (scatter === 'wall') {
       if (wave.formation && wave.formation !== 'scatter') throw new Error(`${wave.type} climbs a wall: no formation`)
       for (const wall of wallSlots(wave.count, walls, rng)) {
@@ -173,7 +186,7 @@ function generateEnemies(
       continue
     }
     if (scatter === 'trackside') {
-      for (const trackside of tracksideSlots(wave.count, surface, rng)) {
+      for (const trackside of tracksideSlots(wave.count, surface, rng, wave.formationSpread)) {
         enemies.push({ id: `enemy-${id++}`, position: null, slot: null, trackside, ...base })
       }
       continue
@@ -226,6 +239,7 @@ export default function EnemySpawner({
   clearGround,
   hardRoute,
   darkSections = NO_DARK_SECTIONS,
+  perch,
 }: EnemySpawnerProps) {
   const heightFn = useContext(TerrainContext)
   const components = useWorld().enemies
@@ -241,7 +255,7 @@ export default function EnemySpawner({
   }, [runSeed, waves, goldenBalloonCount, heightFn, trackTable, walls])
   useEffect(() => {
     // Formation and trackside members digest their seeded slots: their world positions depend on where the rider is at activation.
-    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot?.local ?? (e.swarm && { x: e.swarm.du, y: e.swarm.dv, z: 0 }) ?? (e.floorSlot && { x: e.floorSlot.along, y: 0, z: e.floorSlot.side }) ?? { x: e.trackside!.ahead, y: 0, z: e.trackside!.side }))
+    recordE2ESpawns([...enemies, ...goldenBalloons].map((e) => e.position ?? e.slot?.local ?? (e.swarm && { x: e.swarm.du, y: e.swarm.dv, z: 0 }) ?? (e.floorSlot && { x: e.floorSlot.along, y: 0, z: e.floorSlot.side }) ?? (e.perchSlot && { x: e.perchSlot.u, y: e.perchSlot.h, z: e.perchSlot.v }) ?? { x: e.trackside!.ahead, y: 0, z: e.trackside!.side }))
   }, [enemies, goldenBalloons])
   const phase = useGameStore((s) => s.phase)
 
@@ -256,6 +270,11 @@ export default function EnemySpawner({
     (table: ArcTable, wave: EnemyWave, ride: RideAhead, members: SpawnedEnemy[], riderIndex: number, camera: Vec3): [string, Placed][] => {
       if (members[0]?.floorSlot) {
         const placed = placeOnDarkFloor(table, riderIndex, darkSections, members.map((e) => e.floorSlot!))
+        return members.map((e, i) => [e.id, { position: toVector3(placed[i].position), floor: placed[i].floor }])
+      }
+      if (members[0]?.perchSlot) {
+        if (!perch) throw new Error("a perch wave needs the biome's perch")
+        const placed = placeOnPerch(perch, table, members.map((e) => e.perchSlot!))
         return members.map((e, i) => [e.id, { position: toVector3(placed[i].position), floor: placed[i].floor }])
       }
       if (members[0]?.trackside) {
@@ -302,7 +321,7 @@ export default function EnemySpawner({
         return [e.id, { position: toVector3(p.position), entry: { from: p.from, spin: p.spin, seconds: p.entrySeconds }, motion: p.motion }]
       })
     },
-    [groundFn, bounds, keepOff, clearAir, clearGround, walls, runSeed, darkSections],
+    [groundFn, bounds, keepOff, clearAir, clearGround, walls, runSeed, darkSections, perch],
   )
 
   const placeWave = useCallback(
@@ -362,6 +381,11 @@ export default function EnemySpawner({
   const bossBeaten = useRef(false)
   /** `run:cleared` went out this run (#961). */
   const cleared = useRef(false)
+  /** Level time of the next boss-win check, every quarter second once the boss is beaten (#983). */
+  const nextClearCheck = useRef(0)
+  const reach = useMemo(() => runReach(trackTable, rideSpeeds), [trackTable, rideSpeeds])
+  /** The counted enemies' kinds by id, to find them among the collision targets. */
+  const enemyTypes = useMemo(() => new Map(enemies.flatMap((e) => (e.bystander ? [] : [[e.id, e.type as EnemyType] as const]))), [enemies])
   // A hard-route wave's members join the count when it arrives (`joinedEnemies`): an easy-route run never meets them.
   const totalEnemyCount = useMemo(() => enemies.filter((e) => !e.bystander && !waves[e.waveIndex].route).length, [enemies, waves])
   const joinedEnemies = useRef(0)
@@ -384,6 +408,7 @@ export default function EnemySpawner({
     goneGolden.current.clear()
     bossBeaten.current = false
     cleared.current = false
+    nextClearCheck.current = 0
     joinedEnemies.current = 0
     useGameStore.getState().setEnemyCounts(totalEnemyCount, totalEnemyCount)
     setGeneration((g) => g + 1)
@@ -467,8 +492,18 @@ export default function EnemySpawner({
     tickWaves(waveDelays, levelTime, waveProgress.current, tellWave, activateWave)
     lastWaveTick.current = levelTime
     // The boss beaten with nothing left to shoot or still to come: GameTimer ends the run after the defeat's hold (#961).
-    if (cleared.current) return
-    const left = enemiesLeft(totalEnemyCount + joinedEnemies.current, goneEnemies.current.size, escapedEnemies.current.size)
+    // An enemy the rest of the run never has in range, in view and in sight counts as gone (#983); a follower never does.
+    if (cleared.current || !bossBeaten.current || levelTime < nextClearCheck.current) return
+    nextClearCheck.current = levelTime + 0.25
+    const targets = getCollisionTargets()
+    const eye = getThree().camera.position
+    const t = rideProgress()
+    const eyeLift = Math.max(0, eye.y - trackTable.y[indexAtT(trackTable, t)])
+    let left = enemiesLeft(totalEnemyCount + joinedEnemies.current, goneEnemies.current.size, escapedEnemies.current.size)
+    for (let i = 0; i < targets.length; i++) {
+      const type = enemyTypes.get(targets[i].id)
+      if (type && !FOLLOWS_RIDER.has(type) && outOfReach(targets[i].getPosition(), ENEMY_SILHOUETTE[type], reach, groundFn, eyeLift, t, levelTime, maxReadableDistance(type))) left--
+    }
     if (!nothingLeft(bossBeaten.current, left, goldenBalloons.length - goneGolden.current.size, nextWaveDue(waveDelays, waveProgress.current))) return
     cleared.current = true
     eventBus.emit('run:cleared')

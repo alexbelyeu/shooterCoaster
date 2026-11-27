@@ -547,6 +547,11 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   // target and the recoil depend on frame timing (#158).
   const weapon = await weaponProblems(page, 'desktop', { aim: false })
   problems.push(...weapon.problems)
+  // That box depends on which enemy the last shot hit and how wide the meter was then (#1079): the HUD
+  // check proper is the sweep's fixed aims, game time frozen, under the widest live meter (5x, two digits).
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  problems.push(...(await weaponAimSweepProblems(page, 'desktop', COMBO_WIDEST_PRIME)))
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
   // Release the hold and let the trauma decay; it must return exactly to 0.
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
   const settleStart = await getFrames(page)
@@ -1515,9 +1520,12 @@ async function weaponProblems(page, label, { aim = true } = {}) {
 /** Shot points (NDC) that swing the gun furthest: the screen's left edge high, mid and low, and the top right. */
 const WEAPON_SWEEP_AIMS = [[-0.95, 0.9], [-0.95, 0], [-0.95, -0.85], [0.95, 0.9]]
 
-/** The gun's box depends on its aim (#223): weapon checks at each sweep aim, combo meter showing (leaves a live chain). */
-async function weaponAimSweepProblems(page, label) {
-  await page.evaluate(() => window.__SC_TEST__.primeCombo(3))
+/** A chain in the top tier with a two-digit count: the widest live combo meter (src/combat/comboTiers.ts). */
+const COMBO_WIDEST_PRIME = 20
+
+/** The gun's box depends on its aim (#223): weapon checks at each sweep aim, combo meter showing (leaves a live chain of `combo`). */
+async function weaponAimSweepProblems(page, label, combo = 3) {
+  await page.evaluate((n) => window.__SC_TEST__.primeCombo(n), combo)
   if (!(await waitVisible(page, '.hud-combo', 15000))) return [`${label}: combo meter never showed for the aim sweep`]
   const problems = []
   for (const [x, y] of WEAPON_SWEEP_AIMS) {

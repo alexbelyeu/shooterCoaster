@@ -2,6 +2,7 @@ import type { BiomeDefinition } from '../../shared/types'
 import { PARTICLE_PRESETS } from '../../shared/particlePresets'
 import { COLOR_RAMP, HALL_BOUNDS, gymFloor } from './config'
 import Features from './Features'
+import { FLAME_PERCH } from './flameFire'
 import { createGymFloorMaterial } from './grimeShader'
 import { GYM_SCALE, STAR, toWorld } from './blockout'
 
@@ -16,6 +17,7 @@ export const gym: BiomeDefinition = {
   particles: PARTICLE_PRESETS.gymChalk,
   floor: gymFloor,
   bounds: HALL_BOUNDS,
+  perch: FLAME_PERCH,
   // The Starr hangs on the hall's end wall: the orbit swings in front of it, inside the hall. The ride starts in the
   // station on the black path (#700): the tour reveals the pit from mid-hall, pulls back down the hall facing the
   // Starr to the south end (the landmark pass), then rides the last of the track into the station (`gymTrack.test.ts`).

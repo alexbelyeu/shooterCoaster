@@ -18,6 +18,17 @@ export interface WeaponLayout {
 export const WEAPON_LANDSCAPE = { right: 0.5, bottom: 0.2, unit: 0.28 }
 export const WEAPON_PORTRAIT = { right: 0.2, bottom: 0.54, unit: 0.28 }
 
+/**
+ * Landscape (#1079): how far the gun's projected box reaches left or right of its pivot at any
+ * on-screen aim (fraction of the short side; 0.26 measured at 1280x720, the screen's top-left
+ * corner and bottom edge), and the bottom row it must clear in CSS px: half the widest combo
+ * meter (tier 3 "combo lost", 232 px, centred) and the mute button's corner (69 px + 16 px inset).
+ * At 1280x720 the default pivot left a top-left aim's gun touching a 5x meter.
+ */
+export const WEAPON_REACH = 0.27
+export const COMBO_HALF_PX = 130
+export const CORNER_BUTTON_PX = 90
+
 /** Min on-screen heading from straight up (rad): pointing straight up, the gun is seen end-on. */
 export const WEAPON_MIN_TILT = 0.15
 /** Max heading from straight up (rad) for aims below the pivot. */
@@ -58,6 +69,12 @@ export function weaponLayout(width: number, height: number, out: WeaponLayout): 
   const m = Math.min(w, h)
   const p = h > w ? WEAPON_PORTRAIT : WEAPON_LANDSCAPE
   out.x = w - m * p.right
+  if (p === WEAPON_LANDSCAPE) {
+    // Right of the combo meter where the row has room; never left of the default pivot.
+    const clearOfMeter = w / 2 + COMBO_HALF_PX + m * WEAPON_REACH
+    const clearOfCorner = w - CORNER_BUTTON_PX - m * WEAPON_REACH
+    out.x = Math.max(out.x, Math.min(clearOfMeter, clearOfCorner))
+  }
   out.y = h - m * p.bottom
   out.unitPx = m * p.unit
   return out

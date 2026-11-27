@@ -1,6 +1,6 @@
 import type { Vector3 } from 'three'
 import type { HeightFunction } from '@/utils/terrainNoise'
-import { clamp01, smooth, type FlatDir } from './bossCycle.hot'
+import { clamp01, inWindow, smooth, windowAmount, type ExposureWindow, type FlatDir } from './bossCycle.hot'
 
 /**
  * The Helicopter's motion (Neon Metropolis's finale, #325), pure and on game time so a test can sample it.
@@ -49,6 +49,22 @@ export const BEAM = {
   /** During the tell the spot comes in from this far off to the side, out of the frame. */
   tellSide: 900,
 } as const
+
+/**
+ * Once its searchlight and tail rotor are gone it lunges at the rider on this beat, `LUNGE_PITCH` nose down, which tips
+ * its rotor hub into view: the hub can be shot only then (#1059). Seconds since the hub was first exposed.
+ */
+export const HUB_LUNGE: ExposureWindow = { first: 0, period: 3.5, openS: 2.5, rampS: 0.4 }
+export const LUNGE_PITCH = 0.25
+
+/** Extra nose-down pitch of its lunge, 0 between lunges. */
+export function lungePitch(sinceExposed: number): number {
+  return LUNGE_PITCH * windowAmount(HUB_LUNGE, sinceExposed)
+}
+
+export function hubShut(sinceExposed: number): boolean {
+  return !inWindow(HUB_LUNGE, sinceExposed)
+}
 
 /** Losing its tail rotor: it yaws back and forth, as a real one would spin. */
 export const TAIL_LOST_WOBBLE = { amplitude: 0.45, rate: 2.6 } as const

@@ -33,9 +33,9 @@ function flyingFish(count: number, weight: number, waveLabel?: string): PacedWav
   return { type: 'flyingFish', count, waveLabel, formation: 'school', formationSpread: 3, weight }
 }
 
-/** Level 4's waves (#937): seven snowmen beside the track every ~2 s. */
-function snowmen(type: EnemyType, waveLabel?: string, count = 7): PacedWave {
-  return { type, count, waveLabel, weight: 2 }
+/** Level 4's waves (#937): nine snowmen beside the track every ~2 s, spread wide of it (#1059). */
+function snowmen(type: EnemyType, waveLabel?: string, count = 9): PacedWave {
+  return { type, count, waveLabel, formationSpread: 2, weight: 2 }
 }
 
 /** Wave and boss times come from the pacing template (`pacing.ts`): a level lists its roster, never seconds. */
@@ -54,13 +54,13 @@ const LEVELS: LevelConfig[] = [
     goldenBalloons: 3,
     ...paceLevel({
       waves: [
-        { type: 'balloon', count: 25, waveLabel: 'Pop em!', formation: 'ring', weight: 5 },
+        { type: 'balloon', count: 25, waveLabel: 'Pop em!', formation: 'ring', formationSpread: 2, weight: 5 },
         // Up the lift hill (5–12 s), a ring every few seconds of the slow climb (a wave's later groups are a lift's length
         // apart): up in the sky it looks at, either side of the lift so its rails hide none of them.
         { type: 'balloon', count: 10, waveLabel: 'Up they go!', formation: 'ring', formationOrigin: LIFT_RINGS, weight: 4 },
         { type: 'balloon', count: 15, formation: 'ring', formationOrigin: LIFT_RINGS, weight: 4 },
         { type: 'balloon', count: 50, waveLabel: 'More Balloons!', weight: 15 },
-        { type: 'balloon', count: 50, waveLabel: 'Final Wave!', formation: 'ring', weight: 17 },
+        { type: 'balloon', count: 50, waveLabel: 'Final Wave!', formation: 'ring', formationSpread: 3, weight: 17 },
       ],
       boss: 'goldenBlimp',
     }),
@@ -149,7 +149,7 @@ const LEVELS: LevelConfig[] = [
     description: 'The living snowmen',
     order: 4,
     biome: 'arctic',
-    maxScore: 42 * 15 + 49 * 30 + 22 * 50 + 2 * 60 + 400, // 3200 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 3720
+    maxScore: 54 * 15 + 63 * 30 + 28 * 50 + 2 * 60 + 400, // 4100 + the Yeti's fists and reward (bossSpecs.ts; snowballs are bonus kills) = 4620
     message: "You've made it! Congrats!",
     nextLevel: 'level5',
     // The ride kit's (#866, `arcticTrack.ts`).
@@ -157,7 +157,8 @@ const LEVELS: LevelConfig[] = [
       waves: [
         // A small wave every ~2 s (#937), so no stretch of the storyboard rides empty: scouts from the station up the
         // lift and down into the ice cave, snowmen out of it, through the blizzard's ridge and over the crest, then
-        // brutes down the helix to the Yeti. A snowman falls to one hit: a player meets about two a second.
+        // brutes down the helix to the Yeti. A snowman falls to one hit, but more come than a player can shoot
+        // (about four a second against three) and each sinks back into the snow soon after it is seen (#1059).
         snowmen('snowmanScout', 'Scout Party'),
         snowmen('snowmanScout'),
         snowmen('snowmanScout'),
@@ -171,9 +172,9 @@ const LEVELS: LevelConfig[] = [
         snowmen('snowman'),
         snowmen('snowman'),
         snowmen('snowman'),
-        snowmen('snowmanBrute', 'Brutes!', 6),
-        snowmen('snowmanBrute', undefined, 6),
-        { ...snowmen('snowmanBrute', undefined, 10), weight: 11 },
+        snowmen('snowmanBrute', 'Brutes!', 8),
+        snowmen('snowmanBrute', undefined, 8),
+        { ...snowmen('snowmanBrute', undefined, 12), weight: 11 },
       ],
       boss: 'yeti',
     }),
@@ -198,29 +199,30 @@ const LEVELS: LevelConfig[] = [
       waves: [
         // A wave to each stretch of the storyboard (weights in seconds of the 45 s wave span), so no element rides empty
         // (#937): the tube, up the lift, its top at the volcano's flank, the drop tower, out of the cone, the camelbacks,
-        // then the turntable, where what is left stands along the track the car faces once it turns. A full group a wave
+        // then the turntable, where what is left stands along the track the car faces once it turns. Each spiral and line spread twice its
+        // formation's spacing (the Eruption 1.5x, #1059; a column stays single file on the rails), so no more than two sit in one aim-assist circle. A full group a wave
         // (12 embers, 7 in a line, 9 in a `v`), so each lasts until the next is in view: a player clears about 3 a second.
         // The Eruption rises out of the cone over the drop tower, low enough to be seen through the flank's hole, as the last
         // near embers leave the top of the frame on the approach to it (a second sooner than it was, the same spot); the imps
-        // come a second before the drop, so they are on the cone's floor as the car falls; a spiral straight down the
+        // come two seconds before the drop, so they are on the cone's floor as the car falls and stand in the entry hole's view; a spiral straight down the
         // track ahead of the exit hole, then a column through it (single file down the rails, the one shape the rider sees in
         // there), then the imps out on the plain. The tube's own wave is a column too: anything off the rails' line is in the rock.
         { type: 'emberWisp', count: 8, waveLabel: 'Embers Rise!', formation: 'column', weight: 1 },
-        { type: 'emberWisp', count: 12, formation: 'spiral', weight: 3 },
-        { type: 'emberWisp', count: 12, formation: 'spiral', weight: 4 },
-        { type: 'emberWisp', count: 12, formation: 'spiral', formationOrigin: NEAR_EMBERS, weight: 4 },
-        { type: 'emberWisp', count: 12, formation: 'spiral', formationOrigin: NEAR_EMBERS, weight: 2 },
-        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationOrigin: { ahead: 300, side: 0, up: 100 }, weight: 4 },
-        { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', weight: 3 },
-        { type: 'emberWisp', count: 10, formation: 'spiral', formationOrigin: EXIT_EMBERS, weight: 1 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, weight: 3 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, weight: 4 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, formationOrigin: NEAR_EMBERS, weight: 4 },
+        { type: 'emberWisp', count: 12, formation: 'spiral', formationSpread: 2, formationOrigin: NEAR_EMBERS, weight: 2 },
+        { type: 'emberWisp', count: 16, waveLabel: 'Eruption!', isEruption: true, formation: 'spiral', formationSpread: 1.5, formationOrigin: { ahead: 300, side: 0, up: 100 }, weight: 3 },
+        { type: 'fireImp', count: 7, waveLabel: 'Imps Attack!', formation: 'line', formationSpread: 2, weight: 4 },
+        { type: 'emberWisp', count: 10, formation: 'spiral', formationSpread: 2, formationOrigin: EXIT_EMBERS, weight: 1 },
         { type: 'emberWisp', count: 8, formation: 'column', weight: 1.5 },
-        { type: 'fireImp', count: 7, formation: 'line', weight: 0.5 },
+        { type: 'fireImp', count: 7, formation: 'line', formationSpread: 2, weight: 0.5 },
         { type: 'infernalDrake', count: 4, waveLabel: 'Drakes Descend!', formation: 'v', weight: 1 },
-        { type: 'lavaGolem', count: 7, waveLabel: 'Golems Awaken!', formation: 'line', weight: 2 },
-        { type: 'fireImp', count: 7, formation: 'line', weight: 2 },
-        { type: 'lavaGolem', count: 6, waveLabel: 'Golems Return!', formation: 'line', weight: 1 },
-        { type: 'lavaGolem', count: 6, formation: 'line', weight: 1 },
-        { type: 'lavaGolem', count: 7, formation: 'line', weight: 1 },
+        { type: 'lavaGolem', count: 7, waveLabel: 'Golems Awaken!', formation: 'line', formationSpread: 2, weight: 2 },
+        { type: 'fireImp', count: 7, formation: 'line', formationSpread: 2, weight: 2 },
+        { type: 'lavaGolem', count: 6, waveLabel: 'Golems Return!', formation: 'line', formationSpread: 2, weight: 1 },
+        { type: 'lavaGolem', count: 6, formation: 'line', formationSpread: 2, weight: 1 },
+        { type: 'lavaGolem', count: 7, formation: 'line', formationSpread: 2, weight: 1 },
         { type: 'infernalDrake', count: 9, formation: 'v', weight: 13 },
       ],
       boss: 'magmaTitan',
@@ -237,26 +239,29 @@ const LEVELS: LevelConfig[] = [
     description: 'Ride the walls of the climbing gym',
     order: 6,
     biome: 'gym',
-    maxScore: 36 * 15 + (14 + 24) * 12 + (34 + 8) * 18 + 8 * 50 + 500, // 1752 (the V8’s rats included) + the Medusa’s eight snakes and reward (bossSpecs.ts) = 2652
+    maxScore: 42 * 15 + (14 + 27) * 12 + (56 + 8) * 18 + 8 * 50 + 500, // 2274 (the V8’s rats included) + the Medusa’s eight snakes and reward (bossSpecs.ts) = 3174
     message: 'You sent the Climbing Gym!',
     nextLevel: 'level7',
     // Authored from Alex's blockout (#514), the ride rebuilt from the ride kit's storyboard (#700, `gymTrack.ts`).
     // Every enemy is a gym pest: no birds indoors (#664). Climbers are bystanders (#518): the first wave brings some, to
-    // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more over
-    // the roll (8 s), rats in the Training Area's dark cave (12 s), the lanternflies (#575) at 20 s, their swarm in groups
-    // landing one after another on the Alaska walls beside the climbing car, each where the rider looks as it lands
-    // (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948), the last ones on the Starr
-    // and the Shield the car looks at from the Shield's top and on the auto belay's fall (#957), and the pack in the pit
-    // from 25 s, before the dyno.
+    // teach the don't-shoot rule from the start. The waves follow the storyboard (#768): dust over the launch, more from
+    // 5 s round the Flame's top and up in its fire's updraft (#945, the gym's `perch`), in sight on the climb to it and all
+    // through the roll across it, rats in the Training Area's dark cave (11 s, as the last of the dust is shot) and on the
+    // mats after it, 26 so some are still ahead on the U-turn out of the cave (#1038, #1039), the lanternflies (#575) at 17 s, their swarm in groups landing one after another, the first on the Starr
+    // the car looks at on its way out of the cave, then on the Alaska walls beside the climbing car, each where the
+    // rider looks as it lands (`placeWallSwarm`), then on the roof the car looks up into as it rolls over the top (#948),
+    // the last ones on the Starr and the Shield the car looks at from the Shield's top and on the auto belay's fall
+    // (#957), and the pack, 30 of them so more are in sight on the way down into the pit, from 24 s, as the last
+    // lanternflies are shot (#1033).
     // Shoot the V2 sign and the V8 way round (#702) brings its own rats (#720): from 19 s, once the sign is shot (it can be
     // until the car reaches it, ~20 s), they line the branch ahead (ridden 20.2–22.5 s), and only that run meets them.
     ...paceLevel({
       waves: [
-        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 8, bystanders: { type: 'climber', count: 4 } },
-        { type: 'dustBunny', count: 24, waveLabel: 'Dust Bunnies!', weight: 4 },
-        { type: 'rat', count: 16, waveLabel: 'Rats on the Mats!', weight: 8, bystanders: { type: 'climber', count: 3 } },
-        { type: 'lanternfly', count: 36, waveLabel: 'Lanternflies!', weight: 5 },
-        { type: 'rat', count: 18, waveLabel: 'The Pack!', weight: 20, bystanders: { type: 'climber', count: 3 } },
+        { type: 'dustBunny', count: 14, waveLabel: 'Chalk Dust!', weight: 5, bystanders: { type: 'climber', count: 4 } },
+        { type: 'dustBunny', count: 27, waveLabel: 'Dust Bunnies!', weight: 6, perch: true },
+        { type: 'rat', count: 26, waveLabel: 'Rats on the Mats!', weight: 6, bystanders: { type: 'climber', count: 3 } },
+        { type: 'lanternfly', count: 42, waveLabel: 'Lanternflies!', weight: 7 },
+        { type: 'rat', count: 30, waveLabel: 'The Pack!', weight: 21, bystanders: { type: 'climber', count: 3 } },
       ],
       boss: 'medusa',
       branch: { type: 'rat', count: 8, waveLabel: 'Pad Rats!', at: 19 },
@@ -270,7 +275,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Drones over the city that never sleeps',
     order: 7,
     biome: 'city',
-    maxScore: 57 * 15 + 25 * 20 + 60 + 60 + 400, // 57 drones and 25 bots, 1355, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1875
+    maxScore: 63 * 15 + 25 * 20 + 60 + 60 + 400, // 63 drones and 25 bots, 1445, + the Helicopter's searchlight, tail rotor and reward (bossSpecs.ts) = 1965
     message: 'You cleared Neon Metropolis!',
     nextLevel: 'level8',
     // The ride kit's storyboard down the city's streets (#871, `cityTrack.ts`), shipped in the city world's chunk (#960).
@@ -288,7 +293,7 @@ const LEVELS: LevelConfig[] = [
         { type: 'hoverDrone', count: 10, waveLabel: 'Surveillance Ring!', formation: 'ring' },
         { type: 'billboardBot', count: 13, waveLabel: 'Street March!' },
         { type: 'hoverDrone', count: 17, waveLabel: 'Street Sweep!', formation: 'ring' },
-        { type: 'hoverDrone', count: 21, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.9 },
+        { type: 'hoverDrone', count: 27, waveLabel: 'Lockdown!', formation: 'ring', weight: 2.9 },
       ],
       boss: 'helicopter',
     }),

@@ -31,7 +31,7 @@ no enemy is on screen at that probe, or fewer than min(2, on screen) are ≥ 12 
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
 level timer already ran out), the level's boss arrives during these checks (they are the boss step's), the camera translates off the track pose at all
 (kill feedback is rotation-only trauma, ≤ 1°, back to 0), the first-person weapon is off
-screen / covers the centre / overlaps the HUD / points > 25° off the tracer of the frozen fixed-point shot or of a second shot on the far side of the screen without `holdFeedback` (`aimJump=`; the gun snaps to every shot) (also
+screen / covers the centre / overlaps the HUD (on the kill frame, then at four extreme aims with game time frozen under the widest combo meter, 5× with a two-digit chain, #1079) / points > 25° off the tracer of the frozen fixed-point shot or of a second shot on the far side of the screen without `holdFeedback` (`aimJump=`; the gun snaps to every shot) (also
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
@@ -200,7 +200,7 @@ played as a player (#925): `autoFire(true, PLAYER_HITS_PER_SECOND)` lands 3 hits
 `sight()` counts shootable, on the game clock (each through `processHit`, the only path that hits; the shot's look is `showShotAtNDC`, no colliding bullet), so a stretch a player clears goes empty as it would for them (unfired, the
 leftovers of earlier waves filled the gym's empty stretches). Every step the page records level time (unrounded), `sight()` (#925, `src/testing/lineOfSight.ts`:
 the live enemies and exposed boss weak points the rider can shoot, inside the view, at least `MIN_ENEMY_PX` and with a clear
-line from the camera; those hidden behind the world and the specks too small to read are counted apart, `hidden` / `specks`),
+line from the camera to its origin or to the middle of what draws it (a ground enemy's origin is its feet, #937); those hidden behind the world and the specks too small to read are counted apart, `hidden` / `specks`),
 `rideProgress`, the boss's stage and whether it is framed, and whether a wave tell (the 1 s before a wave) or the boss tell is
 on. (Until #925 it counted `stats().onScreenEnemies`, every live enemy whose centre projects into the viewport, and passed
 the gym's ride with stretches where every enemy was behind a wall or a speck across the hall.) Pure `pacingMetric.mjs` (`pacingMetric.test.ts`) turns that into `noTargetShare` (share of

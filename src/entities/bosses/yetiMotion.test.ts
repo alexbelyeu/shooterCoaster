@@ -16,6 +16,8 @@ const hit = (s: BossState, id: string, n: number) => {
   for (let i = 0; i < n; i++) s = applyHit(s, id)
   return s
 }
+const hpOf = (id: string) => YETI.weakPoints.find((w) => w.id === id)!.hp
+const FIST_HP = hpOf('fist-l')
 const atRoarTime = (s: BossState, roarT: number) => setRetracted(s, 'chest', chestRetracted(currentPhase(s) === 1, roarT))
 
 describe('the Yeti spec', () => {
@@ -23,16 +25,16 @@ describe('the Yeti spec', () => {
     const start = createBossState(YETI)
     expect(ids(start)).toEqual(['fist-l', 'fist-r'])
     for (const order of [['fist-l', 'fist-r'], ['fist-r', 'fist-l']]) {
-      let s = hit(start, order[0], 2)
+      let s = hit(start, order[0], FIST_HP)
       expect(ids(s)).toEqual([order[1]])
-      s = hit(s, order[1], 2)
+      s = hit(s, order[1], FIST_HP)
       expect(ids(s)).toEqual(['chest'])
-      expect(isDefeated(hit(s, 'chest', 4))).toBe(true)
+      expect(isDefeated(hit(s, 'chest', hpOf('chest')))).toBe(true)
     }
   })
 
   it('the chest is exposed only while it roars, and a hit between roars does nothing', () => {
-    let s = hit(hit(createBossState(YETI), 'fist-l', 2), 'fist-r', 2)
+    let s = hit(hit(createBossState(YETI), 'fist-l', FIST_HP), 'fist-r', FIST_HP)
     const epoch = windowNowEpoch(YETI_ROAR, 10)
     for (let t = 10; t < 10 + 2 * YETI_ROAR.period; t += 0.1) {
       s = atRoarTime(s, t - epoch)
