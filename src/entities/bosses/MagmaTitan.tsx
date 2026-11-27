@@ -52,8 +52,11 @@ const RIVER_SPOTS: readonly Point2[] = RIVER_CONFIGS.flatMap((cfg) =>
 const _cam = new THREE.Vector3()
 const _p = new THREE.Vector3()
 const _view = new THREE.Vector3()
-/** Seconds the risen Titan stays out of the rider's view before it sinks and climbs out ahead of it again. */
-const RESURFACE_AWAY_S = 1
+/**
+ * Seconds the risen Titan stays out of the rider's view before it sinks and climbs out ahead of it again: at 1 s, with its
+ * climb, the turntable left 2-2.5 s with nothing to shoot (#1101).
+ */
+const RESURFACE_AWAY_S = 0.4
 /**
  * The rider's view for that: `TITAN_WADE`'s bounds, but no wider than the frame (its 0.95 rad let the turntable and the
  * curve after it carry the Titan off screen for 2 s, #937). Still wider than every river spot (`RIVER_SPOT.maxOff`) and
@@ -94,6 +97,7 @@ export default function MagmaTitan(props: BossProps) {
       waded: 0,
       holdStart: 0,
       riseFrom: 0,
+      riseS: TITAN_RISE.riseS as number,
       awayFor: 0,
       yaw: 0,
       glow: 0,
@@ -172,7 +176,7 @@ export default function MagmaTitan(props: BossProps) {
       // Out of the rider's view (level 5's turntable turns the car round as it climbs out, #937): it sinks unseen and
       // climbs out of a river ahead of the new view, at once while it is still climbing out, else once it has been
       // out of view for `RESURFACE_AWAY_S`.
-      const risen = age - sim.riseFrom >= TITAN_RISE.riseS
+      const risen = age - sim.riseFrom >= sim.riseS
       const away = sim.placed && fighting && !inRiderView(sim.pos.x, sim.pos.z)
       sim.awayFor = away ? sim.awayFor + dt : 0
       const resurface = away && (!risen || sim.awayFor >= RESURFACE_AWAY_S)
@@ -183,6 +187,7 @@ export default function MagmaTitan(props: BossProps) {
         sim.holdStart = age
         if (resurface) {
           sim.riseFrom = age
+          sim.riseS = TITAN_RISE.resurfaceS
           sim.awayFor = 0
           sim.wading = false
           lavaBurst(sim.pos.x, groundFn(sim.pos.x, sim.pos.z) + 40, sim.pos.z)
@@ -236,7 +241,7 @@ export default function MagmaTitan(props: BossProps) {
       root.rotation.z = Math.sin(stride) * TITAN_WADE.sway * walking
       root.rotation.x = sinceDefeat < 0 ? 0 : -0.15 * Math.min(1, sinceDefeat / TITAN_DEFEAT.darkS)
       const bob = Math.abs(Math.sin(stride)) * TITAN_WADE.bob * walking
-      root.position.set(x, groundFn(x, z) + riseOffset(age - sim.riseFrom) + bob + defeatSink(sinceDefeat), z)
+      root.position.set(x, groundFn(x, z) + riseOffset(age - sim.riseFrom, sim.riseS) + bob + defeatSink(sinceDefeat), z)
       if (!sim.placed) {
         sim.placed = true
         lavaBurst(x, groundFn(x, z) + 40, z, RISE_TRAUMA)

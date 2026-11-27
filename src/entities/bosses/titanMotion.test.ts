@@ -109,6 +109,8 @@ describe('rise, sink and wade', () => {
   it('climbs out of the lava to knee-deep, and sinks after its break', () => {
     expect(riseOffset(0)).toBe(-TITAN_RISE.depth - TITAN_RISE.wadeDepth)
     expect(riseOffset(TITAN_RISE.riseS)).toBe(-TITAN_RISE.wadeDepth)
+    expect(riseOffset(TITAN_RISE.resurfaceS, TITAN_RISE.resurfaceS)).toBe(-TITAN_RISE.wadeDepth)
+    expect(TITAN_RISE.resurfaceS).toBeLessThan(TITAN_RISE.riseS)
     expect(defeatSink(-1)).toBe(0)
     expect(defeatSink(TITAN_DEFEAT.darkS)).toBeCloseTo(0)
     expect(defeatSink(10)).toBe(-TITAN_DEFEAT.sinkDepth)
