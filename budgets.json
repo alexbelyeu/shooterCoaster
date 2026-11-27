@@ -131,7 +131,7 @@
     }
   },
   "challenge": {
-    "_comment": "How hard each level's run is for the model player (#1058, docs/RIDE-KIT.md rule 9): the smoke's `pacing` step (e2e/pacingMetric.mjs `challengeMetrics`, `challengeGate`) fails a level whose base score (its kills' points before the combo multiplier) is over `baseScoreShareMax` of its `maxScore`, whose 90th-percentile second has more than `bunchingP90Max` shootable enemies in one aim-assist circle (44 px of a 720 px view), or whose boss it beats in under `bossSecondsMin` seconds of its fight. `_default` holds every level; a level's own entry overrides it, and `knownOver: \"#<open issue>\"` turns its failures into a WARN line (its own key: it never excuses a `pacing` ceiling). Started on 2026-11-25 at the #1058 values (0.8 / 2 / 12) with every level over them, measured by the pacing step locally (seed 1337, 0.5 s steps; level6 at 1 s): base score / bunching p90 / boss seconds level1 93% / 6 / 12.0, level2 97% / 3 / 4.5, level3 91% / 7 / 9.5, level4 91% / 4 / 5.0, level5 80% / 3 / 7.5, level6 77% / 2 / 14.0 (at the limits, so excused for CI's margin), level7 85% / 3 / 6.5, level8 100% / 3 / 9.0; #1059 retunes the levels to them, and a level that meets them loses its `knownOver` (level6 after #1093: CI read 76% / 2 / 13.0 s on three PRs). Only the Director raises them.",
+    "_comment": "How hard each level's run is for the model player (#1058, docs/RIDE-KIT.md rule 9): the smoke's `pacing` step (e2e/pacingMetric.mjs `challengeMetrics`, `challengeGate`) fails a level whose base score (its kills' points before the combo multiplier) is over `baseScoreShareMax` of its `maxScore`, whose 90th-percentile second has more than `bunchingP90Max` shootable enemies in one aim-assist circle (44 px of a 720 px view), or whose boss it beats in under `bossSecondsMin` seconds of its fight. `_default` holds every level; a level's own entry overrides it, and `knownOver: \"#<open issue>\"` turns its failures into a WARN line (its own key: it never excuses a `pacing` ceiling). Started on 2026-11-25 at the #1058 values (0.8 / 2 / 12) with every level over them, measured by the pacing step locally (seed 1337, 0.5 s steps; level6 at 1 s): base score / bunching p90 / boss seconds level1 93% / 6 / 12.0, level2 97% / 3 / 4.5, level3 91% / 7 / 9.5, level4 91% / 4 / 5.0, level5 80% / 3 / 7.5, level6 77% / 2 / 14.0 (at the limits, so excused for CI's margin), level7 85% / 3 / 6.5, level8 100% / 3 / 9.0; #1059 retunes the levels to them, and a level that meets them loses its `knownOver` (level6 after #1093: CI read 76% / 2 / 13.0 s on three PRs; level4 after #1098: CI read 65% / 2 / 12.5 s on #1098, #1102 and #1112). Only the Director raises them.",
     "_default": {
       "baseScoreShareMax": 0.8,
       "bunchingP90Max": 2,
@@ -141,9 +141,6 @@
       "knownOver": "#1059"
     },
     "level3": {
-      "knownOver": "#1059"
-    },
-    "level4": {
       "knownOver": "#1059"
     },
     "level5": {
