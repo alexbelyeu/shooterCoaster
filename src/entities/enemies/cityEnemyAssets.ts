@@ -1,10 +1,14 @@
 import * as THREE from 'three'
 import { mergePainted, painted } from '@/levels/environments/shared/paintedParts'
+import { EnemyFleet } from './enemyFleet'
 import { withEmissivePatch, withRim } from './enemyRim'
 import { BOT_FACE, BOT_GLYPH, DRONE_BODY, DRONE_DOME, DRONE_GLOW, DRONE_TAIL } from './enemyPalette'
 
 // Neon Metropolis's enemies (briefs in docs/art/ENEMIES.md): the hover drone (#323) and the billboard bot (#963). +z faces the rider, +y is up.
 // Re-exported by SharedEnemyAssets, so ShaderWarmup compiles every material here.
+
+/** Live enemies of one kind a fleet draws at once; any past it draw themselves. */
+const FLEET_SIZE = 128
 
 /** Where the four rotors sit: the ends of the X of arms, in the model's units. */
 const ROTOR_REACH = 3.2
@@ -13,7 +17,7 @@ const ROTORS = [45, 135, 225, 315].map((deg) => {
   return [Math.sin(a) * ROTOR_REACH, 0.15, Math.cos(a) * ROTOR_REACH] as [number, number, number]
 })
 
-// One geometry and one material, so a drone is one draw call (a wave puts 15-20 on screen, #881): the dark frame is
+// One geometry and one material, so every drone on screen is one instance of `DRONE_FLEET` (#881, #1108): the dark frame is
 // lit, the glowing parts are painted bright and the material lights them itself (`DRONE_GLOW_APPLY`).
 
 /** The drone's dark frame: puck, dome, the X of arms, the rotor hubs and the eye's housing. */
@@ -57,6 +61,8 @@ export function cityMachineMaterial(rim: THREE.ColorRepresentation): THREE.MeshS
 }
 
 export const DRONE_MAT = cityMachineMaterial(DRONE_GLOW)
+/** Every live drone in one draw call: a level 7 wave puts 30 on screen. */
+export const DRONE_FLEET = new EnemyFleet(DRONE_GEO, DRONE_MAT, FLEET_SIZE)
 
 // The billboard bot (#963): a lit sign on two legs, feet at y = 0, painted by the drone's rule (dark lit, bright burns).
 
@@ -89,3 +95,4 @@ const BOT_LIGHTS = [
 export const BOT_GEO = mergePainted([...BOT_FRAME, ...BOT_GLYPHS, ...BOT_LIGHTS])
 
 export const BOT_MAT = cityMachineMaterial(BOT_FACE)
+export const BOT_FLEET = new EnemyFleet(BOT_GEO, BOT_MAT, FLEET_SIZE)

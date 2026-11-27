@@ -4,8 +4,9 @@ import type * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { DRONE_BOB, DRONE_SWING } from './hoverDroneMotion'
-import { DRONE_GEO, DRONE_MAT } from './SharedEnemyAssets'
+import { DRONE_FLEET, DRONE_GEO, DRONE_MAT } from './SharedEnemyAssets'
 import { DRONE_FLEE } from './slipAway.hot'
+import { useFleetSeat } from './useFleetSeat'
 import { useSlipAway } from './useSlipAway'
 
 /** Radians of figure-eight per game second. */
@@ -49,11 +50,12 @@ export default function HoverDrone(props: EnemyProps) {
     if (!model?.parent) return
     model.rotation.y = Math.atan2(camera.position.x - model.parent.position.x, camera.position.z - model.parent.position.z)
   })
+  const meshRef = useFleetSeat(DRONE_FLEET)
 
   return (
     <EnemyBase {...props} updatePosition={updatePosition}>
       <group ref={modelRef} scale={[9, 9, 9]}>
-        <mesh geometry={DRONE_GEO} material={DRONE_MAT} />
+        <mesh ref={meshRef} geometry={DRONE_GEO} material={DRONE_MAT} />
       </group>
     </EnemyBase>
   )

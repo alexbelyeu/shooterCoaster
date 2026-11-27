@@ -1603,7 +1603,8 @@ function collectSceneStats(scene: THREE.Scene): SceneStats {
   }
   scene.traverseVisible((o) => {
     const m = o as THREE.Mesh & { isInstancedMesh?: boolean; count?: number }
-    if (!m.isMesh || !m.geometry) return
+    // A fleet's enemy (`enemyFleet.ts`) is on no layer while the fleet's instances draw it.
+    if (!m.isMesh || !m.geometry || m.layers.mask === 0) return
     const g = m.geometry
     const verts = g.index ? g.index.count : (g.attributes.position?.count ?? 0)
     const tris = Math.floor(verts / 3) * (m.isInstancedMesh ? (m.count ?? 1) : 1)
