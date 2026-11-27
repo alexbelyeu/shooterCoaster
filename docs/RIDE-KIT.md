@@ -121,8 +121,9 @@ frame for the last 16 s); the Tree stays as scenery.
   to face the Pyramid, `landmarks.ts` `RIDE_FRAME`): a station launch and a lift hill at the Pyramid, a 62° drop at its
   foot into a cut through the dunes, under the west door's lintel (the near miss, 13 s) and through tier 1's torchlit
   passage in the dark (`Pyramid.tsx` `passage`: torches as emissive points, no lights), a climbing U-turn into the
-  sandstorm, a jump gap over the canyon between two fixed mesas (24 s, `CANYON_MESAS`), an airtime hill (31 s) and the
-  boss's slow wide turn round the flats into the brake run. The scorpions come in two packs (0 s, and 11 s on the sand
+  sandstorm and a swerve through it (21 s), a jump gap over the canyon between two fixed mesas (24 s, `CANYON_MESAS`), banked
+  esses down through the dunes (26 s), an airtime hill (31 s), a slow slalom across the flats (34 s, #1059: the twists the
+  first rebuild had lost) and the boss's wide turn round the flats into the brake run. The scorpions come in two packs (0 s, and 11 s on the sand
   before the door) so the straight run to the lift doesn't line all thirty up in view; a first crow V (5 s) fills the lift
   hill's crest, where the view is pitched at the sky (#925's pacing gate).
 - **Ocean (3):** built (#865, `ocean/oceanTrack.ts`, its storyboard and seconds at the top): a lift east, a crawl
