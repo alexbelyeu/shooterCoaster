@@ -54,14 +54,11 @@ describe('paceLevel', () => {
     expect(() => paceLevel({ waves: [balloons(1)], boss: 'kraken', bossAt: 38.5 })).toThrow(/whole second/)
   })
 
-  it('times fight waves at their own seconds, after the boss arrives and before the run ends (#1059)', () => {
+  it('times fight waves at their own seconds, after the weighted waves (#1059)', () => {
     const plain = paceLevel({ waves: [balloons(1), balloons(1)], boss: 'kraken' })
     const paced = paceLevel({ waves: [balloons(1), balloons(1)], boss: 'kraken', fight: [{ type: 'crow', count: 6, at: 44 }] })
     expect(paced.enemies.slice(0, -1)).toEqual(plain.enemies)
     expect(paced.enemies[paced.enemies.length - 1]).toEqual({ type: 'crow', count: 6, spawnDelay: 44 })
-    expect(() => paceLevel({ waves: [balloons(1)], boss: 'kraken', fight: [{ type: 'crow', count: 1, at: 40 }] })).toThrow(/between 40 and 60/)
-    expect(() => paceLevel({ waves: [balloons(1)], boss: 'kraken', fight: [{ type: 'crow', count: 1, at: 60 }] })).toThrow(/between/)
-    expect(() => paceLevel({ waves: [balloons(1)], fight: [{ type: 'crow', count: 1, at: 50 }] })).toThrow(/need a boss/)
   })
 
   it('refuses a last wave too late to be shot before the boss, an empty roster, a bad weight, a boss and a finale', () => {

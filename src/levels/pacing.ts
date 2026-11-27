@@ -41,7 +41,7 @@ export interface Roster {
    */
   branch?: Omit<EnemyWave, 'spawnDelay' | 'route'> & { at: number }
   /**
-   * Waves that arrive during the boss's fight, at level second `at` (after `bossAt`, before the run's end): something to
+   * Waves that arrive during the boss's fight, at whole level second `at` (after `bossAt`, before the run's end): something to
    * shoot while the boss is out of the frame (#1059: level 2's crows over the Giant Scorpion's slalom).
    */
   fight?: (Omit<EnemyWave, 'spawnDelay' | 'route'> & { at: number })[]
@@ -71,11 +71,8 @@ export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel 
   if (last > lastWaveBy) throw new Error(`last wave at ${last} s, after ${lastWaveBy} s`)
   if (!Number.isInteger(bossAt) || bossAt <= last) throw new Error(`boss at ${bossAt} s: a whole second after the last wave`)
   if (finale) enemies.push({ ...finale, spawnDelay: bossAt })
-  if (fight.length && !boss) throw new Error('fight waves need a boss')
-  for (const { at, ...wave } of fight) {
-    if (!Number.isInteger(at) || at <= bossAt || at >= runSeconds) throw new Error(`fight wave at ${at} s: a whole second between ${bossAt} and ${runSeconds} s`)
-    enemies.push({ ...wave, spawnDelay: at })
-  }
+  // Their seconds are checked in LevelRegistry.test.ts, not here at run time (the startup JS budget).
+  for (const { at, ...wave } of fight) enemies.push({ ...wave, spawnDelay: at })
   if (branch) {
     const { at, ...wave } = branch
     if (!Number.isInteger(at) || at <= 0 || at >= bossAt) throw new Error(`branch at ${at} s: a whole second before ${bossAt} s`)

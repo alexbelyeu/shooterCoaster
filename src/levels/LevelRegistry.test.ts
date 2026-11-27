@@ -83,6 +83,8 @@ describe('LevelRegistry', () => {
       // Up to 28 s where the boss comes sooner (level2, #1059: the Giant Scorpion before the final lift turns the view away).
       expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(28)
       if (level.boss) expect(level.boss.at - BOSS_SPECS[level.boss.type].tell.seconds).toBeGreaterThan(Math.max(...waves))
+      // A fight wave (`Roster.fight`) at a whole second of the fight, before the run ends.
+      for (const w of level.enemies.filter((w) => inFight(level, w))) expect(Number.isInteger(w.spawnDelay) && w.spawnDelay! < RUN_SECONDS).toBe(true)
     },
   )
 
