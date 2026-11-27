@@ -662,11 +662,12 @@ export interface TracksideBand {
 
 /**
  * Ground: spread evenly from 700 ahead over the wave's window, at least to 2200; water: ~1–14 s of
- * Ocean's ~250 units/s ride, about its gap between waves (#316).
+ * Ocean's ~250 units/s ride, about its gap between waves (#316), and 200–700 to the side: at 160–400 the far sharks of a
+ * shoal stood in one aim-assist circle down the tunnel's straight (#1059).
  */
 export const TRACKSIDE: Record<'ground' | 'water', TracksideBand> = {
   ground: { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400, spread: true },
-  water: { aheadMin: 300, aheadMax: 1400, sideMin: 160, sideMax: 400, near: { share: 0.5, max: 900 } },
+  water: { aheadMin: 300, aheadMax: 1400, sideMin: 200, sideMax: 700, near: { share: 0.5, max: 900 } },
 }
 
 export const tracksideBand = (surface: Surface): TracksideBand => TRACKSIDE[surface === 'water' ? 'water' : 'ground']
