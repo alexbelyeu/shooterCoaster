@@ -84,7 +84,7 @@ describe('LevelRegistry', () => {
       expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(28)
       if (level.boss) expect(level.boss.at - BOSS_SPECS[level.boss.type].tell.seconds).toBeGreaterThan(Math.max(...waves))
       // A fight wave (`Roster.fight`) at a whole second of the fight, before the run ends.
-      for (const w of level.enemies.filter((w) => inFight(level, w))) expect(Number.isInteger(w.spawnDelay) && w.spawnDelay! < RUN_SECONDS).toBe(true)
+      for (const fight of level.enemies.filter((w) => inFight(level, w))) expect(Number.isInteger(fight.spawnDelay) && fight.spawnDelay! < RUN_SECONDS).toBe(true)
     },
   )
 
