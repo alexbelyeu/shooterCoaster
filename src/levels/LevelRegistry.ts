@@ -46,7 +46,7 @@ const LEVELS: LevelConfig[] = [
     description: 'Fun at the fair',
     order: 1,
     biome: 'themePark',
-    maxScore: 150 * 13 + 5 * 65 + 400, // 1950 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2615
+    maxScore: 150 * 13 + 5 * 65 + 400, // 1950 + the Golden Blimp's 5 golden balloons and reward (bossSpecs.ts) = 2675
     message: 'Well, that was easy...',
     nextLevel: 'level2',
     // The ride kit's classic (#863, `parkTrack.ts`): a station launch, a lift hill, camelbacks, past the Ferris wheel.
@@ -76,7 +76,7 @@ const LEVELS: LevelConfig[] = [
     description: 'A murder of Crows',
     order: 2,
     biome: 'desert',
-    maxScore: 56 * 20 + 63 * 15 + 2 * 60 + 4 * 40 + 400, // 2065 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 2745
+    maxScore: 70 * 20 + 63 * 15 + 2 * 60 + 4 * 40 + 400, // 2345 + the Giant Scorpion's claws, tail segments and reward (bossSpecs.ts) = 3025
     message: 'Ready for this one?',
     nextLevel: 'level3',
     // The ride kit's dark ride (#864, `desertTrack.ts`): a lift hill, the drop into the Pyramid, a jump gap between mesas.
@@ -85,25 +85,28 @@ const LEVELS: LevelConfig[] = [
       // each wave is sized to last until the next is in view (#937: a wave cleared early is an empty second). Two scorpion
       // packs so the straight run to the lift doesn't put all of them in view (#864: draws); Vs up the lift hill (2, 6 and
       // 7 s: one wave per V of nine, so a second group doesn't fly in with the first), holding the sky to the crest; the
-      // second pack on the sand before the door, under the drop (11 s), and ten on the passage's floor in the dark (13 s);
+      // second pack on the sand before the door (9 s, in view over the drop: later, the dune hides it until 13 s), and
+      // seven on the passage's floor in the dark (13 s: ten bunched where the passage narrows to its vanishing point);
       // the sandstorm's V meets the car out of the Pyramid (16 s); More Crows over the airtime crest (22 s); then only
       // trackside scorpions (23 to 32 s), each pack in view as the one before it is cleared. The ride review saw every V
       // placed after the crest arrive late, on the straight to the boss, with the Giant Scorpion (40 s): what is left then
-      // delays the fight, and past ~46 s the final lift turns the view away from it.
+      // delays the fight, and past ~46 s the final lift turns the view away from it: the last pack stays at ten, since
+      // two or three more still alive at 41 s held the fight past 47 s (14 s, unframed for 6–8 s). Crows fly off and
+      // scorpions burrow unscored soon after the rider sees them, and the Vs spread wider (#1059): a missed one is a lost score.
       waves: [
         { type: 'scorpion', count: 15, waveLabel: 'Incoming!', weight: 2 },
-        { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', weight: 4 },
-        { type: 'crow', count: 9, formation: 'v', weight: 1 },
-        { type: 'crow', count: 6, formation: 'v', weight: 4 },
-        { type: 'scorpion', count: 10, waveLabel: 'Out of the Sand!', weight: 2 },
-        { type: 'scorpion', count: 10, waveLabel: 'In the Tomb!', darkFloor: true, weight: 3 },
-        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', weather: 'sandstorm', weight: 6 },
-        { type: 'crow', count: 9, waveLabel: 'More Crows!', formation: 'v', weight: 1 },
-        { type: 'scorpion', count: 3, weight: 3 },
-        { type: 'scorpion', count: 5, weight: 1 },
-        { type: 'scorpion', count: 4, weight: 3 },
-        { type: 'scorpion', count: 5, weight: 2 },
-        { type: 'scorpion', count: 4, weight: 13 },
+        { type: 'crow', count: 9, waveLabel: 'Over the Top!', formation: 'v', formationSpread: 2, weight: 4 },
+        { type: 'crow', count: 9, formation: 'v', formationSpread: 2, weight: 1 },
+        { type: 'crow', count: 6, formation: 'v', formationSpread: 2, weight: 2 },
+        { type: 'scorpion', count: 10, waveLabel: 'Out of the Sand!', weight: 4 },
+        { type: 'scorpion', count: 7, waveLabel: 'In the Tomb!', darkFloor: true, weight: 3 },
+        { type: 'crow', count: 30, waveLabel: 'A Murder of Crows!', formation: 'v', formationSpread: 2, weather: 'sandstorm', weight: 6 },
+        { type: 'crow', count: 9, waveLabel: 'More Crows!', formation: 'v', formationSpread: 2, weight: 1 },
+        { type: 'scorpion', count: 5, weight: 3 },
+        { type: 'scorpion', count: 8, weight: 1 },
+        { type: 'scorpion', count: 9, weight: 2 },
+        { type: 'scorpion', count: 6, weight: 3 },
+        { type: 'scorpion', count: 10, weight: 13 },
       ],
       boss: 'giantScorpion',
     }),

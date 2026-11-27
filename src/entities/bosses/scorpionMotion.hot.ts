@@ -1,5 +1,5 @@
 import type { TrackIndex } from '@/levels/environments/shared/trackClearance'
-import { smooth } from './bossCycle.hot'
+import { inWindow, smooth, type ExposureWindow } from './bossCycle.hot'
 
 /** The Giant Scorpion's motion, pure and allocation-free per frame. Local frame: +z its head, +y up, +x its left. */
 
@@ -56,6 +56,36 @@ export const SCORPION_LUNGE = {
 
 export const LUNGE_IMPACT_S = SCORPION_LUNGE.windupS + SCORPION_LUNGE.strikeS
 
+/** Each lunge, from its windup to the end of its recovery. */
+export const STRIKE_WINDOW: ExposureWindow = {
+  first: SCORPION_LUNGE.first,
+  period: SCORPION_LUNGE.period,
+  openS: LUNGE_IMPACT_S + SCORPION_LUNGE.holdS + SCORPION_LUNGE.recoverS,
+  rampS: 0.2,
+}
+
+/**
+ * It fights back (#1059): its tail takes hits only while it strikes, and its claws only between strikes (raised to guard
+ * while it does), so the rider shoots each in its moment and never the whole of it at once. A part never shuts when it is
+ * all that is left to shoot (`othersLive` false: the other group is broken; the stinger, alone on the bare stub), or the
+ * rider would have nothing to shoot half the fight.
+ */
+export function scorpionShut(id: string, age: number, othersLive: boolean): boolean {
+  if (id === 'stinger' || !othersLive) return false
+  const striking = inWindow(STRIKE_WINDOW, age)
+  return id.startsWith('claw') ? striking : !striking
+}
+
+/** `scorpionShut` for weak point `i` of `wps`, with `hp` the hits each has left: whether the other group is live, read off `hp`. */
+export function scorpionPartShut(wps: readonly { id: string }[], hp: ArrayLike<number>, i: number, age: number): boolean {
+  const claw = wps[i].id.startsWith('claw')
+  let othersLive = false
+  for (let j = 0; j < wps.length && !othersLive; j++) {
+    othersLive = hp[j] > 0 && wps[j].id !== 'stinger' && wps[j].id.startsWith('claw') !== claw
+  }
+  return scorpionShut(wps[i].id, age, othersLive)
+}
+
 const GAIT = {
   step: 45,
   lift: 50,
@@ -67,7 +97,7 @@ const GAIT = {
 export const SCORPION_RISE = {
   /** Below its ~480-tall tail. */
   depth: 560,
-  riseS: 1.4,
+  riseS: 0.9,
   sinkS: 1.5,
 } as const
 
@@ -146,6 +176,30 @@ function slotAt(input: PerchInput, config: PerchConfig, slot: number, sign: numb
 }
 
 const _at = { x: 0, z: 0 }
+
+/** Turning less than this (the sine between the eased heading and the look) reads as straight. */
+const TURNING = 0.02
+/** How far ahead of the look to lay its slots, as a share of the eased heading's lag behind it (`HEADING_TAU`, 2.5 s:
+ * half is the turn ~1.2 s on), and at most (radians). */
+const LEAD_SHARE = 0.5
+const LEAD_MAX = 0.6
+
+/**
+ * Where to lay its slots when it bursts out again in a turn (#1059: level 2's final turn): the look (`x`, `z`) turned on
+ * towards where it is turning, from its eased heading (`lagX`, `lagZ`) behind it, into `out`, with `out.sign` the side
+ * it turns to (1 right, −1 left; `current` while it runs straight). A perch laid ahead of the turn and on its inside
+ * swings into the middle of the frame as the car comes round, where one laid on the look as it is leaves it in a second.
+ */
+export function leadLook(out: { x: number; z: number; sign: 1 | -1 }, lagX: number, lagZ: number, x: number, z: number, current: 1 | -1): void {
+  // Right of a heading (fx, fz) is (−fz, fx).
+  const right = -lagZ * x + lagX * z
+  out.sign = right > TURNING ? 1 : right < -TURNING ? -1 : current
+  const lead = Math.max(-LEAD_MAX, Math.min(LEAD_MAX, Math.atan2(right, lagX * x + lagZ * z) * LEAD_SHARE))
+  const c = Math.cos(lead)
+  const sn = Math.sin(lead)
+  out.x = x * c - z * sn
+  out.z = z * c + x * sn
+}
 
 /** Keeps `out`'s slot and side while clear (and seen, with `input.seen`), so it doesn't hop about; a clear slot the rider can't see only when none is seen; false (and `out` unchanged) if all are blocked. */
 export function pickPerch(out: Perch, input: PerchInput, config: PerchConfig = PERCH): boolean {

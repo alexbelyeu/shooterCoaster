@@ -79,9 +79,11 @@ export default function FlapBird(props: FlapBirdProps) {
       if (fled < 0) return 'escaped'
       mesh.position.y += fled - back.fled
       back.fled = fled
+      // A fleeing bird stops flying back, even mid-flight: the fly-back's pull toward the eye would cancel the climb.
+      if (fled > 0) back.flying = false
       const game = useGameStore.getState()
-      const start = fled === 0 && (game.bossArrivedAt === null || game.bossSeconds !== null)
-      const facing = flyBack(back, mesh.position, camera.position, camera.getWorldDirection(LOOK), delta, rode, start) ?? moveAngle
+      const start = game.bossArrivedAt === null || game.bossSeconds !== null
+      const facing = (fled === 0 ? flyBack(back, mesh.position, camera.position, camera.getWorldDirection(LOOK), delta, rode, start) : null) ?? moveAngle
       if (!back.flying) {
         const speed = moving() ? moveSpeed : 0
         mesh.position.x += (Math.cos(moveAngle) * speed + wobble) * dt

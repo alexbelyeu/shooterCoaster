@@ -10,7 +10,7 @@ import { BOSS_SPECS, GIANT_SCORPION } from './bossSpecs'
 import { applyHit, bossMaxScore, createBossState, exposedWeakPoints, isDefeated, type BossState } from './bossModel'
 import {
   LUNGE_IMPACT_S, PERCH, SCORPION_LUNGE, SEEN_PERCH, SCORPION_RISE, SCORPION_TAIL, approachAngle, createTailPose, faceYaw, footStep, layTail,
-  lungeAmount, lungeImpactBetween, perchBehind, perchClear, pickPerch, pickSeenPerch, riseOffset, type Perch, type TailPose, type PerchInput,
+  lungeAmount, lungeImpactBetween, perchBehind, perchClear, pickPerch, pickSeenPerch, riseOffset, scorpionShut, leadLook, STRIKE_WINDOW, type Perch, type TailPose, type PerchInput,
 } from './scorpionMotion.hot'
 
 const tailTopY = (pose: TailPose) => pose.y[pose.count]
@@ -18,7 +18,7 @@ const tailTopY = (pose: TailPose) => pose.y[pose.count]
 const hitAll = (state: BossState, ids: string[]) =>
   ids.reduce((s, id) => {
     let next = s
-    for (let i = 0; i < 5; i++) next = applyHit(next, id)
+    for (let i = 0; i < 10; i++) next = applyHit(next, id)
     return next
   }, state)
 
@@ -41,12 +41,33 @@ describe('Giant Scorpion spec', () => {
     expect(isDefeated(s)).toBe(true)
   })
 
-  it('claws take 2 hits for 60, tail segments 1 for 40, the stinger 3 for the 400 reward', () => {
+  it('claws take 3 hits for 60, tail segments 1 for 40, the stinger 5 for the 400 reward (#1059)', () => {
     const wp = (id: string) => GIANT_SCORPION.weakPoints.find((w) => w.id === id)!
-    expect([wp('claw-l').hp, wp('claw-l').score]).toEqual([2, 60])
+    expect([wp('claw-l').hp, wp('claw-l').score]).toEqual([3, 60])
     expect([wp('tail-2').hp, wp('tail-2').score]).toEqual([1, 40])
-    expect([wp('stinger').hp, wp('stinger').score]).toEqual([3, 0])
+    expect([wp('stinger').hp, wp('stinger').score]).toEqual([5, 0])
     expect(bossMaxScore(GIANT_SCORPION)).toBe(2 * 60 + 4 * 40 + 400)
+  })
+})
+
+describe('it fights back (#1059)', () => {
+  const striking = SCORPION_LUNGE.first + LUNGE_IMPACT_S
+  const between = SCORPION_LUNGE.first + SCORPION_LUNGE.period - 0.5
+
+  it('the tail opens only while it strikes, the claws only between strikes, the stinger always', () => {
+    expect(['claw-l', 'tail-0', 'stinger'].map((id) => scorpionShut(id, striking, true))).toEqual([true, false, false])
+    expect(['claw-l', 'tail-0', 'stinger'].map((id) => scorpionShut(id, between, true))).toEqual([false, true, false])
+  })
+
+  it('never shuts what is left once the other group is broken', () => {
+    expect(scorpionShut('claw-l', striking, false)).toBe(false)
+    expect(scorpionShut('tail-0', between, false)).toBe(false)
+  })
+
+  it('opens on its claws before its first strike, and its strike window holds the whole lunge', () => {
+    expect(scorpionShut('claw-r', 0, true)).toBe(false)
+    expect(scorpionShut('tail-3', 0, true)).toBe(true)
+    expect(lungeAmount(STRIKE_WINDOW.first + STRIKE_WINDOW.openS + 0.01)).toBe(0)
   })
 })
 
@@ -234,5 +255,25 @@ describe('perchBehind', () => {
   it('is true only for a perch the rider has passed', () => {
     expect(perchBehind({ x: 10, z: -500, slot: 9, sign: 1 }, input)).toBe(false)
     expect(perchBehind({ x: 400, z: 300, slot: 9, sign: 1 }, input)).toBe(true)
+  })
+})
+
+describe('leadLook', () => {
+  // Looking −z, its right is +x.
+  const out = { x: 0, z: 0, sign: 1 as 1 | -1 }
+  it('turns the look on towards the turn, by half its lag, and says which side', () => {
+    const a = 0.3
+    leadLook(out, 0, -1, Math.sin(a), -Math.cos(a), -1)
+    expect(out.sign).toBe(1)
+    expect(Math.atan2(out.x, -out.z)).toBeCloseTo(a * 1.5)
+    leadLook(out, 0, -1, -Math.sin(a), -Math.cos(a), 1)
+    expect(out.sign).toBe(-1)
+    expect(Math.atan2(out.x, -out.z)).toBeCloseTo(-a * 1.5)
+  })
+  it('keeps the side and the look while it runs straight, and leads at most 0.6 rad', () => {
+    leadLook(out, 0, -1, 0.005, -1, -1)
+    expect(out.sign).toBe(-1)
+    leadLook(out, 0, -1, 1, 0, 1)
+    expect(Math.atan2(out.x, -out.z)).toBeCloseTo(Math.PI / 2 + 0.6)
   })
 })
