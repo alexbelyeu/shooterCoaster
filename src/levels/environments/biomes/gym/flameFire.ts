@@ -199,7 +199,7 @@ export const FLAME_TOP = { y: TOP.y, halfLength: FLAME.piece.w / 2 + TOP.f, half
 
 /**
  * The Flame's top as level 6's dust perch (#945): chalk dust caught in the fire's updraft, from a little over the top to
- * 2 m up, where the rider looks rolling across its middle, a car's width and more off the rails (world units).
+ * 4 m up (#1059: spread up the plume, fewer in one aim-assist circle), where the rider looks rolling across its middle, a car's width and more off the rails (world units).
  */
 const PERCH_CENTRE = worldPoint(0, TOP.y, 0)
 export const FLAME_PERCH: PerchSpec = {
