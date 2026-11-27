@@ -12,8 +12,8 @@ import {
 } from './SharedEnemyAssets'
 
 /**
- * Ground-crawling scorpion: dark chitin with amber jointed legs, in three draw
- * calls (merged shell, swaying tail, glowing stinger). Scuttles round a small loop through
+ * Ground-crawling scorpion: dark chitin with amber jointed legs, in two draw
+ * calls (merged shell, swaying tail with its glowing stinger). Scuttles round a small loop through
  * where it was placed (#494: a straight crawl took it hundreds of units out of the view its
  * placement chose within seconds), following terrain height. On a dark section's floor (#937, level 2's passage) it
  * holds its spot between the rails and the wall instead, shuffling to and fro down the passage and facing the car.
