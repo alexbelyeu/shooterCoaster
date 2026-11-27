@@ -128,10 +128,12 @@ export const PERCH: PerchConfig = {
 }
 
 /** For the scuttle back into the frame (`pickSeenPerch`): `PERCH`'s slots, then farther ones for a view pitched up a lift,
- * where the nearer sand is under the frame (#937). Never in `pickPerch`'s fallback: a normal fight keeps to the near sand. */
+ * where the nearer sand is under the frame (#937), and nearer ones for the bare stub, in front of a dune that hides the
+ * farther sand from a rider low in a valley (#1059: level 2's final lift). Never in `pickPerch`'s fallback: a normal fight
+ * keeps to its own sand. */
 export const SEEN_PERCH: PerchConfig = {
   ...PERCH,
-  slots: [...PERCH.slots, [1600, 420], [2000, 560], [2400, 700]],
+  slots: [...PERCH.slots, [1600, 420], [2000, 560], [2400, 700], [480, 300], [560, 160], [420, 460]],
 }
 
 interface Circle {

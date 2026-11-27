@@ -46,11 +46,11 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2805, Giant Scorpion 3025, Kraken 3250, Yeti 4620, Magma Titan 3828, Medusa 3174, Helicopter 1965, Jungle Ruins (Blimp placeholder) 2615', () => {
+  it('the finales and maxScores: Blimp 2805, Giant Scorpion 3045, Kraken 3250, Yeti 4620, Magma Titan 3828, Medusa 3174, Helicopter 1965, Jungle Ruins (Blimp placeholder) 2615', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
       ['level1', 'goldenBlimp', 2805],
-      ['level2', 'giantScorpion', 3025],
+      ['level2', 'giantScorpion', 3045],
       ['level3', 'kraken', 3250],
       ['level4', 'yeti', 4620],
       ['level5', 'magmaTitan', 3828],
@@ -67,7 +67,7 @@ describe('LevelRegistry', () => {
   })
 
   it.each(levels.map((l) => [l.id, l] as const))(
-    '%s: waves from 0 s, the last one shootable by 35 s, then a 18–22 s boss fight (or a finale wave) ending the run',
+    '%s: waves from 0 s, the last one shootable by 35 s, then a 18–28 s boss fight (or a finale wave) ending the run',
     (_id, level) => {
       expect(RUN_SECONDS).toBe(60)
       // A hard-route wave is timed by its junction, outside the waves every run meets.
@@ -80,7 +80,8 @@ describe('LevelRegistry', () => {
       // The template's second, or sooner where a level's ride leaves the boss too little in view (level3, #1059).
       expect(finaleAt).toBeLessThanOrEqual(pacingTimes().bossAt)
       expect(RUN_SECONDS - finaleAt).toBeGreaterThanOrEqual(18)
-      expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(22)
+      // Up to 28 s where the boss comes sooner (level2, #1059: the Giant Scorpion before the final lift turns the view away).
+      expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(28)
       if (level.boss) expect(level.boss.at - BOSS_SPECS[level.boss.type].tell.seconds).toBeGreaterThan(Math.max(...waves))
     },
   )

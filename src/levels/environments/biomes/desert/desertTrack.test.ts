@@ -7,10 +7,10 @@ import { getTrackDimensions } from '@/track/trackDimensions'
 import { shippedLevel } from '@/levels/shippedLevels'
 import { createHeightFunction } from '@/utils/terrainNoise'
 import type { TrackParams } from '@/types/level'
-import { PYRAMID_BASE_SIZE, PYRAMID_SHRINK } from '../../landmarkDimensions'
+import { ARCH_REACH, PYRAMID_BASE_SIZE, PYRAMID_SHRINK } from '../../landmarkDimensions'
 import { MESA_FOOTPRINT } from './desertLayout'
 import { buildDesertRide, DESERT_TRACK, PYRAMID_BASE_Y } from './desertTrack'
-import { CANYON, CANYON_MESAS, PYRAMID_PASSAGE, PYRAMID_PASSAGE_FLOOR, RIDE_FRAME, rideFrameToWorld } from './landmarks'
+import { ARCHES, CANYON, CANYON_MESAS, PYRAMID_PASSAGE, PYRAMID_PASSAGE_FLOOR, RIDE_FRAME, rideFrameToWorld } from './landmarks'
 
 /** `rideFrameToWorld`'s inverse. */
 const toRideFrame = ({ x, y = 0, z }: { x: number; y?: number; z: number }) => ({
@@ -76,6 +76,14 @@ describe.each([
       return Math.sign(m.z - off.z)
     })
     expect(sides[0]).toBe(-sides[1])
+  })
+
+  it('swerves through the esses (#1059) clear of the rock arches', () => {
+    const points = sample(0, 1, 2000).map(rideFrameToWorld)
+    for (const a of ARCHES) {
+      const nearest = Math.min(...points.map((p) => Math.hypot(p.x - a.pos[0], p.z - a.pos[2])))
+      expect(nearest).toBeGreaterThan(ARCH_REACH * a.scale + 60)
+    }
   })
 
   it('keeps its rails over the natural ground but in the dunes\' cut to the west door, at most 120 deep', () => {
