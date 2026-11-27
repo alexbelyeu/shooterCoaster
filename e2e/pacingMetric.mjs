@@ -70,22 +70,22 @@ export function pacingMetrics(samples, end) {
   }
 }
 
-/** One row a level second, for pacing.json: its fewest and most targets, and the most in one aim-assist circle (`bunch`, #1058). */
+/** One row a level second, for pacing.json (`bunch`: the most shootable enemies in one aim-assist circle that second). */
 export function pacingTimeline(samples) {
   const rows = []
   for (const s of samples) {
     const t = Math.floor(s.t)
     let row = rows.at(-1)
     if (!row || row.t !== t) {
-      row = { t, min: s.targets, max: s.targets, bunch: 0, track: round(s.track, 3), waveTell: false, bossTell: false, boss: s.bossStage ?? 'none', bossFramed: false }
+      row = { t, min: s.targets, max: s.targets, track: round(s.track, 3), waveTell: false, bossTell: false, boss: s.bossStage ?? 'none', bossFramed: false, bunch: 0 }
       rows.push(row)
     }
     row.min = Math.min(row.min, s.targets)
     row.max = Math.max(row.max, s.targets)
-    row.bunch = Math.max(row.bunch, s.bunch ?? 0)
     row.waveTell ||= !!s.waveTell
     row.bossTell ||= !!s.bossTell
     row.bossFramed ||= !!s.bossFramed
+    row.bunch = Math.max(row.bunch, s.bunch ?? 0)
     if (s.bossStage) row.boss = s.bossStage
   }
   return rows

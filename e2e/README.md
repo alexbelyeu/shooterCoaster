@@ -90,7 +90,7 @@ A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run mus
 daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no initials entry (the campaign boards stay empty),
 send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
 run, with the stub answering 503, must show no board, New best and save the local record (`daily-results-offline.png`), and no ghost crosshair
-(#1042). The first load's run fetches the day's ghost from the stub (`?ghost=1`, once, for today), which aims at the shot step's
+(#1042). Each load kills its nearest enemies until the run has a score (`scoreSomething`, at most 20 s, else a `scored nothing` failure; #1074). The first load's run fetches the day's ghost from the stub (`?ghost=1`, once, for today), which aims at the shot step's
 `GHOST_AT`: its ring must show there, translucent (`daily-ghost.png`), and the new best must go up with a ghost of its own
 ( its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 A `bossRush` step (#1011, nightly) saves 3 stars on every level, opens the Boss Rush ticket on level select, checks the first stage shows no wave enemies, beats its boss (`summonBoss` + `bossHit`), must move on to the next level's stage with the time carried and the HUD's "Boss 2 of N", then runs the timer out (`timerStep` 1): the rush's results (`bossrush-results.png`) must read 1 boss beaten and offer Replay, with the campaign saves, boards and the Boss Rush best untouched.
@@ -208,7 +208,7 @@ the run with nothing on screen) and the gaps (`longestGapSeconds`, `longestGap` 
 `gaps` of 1 s or more); the first 2 s after GO and the boss tell are meant to be empty, so they count neither way and end a
 gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest gap 2.0 s at 4 s (track 0.03)`) and
 writes `e2e-results/pacing.json`: those metrics per level plus a `timeline`, one row a level second (`t`, fewest and most
-targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. Each step gets a
+targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`, `bunch`: the most in one aim-assist circle), which is where to look for where a gap or a bunch is. Each step gets a
 wall-clock deadline (#535): a step still held after the frame deadline (`--seconds` × 4 s; the first step the level's 60 s
 load on top) fails with `never settled: step N held … frames` (React committing on every held frame) or `the level registered no
 waves` (`nextWave()` still null), and the ride step stops at that same deadline with the same no-waves line instead of

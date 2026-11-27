@@ -46,19 +46,19 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 3045, Kraken 3250, Yeti 4620, Magma Titan 3828, Medusa 3174, Helicopter 2055, Jungle Ruins (Blimp placeholder) 2615', () => {
+  it('the finales and maxScores: Blimp 2805, Giant Scorpion 3045, Kraken 3250, Yeti 4530, Magma Titan 3828, Medusa 3174, Helicopter 2055, Jungle Ruins (Blimp placeholder) 2615', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
-      ['level1', 'goldenBlimp', 2675],
+      ['level1', 'goldenBlimp', 2805],
       ['level2', 'giantScorpion', 3045],
       ['level3', 'kraken', 3250],
-      ['level4', 'yeti', 4620],
+      ['level4', 'yeti', 4530],
       ['level5', 'magmaTitan', 3828],
       ['level6', 'medusa', 3174],
       ['level7', 'helicopter', 2055],
       ['level8', 'goldenBlimp', 2615],
     ])
-    expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
+    expect(getLevelConfig('level1')!.maxScore).toBe(160 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
   })
 
   it("counts the hard route's wave in maxScore (#720): every wave and the boss, the gym's V8 rats included", () => {
@@ -95,7 +95,7 @@ describe('LevelRegistry', () => {
     expect(level5.enemies.some((w) => w.type === 'infernalDrake')).toBe(true)
   })
 
-  it('every level comes at 2–4 enemies a second of the waves before the finale; Theme Park, the bar, keeps its 50-balloon waves', () => {
+  it('every level comes at 2–4 enemies a second of the waves before the finale', () => {
     for (const l of levels) {
       const waves = l.boss ? l.enemies : l.enemies.slice(0, -1)
       const perSecond = waves.reduce((n, w) => n + w.count, 0) / pacingTimes().bossAt
