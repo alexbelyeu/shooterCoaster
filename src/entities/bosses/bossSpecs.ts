@@ -85,7 +85,7 @@ const scorpionTail: WeakPointSpec[] = Array.from({ length: SCORPION_TAIL.segment
   phase: 0,
 }))
 
-/** Claws 4 and tail segments 2, each open only in its moment of the strike (`scorpionShut`), and the stinger 8 keep it fighting ~12 s (#1059). */
+/** Claws 3 and the stinger 5, each open only in its moment of the strike (`scorpionShut`): ~7 s on level 2 (#1059), all the final stretch frames before the lift turns the view away. */
 const scorpionClaw = (id: string): WeakPointSpec => ({ id, radius: 80, offset: [0, 0, 0], hp: 3, score: 60, phase: 0 })
 
 export const GIANT_SCORPION: BossSpec = {

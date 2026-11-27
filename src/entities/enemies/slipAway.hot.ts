@@ -17,10 +17,10 @@ export interface SlipAway {
 export const SNOW_SINK: SlipAway = { near: 1300, seenCos: 0.7, linger: 5, goS: 0.8, distance: 220 }
 
 /** Level 2's scorpions burrow into the sand, past the tip of the tail (~70 at its scale of 8). */
-export const SAND_BURROW: SlipAway = { near: 1300, seenCos: 0.7, linger: 3.5, goS: 0.6, distance: 120 }
+export const SAND_BURROW: SlipAway = { near: 1300, seenCos: 0.7, linger: 5, goS: 0.6, distance: 120 }
 
 /** Level 2's crows climb out of the top of the frame. */
-export const CROW_FLEE: SlipAway = { near: 1500, seenCos: 0.7, linger: 3.5, goS: 1.2, distance: 900 }
+export const CROW_FLEE: SlipAway = { near: 1500, seenCos: 0.7, linger: 4.5, goS: 1.2, distance: 900 }
 
 /** How far it has gone: 0 while it stays, easing in so it starts slowly, then goes. */
 export function slipOffset(s: SlipAway, seen: number): number {
