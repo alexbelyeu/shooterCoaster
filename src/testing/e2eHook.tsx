@@ -58,7 +58,7 @@ import { droppedSounds } from '@/audio/soundGuard'
 import { musicState, type MusicFade } from '@/audio/musicBus'
 import { scrimPlayer } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
-import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
+import { currentPhase, exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayload } from '@/ui/share'
 import { setOnlineEndpointOverride } from '@/app/onlineLeaderboard'
 import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
@@ -460,6 +460,8 @@ export interface E2EBoss {
   stage: E2EBossStage
   hpFraction: number | null
   weakPointsLeft: number
+  /** The phase being fought (`currentPhase`); null before the boss. */
+  phase: number | null
   /** Exposed weak points: id, hp left, CSS px (origin top-left), NDC, and whether inside the viewport. */
   exposed: { id: string; hp: number; x: number; y: number; ndcX: number; ndcY: number; onScreen: boolean }[]
   /** Projected bounds of the body (CSS px) and its width / height as fractions of the canvas. */
@@ -871,11 +873,12 @@ const _corner = new THREE.Vector3()
 
 function readBoss(): E2EBoss {
   const h = e2eBoss.handle
-  const out: E2EBoss = { stage: e2eBoss.stage, hpFraction: null, weakPointsLeft: 0, exposed: [], box: null, projectiles: [] }
+  const out: E2EBoss = { stage: e2eBoss.stage, hpFraction: null, weakPointsLeft: 0, phase: null, exposed: [], box: null, projectiles: [] }
   if (!h) return out
   const state = h.state()
   out.hpFraction = hpFraction(state)
   out.weakPointsLeft = state.hp.filter((hp) => hp > 0).length
+  out.phase = currentPhase(state)
   const cam = probeCamera
   if (!cam) return out
   const { width, height } = probeSize

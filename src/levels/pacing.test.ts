@@ -48,6 +48,12 @@ describe('paceLevel', () => {
     expect(() => paceLevel({ waves: [balloons(1)], boss: 'kraken', branch: { type: 'crow', count: 1, at: 40 } })).toThrow(/before 40 s/)
   })
 
+  it('brings the boss in at its own second when the roster gives one, after the last wave (#1059)', () => {
+    expect(paceLevel({ waves: [balloons(1), balloons(1)], boss: 'kraken', bossAt: 38 }).boss).toEqual({ type: 'kraken', at: 38 })
+    expect(() => paceLevel({ waves: [balloons(1), balloons(1)], boss: 'kraken', bossAt: 22 })).toThrow(/after the last wave/)
+    expect(() => paceLevel({ waves: [balloons(1)], boss: 'kraken', bossAt: 38.5 })).toThrow(/whole second/)
+  })
+
   it('refuses a last wave too late to be shot before the boss, an empty roster, a bad weight, a boss and a finale', () => {
     expect(() => paceLevel({ waves: [balloons(1), balloons(1), balloons(1), balloons(1)] })).toThrow(/after 33 s/)
     expect(() => paceLevel({ waves: [] })).toThrow()

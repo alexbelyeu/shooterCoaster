@@ -2,9 +2,14 @@ import { useCallback, useRef } from 'react'
 import type * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
+import { SEA_DIVE } from './seaDive.hot'
 import { JELLY_COLOR_COUNT, JELLY_GEO, JELLY_MATS } from './SharedEnemyAssets'
+import { useSeaDive } from './useSeaDive'
 
-/** Translucent jellyfish on the water beside the track: rises until its bell is clear of the surface, then bobs there. */
+/**
+ * Translucent jellyfish on the water beside the track: rises until its bell is clear of the surface, bobs there, and sinks
+ * away if the rider leaves it too long (`useSeaDive`).
+ */
 export default function Jellyfish(props: EnemyProps) {
   const { colorIdx, wobbleOffset, riseSpeed, maxY } = useEnemyRandom(props.id, (rng) => ({
     colorIdx: Math.floor(rng() * JELLY_COLOR_COUNT),
@@ -13,12 +18,17 @@ export default function Jellyfish(props: EnemyProps) {
     maxY: 3 + rng() * 5,
   }))
   const bodyRef = useRef<THREE.Group>(null)
+  const dive = useSeaDive('jellyfish', props.onEscape !== undefined)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
+      const sunk = dive(mesh, time)
+      if (sunk >= 1) return 'escaped' as const
 
-      if (mesh.position.y < maxY) {
+      if (sunk > 0) {
+        mesh.position.y = maxY + Math.sin(time * 1.5 + wobbleOffset) * 2 - sunk * SEA_DIVE.depth
+      } else if (mesh.position.y < maxY) {
         mesh.position.y += riseSpeed * dt
       } else {
         mesh.position.y = maxY + Math.sin(time * 1.5 + wobbleOffset) * 2
@@ -34,7 +44,7 @@ export default function Jellyfish(props: EnemyProps) {
         body.rotation.z = Math.cos(time * 1.2 + wobbleOffset) * 0.08
       }
     },
-    [riseSpeed, wobbleOffset, maxY],
+    [riseSpeed, wobbleOffset, maxY, dive],
   )
 
   return (
