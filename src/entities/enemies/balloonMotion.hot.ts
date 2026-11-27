@@ -15,7 +15,7 @@ export const BALLOON_FLIGHT = {
   near: 2000,
   /** Cosine off the rider's look within which it counts as seen. */
   seenCos: 0.7,
-  linger: 3.5,
+  linger: 5.5,
   /** Units a second² it climbs once it lets go. */
   climb: 160,
   flyOff: 2.5,

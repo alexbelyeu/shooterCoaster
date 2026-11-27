@@ -54,7 +54,7 @@ const LEVELS: LevelConfig[] = [
     goldenBalloons: 3,
     ...paceLevel({
       waves: [
-        { type: 'balloon', count: 25, waveLabel: 'Pop em!', formation: 'ring', formationSpread: 2, weight: 5 },
+        { type: 'balloon', count: 20, waveLabel: 'Pop em!', formation: 'ring', formationSpread: 2, weight: 5 },
         // Up the lift hill (5–12 s), a ring every few seconds of the slow climb (a wave's later groups are a lift's length
         // apart): up in the sky it looks at, either side of the lift so its rails hide none of them.
         { type: 'balloon', count: 10, waveLabel: 'Up they go!', formation: 'ring', formationOrigin: LIFT_RINGS, weight: 4 },
@@ -62,12 +62,13 @@ const LEVELS: LevelConfig[] = [
         // Then Vs spread wide (#1059): a ring seen edge-on down the track, or rings lined up behind each other, stacked
         // balloons in one aim circle. More balloons than the model player can pop before they slip away (`BALLOON_FLIGHT`),
         // and the last waves split so a few Vs are in view at a time, not the whole finale.
-        { type: 'balloon', count: 35, waveLabel: 'More Balloons!', formation: 'v', formationSpread: 4.5, weight: 5 },
-        { type: 'balloon', count: 15, formation: 'v', formationSpread: 3.5, weight: 5 },
-        { type: 'balloon', count: 10, formation: 'v', formationSpread: 3.5, weight: 4 },
-        { type: 'balloon', count: 18, waveLabel: 'Final Wave!', formation: 'v', formationSpread: 3.5, weight: 3 },
+        { type: 'balloon', count: 20, waveLabel: 'More Balloons!', formation: 'v', formationSpread: 4.5, weight: 2 },
+        { type: 'balloon', count: 12, formation: 'v', formationSpread: 3.5, weight: 3 },
+        { type: 'balloon', count: 18, formation: 'v', formationSpread: 4, weight: 5 },
+        { type: 'balloon', count: 15, formation: 'v', formationSpread: 4, weight: 4 },
+        { type: 'balloon', count: 16, waveLabel: 'Final Wave!', formation: 'v', formationSpread: 3.5, weight: 3 },
         { type: 'balloon', count: 16, formation: 'v', formationSpread: 3.5, weight: 3 },
-        { type: 'balloon', count: 16, formation: 'v', formationSpread: 3.5, weight: 12 },
+        { type: 'balloon', count: 18, formation: 'v', formationSpread: 3.5, weight: 12 },
       ],
       boss: 'goldenBlimp',
     }),
