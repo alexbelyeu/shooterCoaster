@@ -3,6 +3,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { getAllLevels, getLevelConfig } from '@/levels/LevelRegistry'
 import { formatRushTime, isNewBest, rushComplete, rushStages, stagesCleared } from '@/levels/bossRush'
 import { FairBoard } from '@/ui/Fair'
+import { bindings, matchesKey } from '@/input/bindings'
 
 /** The finished rush, read once on mount, before its time is saved. */
 function snapshotRush() {
@@ -43,8 +44,11 @@ export default function BossRushResults() {
       if (e.repeat) return
       const target = e.target instanceof Element ? e.target : null
       if (e.key === 'Enter' && target?.closest('.results-screen button')) return
-      if (e.key === 'Enter' || e.key === 'r' || e.key === 'R') leave('replay')
-      else if (e.key === 'Escape') leave('levels')
+      // Handled keys are marked so the mute key, if it shares one after a rebind, doesn't also fire.
+      const to = e.key === 'Enter' || matchesKey(bindings(), 'replay', e.key) ? 'replay' : e.key === 'Escape' ? 'levels' : null
+      if (!to) return
+      e.preventDefault()
+      leave(to)
     }
     window.addEventListener('keydown', onKey, { capture: true })
     return () => window.removeEventListener('keydown', onKey, { capture: true })

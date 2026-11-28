@@ -1,10 +1,11 @@
-import { useEffect, useRef, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { useGameStore } from '@/store/useGameStore'
 import { getLevelConfig } from '@/levels/LevelRegistry'
 import { computeStars } from '@/levels/scoring'
 import { FairBoard, FairStars } from '@/ui/Fair'
 import { menuFocus } from '@/ui/menuFocus'
 import { PAUSE_MENU, type PauseMenuAction } from './pauseMenu'
+import { bindings, keyLabel, matchesKey, subscribeBindings } from '@/input/bindings'
 
 const fmt = new Intl.NumberFormat('en-US')
 
@@ -22,6 +23,7 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
   const timeRemaining = useGameStore((s) => s.timeRemaining)
   const kills = useGameStore((s) => s.kills)
   const total = useGameStore((s) => s.totalEnemies)
+  const pauseKey = useSyncExternalStore(subscribeBindings, bindings).keys.pause
   const buttons = useRef<(HTMLButtonElement | null)[]>([])
   const config = levelId ? getLevelConfig(levelId) : undefined
 
@@ -29,10 +31,10 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
     buttons.current[0]?.focus({ preventScroll: true })
   }, [])
 
-  // On window: Esc resumes with nothing focused too.
+  // On window: Esc (always the way out) and the pause key resume, with nothing focused too.
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.repeat) useGameStore.getState().resume()
+      if ((e.key === 'Escape' || matchesKey(bindings(), 'pause', e.key)) && !e.repeat) useGameStore.getState().resume()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -99,7 +101,7 @@ export default function PauseScreen({ onSettings }: PauseScreenProps) {
             </button>
           ))}
         </div>
-        <p className="pause-keys">Esc gets you back on. Arrows and Enter pick.</p>
+        <p className="pause-keys">{pauseKey === 'Escape' ? 'Esc' : `Esc or ${keyLabel(pauseKey)}`} gets you back on. Arrows and Enter pick.</p>
       </FairBoard>
     </div>
   )

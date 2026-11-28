@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   MAX_STEP_S,
-  PAD,
   STICK_DEADZONE,
   cursorSpeedPx,
   moveCursor,
@@ -92,24 +91,24 @@ describe('menu navigation', () => {
 
 describe('padAction', () => {
   it('Start pauses a run and resumes it', () => {
-    expect(padAction(PAD.START, 'playing', false)).toBe('pause')
-    expect(padAction(PAD.START, 'paused', true)).toBe('resume')
-    expect(padAction(PAD.START, 'title', false)).toBe('confirm')
-    expect(padAction(PAD.START, 'countdown', false)).toBeNull()
+    expect(padAction('pause', 'playing', false)).toBe('pause')
+    expect(padAction('pause', 'paused', true)).toBe('resume')
+    expect(padAction('pause', 'title', false)).toBe('confirm')
+    expect(padAction('pause', 'countdown', false)).toBeNull()
   })
 
   it('A confirms and B goes back on screens, not during play', () => {
-    expect(padAction(PAD.A, 'levelSelect', false)).toBe('confirm')
-    expect(padAction(PAD.B, 'levelSelect', false)).toBe('back')
-    expect(padAction(PAD.B, 'results', false)).toBe('back')
-    expect(padAction(PAD.A, 'playing', false)).toBeNull()
-    expect(padAction(PAD.B, 'playing', false)).toBeNull()
-    expect(padAction(PAD.B, 'countdown', false)).toBeNull()
+    expect(padAction('confirm', 'levelSelect', false)).toBe('confirm')
+    expect(padAction('back', 'levelSelect', false)).toBe('back')
+    expect(padAction('back', 'results', false)).toBe('back')
+    expect(padAction('confirm', 'playing', false)).toBeNull()
+    expect(padAction('back', 'playing', false)).toBeNull()
+    expect(padAction('back', 'countdown', false)).toBeNull()
   })
 
   it('B on the title only closes its Settings dialog (Escape there opens the worlds)', () => {
-    expect(padAction(PAD.B, 'title', false)).toBeNull()
-    expect(padAction(PAD.B, 'title', true)).toBe('back')
+    expect(padAction('back', 'title', false)).toBeNull()
+    expect(padAction('back', 'title', true)).toBe('back')
   })
 
   it('moves focus on screens only', () => {

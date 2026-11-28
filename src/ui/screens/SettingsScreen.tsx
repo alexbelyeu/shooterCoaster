@@ -10,6 +10,8 @@ import { isInRun } from '@/store/startPhase'
 import { FairBoard } from '@/ui/Fair'
 import { touchFirst } from '@/ui/touchFirst'
 import { canVibrate } from '@/input/useHaptics'
+import { padConnected } from '@/input/gamepadInput'
+import ControlsSettings from './ControlsSettings'
 
 const SHAKE_LABELS: Record<ScreenShakeLevel, string> = { off: 'Off', reduced: 'Reduced', full: 'Full' }
 
@@ -155,13 +157,15 @@ interface SettingsScreenProps {
   onClose: () => void
 }
 
-/** Graphics, sound and comfort settings (persisted) on a fair board, from the title and the pause board; Esc is Back. */
+/** Graphics, sound, comfort and controls settings (persisted) on a fair board, from the title and the pause board; Esc is Back. */
 export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const s = useSettingsStore()
   const fromTitle = useGameStore((g) => !isInRun(g.phase))
   const reducedMotion = usePrefersReducedMotion()
   const systemReducedMotion = useSystemPrefersReducedMotion()
   const showVibration = canVibrate() && touchFirst()
+  // A phone has no keys to rebind; one with a pad connected still gets the list.
+  const showControls = !touchFirst() || padConnected()
   const screen = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
   close.current = onClose
@@ -249,6 +253,8 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
             <ClearDataRow />
             {fromTitle && <InternalDeviceRow />}
           </section>
+
+          {showControls && <ControlsSettings />}
         </div>
 
         <button className="fair-plate fair-go settings-back" onClick={onClose}>

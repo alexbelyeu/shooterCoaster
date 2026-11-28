@@ -22,6 +22,7 @@ import { levelMedals, medalsWon } from '@/levels/medals'
 import { isReloadDue, reloadIfDue } from '@/app/staleReload'
 import { encodeGhost, saveGhost } from '@/combat/ghost'
 import { recording } from '@/combat/ghostTrack.hot'
+import { bindings, matchesKey } from '@/input/bindings'
 
 const fmt = new Intl.NumberFormat('en-US')
 
@@ -223,7 +224,7 @@ export default function ResultsScreen() {
     if (e.key === 'Enter' && target?.closest('.results-screen button, .results-screen a')) return
     if (e.repeat) return
     if (e.key === 'Enter') leave(enterTo)
-    else if (e.key === 'r' || e.key === 'R') leave('replay')
+    else if (matchesKey(bindings(), 'replay', e.key)) leave('replay')
   }
 
   useEffect(() => {

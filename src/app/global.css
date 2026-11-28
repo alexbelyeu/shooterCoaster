@@ -2680,6 +2680,82 @@ canvas {
   background: var(--fair-vermilion);
 }
 
+/* Controls (#998): the action, then its key and pad plates, in two columns that line up down the list. */
+.settings-binds {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(4.5rem, auto) minmax(4.5rem, auto);
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin-top: 0.3rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.settings-bind-row {
+  display: contents;
+}
+
+.settings-bind-head {
+  font-size: 1.05rem;
+  font-weight: 500;
+  text-align: center;
+  opacity: 0.75;
+}
+
+.settings-bind,
+.settings-bind-fixed {
+  min-height: 44px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.settings-bind {
+  margin-bottom: 5px;
+  padding: 0.3rem 0.6rem 0.2rem;
+  font-size: 1.15rem;
+}
+
+/* Waiting for a press: painted cream and pressed in, like a picked segment. */
+.settings-bind[aria-pressed='true'] {
+  color: var(--fair-tar);
+  background: var(--fair-cream);
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--fair-tar);
+}
+
+.settings-bind-fixed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+/* Not a .settings-row: the internal-device toggle stays the card's last row. */
+.settings-binds-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.2rem;
+}
+
+.settings-binds-foot .settings-note {
+  margin: 0;
+}
+
+.settings-bind-reset {
+  flex-shrink: 0;
+  padding: 0.5rem 0.8rem 0.4rem;
+  font-size: 1.15rem;
+}
+
+.settings-bind-reset:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .settings-card :focus-visible {
   outline: 3px solid var(--fair-cream);
   outline-offset: 3px;
@@ -2707,12 +2783,32 @@ canvas {
     width: min(100%, 46rem);
   }
 
+  /* Columns, not a grid: the Controls list is taller than any other group, and columns balance round it. */
   .settings-groups {
-    display: grid;
-    grid-template-rows: auto auto;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(0, 1fr);
-    gap: 0.6rem 2rem;
+    display: block;
+    columns: 2;
+    column-gap: 2rem;
+  }
+
+  .settings-group {
+    break-inside: avoid;
+    margin-bottom: 0.6rem;
+  }
+}
+
+/* A desktop board with Controls (#998): a third column for them, so the card still fits 720 px tall. */
+@media (min-width: 1100px) and (min-height: 600px) {
+  .fair-board-shadow.settings-board-shadow:has(.settings-binds) {
+    width: min(100%, 66rem);
+  }
+
+  .settings-groups:has(.settings-binds) {
+    columns: 3;
+  }
+
+  /* Graphics and sound, comfort and data, then Controls. */
+  .settings-groups:has(.settings-binds) > :is(:nth-child(3), .settings-group--controls) {
+    break-before: column;
   }
 }
 
@@ -2735,7 +2831,10 @@ canvas {
   .settings-groups {
     grid-column: 1 / -1;
     margin-top: 0.2rem;
-    gap: 0.1rem 2rem;
+  }
+
+  .settings-group {
+    margin-bottom: 0.1rem;
   }
 
   .settings-card .settings-back {
