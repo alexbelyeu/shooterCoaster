@@ -61,8 +61,8 @@ export const YETI_ROAM = {
   hopHeight: 70,
   minAhead: 520,
   maxOffAngle: 1.05,
-  /** Out of the rider's look (`viewAngle` either side) or hidden by the snow this long, it lopes to a ridge in sight (#937). 2 s is the one value the pacing gate passed on level 4 (1 / 1.5 / 2.5 / 3 s: 51–58% with nothing to shoot). */
-  unseenS: 2,
+  /** Out of the rider's look (`viewAngle` either side) or hidden by the snow this long, it lopes to a ridge in sight (#937). 2 s until level 4's snowmen stood in lines (#1059): then its fight ran into the blind turn at track 0.63 (beaten at 58 s, shootable half of it); at 1 s it is down at 53 s, shootable 73%. */
+  unseenS: 1,
   viewAngle: 0.7,
   /** How far up the frame from its middle (1 is the top edge) its head may stand on the ridge it picks: the first of these
    * any slot meets. Its raised fists stand ~0.3 of the frame above its head, and the rider closes in on it (#937). */

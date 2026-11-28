@@ -11,7 +11,7 @@ import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { desertObstacles, layoutDesert } from '@/levels/environments/biomes/desert/desertLayout'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import { setLimb } from './bossLimbs'
-import { isExposed, type BossState, type WeakPointSpec } from './bossModel'
+import { currentPhase, isExposed, type WeakPointSpec } from './bossModel'
 import { GIANT_SCORPION } from './bossSpecs'
 import {
   SCORPION_BODY_GEO, SCORPION_CLAW_GEO, SCORPION_FINGER_GEO, SCORPION_FINGER_HINGE, SCORPION_GLOW_GEO, SCORPION_GLOW_MAT,
@@ -20,7 +20,7 @@ import {
 } from './bossAssets'
 import {
   SCORPION_BODY, SCORPION_RISE, SCORPION_TAIL, advanceGait, approachAngle, createTailPose, faceYaw, firstSlot, footStep, layTail,
-  lungeAmount, lungeImpactBetween, PERCH, perchBehind, pickPerch, pickSeenPerch, riseOffset, type FootStep, type Perch, type PerchInput,
+  lungeAmount, lungeImpactBetween, PERCH, scorpionPartShut, perchBehind, pickPerch, pickSeenPerch, riseOffset, leadLook, type FootStep, type Perch, type PerchInput,
 } from './scorpionMotion.hot'
 import { aimAtRider } from './bossAim.hot'
 
@@ -53,30 +53,45 @@ const _seen = new THREE.Vector3()
 const SEEN_NDC = 0.75
 const CLAW_HEIGHT = 80
 const STINGER_HEIGHT = 480
+/** The stinger on the bare stub, its last phase: low enough that a near slot, in front of a dune the rider looks across, frames it (#1059). */
+const STUB_HEIGHT = 140
 /** No weak point in the frame this long, it burrows and bursts out again in it. */
 const BURROW_AFTER_S = 0.5
 const WEAK_POINT_NDC = 0.9
+/** Its sight line to the rider, sampled every `SIGHT_STEP` and clear of the sand by `SIGHT_MARGIN`: sixteen samples
+ * and none spare stepped over the crests of dunes the terrain's triangles drew over it (#1059: a perch at ~1500 seen by
+ * it and hidden to the rider, for 2 s at a time on level 2's final turn). */
+const SIGHT_STEP = 25
+const SIGHT_SAMPLES_MAX = 100
+const SIGHT_MARGIN = 30
 
 function pointInFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, y: number, z: number, ndc: number): boolean {
   _seen.set(x, y, z).project(camera)
-  return _seen.z < 1 && Math.abs(_seen.x) < ndc && Math.abs(_seen.y) < ndc && sightClear(groundFn, _cam.x, _cam.y, _cam.z, x, y, z)
+  if (!(_seen.z < 1 && Math.abs(_seen.x) < ndc && Math.abs(_seen.y) < ndc)) return false
+  const samples = Math.min(SIGHT_SAMPLES_MAX, Math.max(16, Math.ceil(Math.hypot(x - _cam.x, z - _cam.z) / SIGHT_STEP)))
+  return sightClear(groundFn, _cam.x, _cam.y, _cam.z, x, y, z, samples, SIGHT_MARGIN)
 }
 
-function inFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number): boolean {
+function inFrame(camera: THREE.Camera, groundFn: HeightFunction, x: number, z: number, top: number): boolean {
   const ground = groundFn(x, z)
-  return pointInFrame(camera, groundFn, x, ground + CLAW_HEIGHT, z, SEEN_NDC) && pointInFrame(camera, groundFn, x, ground + STINGER_HEIGHT, z, SEEN_NDC)
+  return pointInFrame(camera, groundFn, x, ground + CLAW_HEIGHT, z, SEEN_NDC) && pointInFrame(camera, groundFn, x, ground + top, z, SEEN_NDC)
 }
 
 const _wp = new THREE.Vector3()
 
-/** One of its exposed weak points inside the rider's frame, no dune between: what the rider can shoot (#937). */
-function weakPointSeen(camera: THREE.Camera, groundFn: HeightFunction, parts: ReadonlyMap<string, THREE.Group>, state: BossState): boolean {
+/**
+ * One of its live, open weak points of this phase inside the rider's frame, no dune between: what the rider can shoot
+ * (#937). Not one shut between strikes (#1059): a raised tail over a dune with the open claws behind it is a fight the
+ * rider can't touch until the next strike.
+ */
+function weakPointSeen(camera: THREE.Camera, groundFn: HeightFunction, frame: BossFrame): boolean {
+  const { parts, state, age } = frame
   // By index, not `for…of parts`: that allocates an iterator and an entry array per weak point every frame (hard rule 8).
   const wps = state.spec.weakPoints
+  const phase = currentPhase(state)
   for (let i = 0; i < wps.length; i++) {
-    const id = wps[i].id
-    if (!isExposed(state, id)) continue
-    const part = parts.get(id)
+    if (state.hp[i] <= 0 || wps[i].phase !== phase || scorpionPartShut(wps, state.hp, i, age)) continue
+    const part = parts.get(wps[i].id)
     if (!part) continue
     part.getWorldPosition(_wp)
     if (pointInFrame(camera, groundFn, _wp.x, _wp.y, _wp.z, WEAK_POINT_NDC)) return true
@@ -106,11 +121,6 @@ export default function GiantScorpion(props: BossProps) {
     }),
     [track, groundFn],
   )
-  /** The same slots, only those in the frame: for when its perch has left the frame. */
-  const seenInput = useMemo<PerchInput>(
-    () => ({ ...input, camera: { x: 0, z: 0 }, seen: (x, z) => inFrame(camera, groundFn, x, z) }),
-    [input, camera, groundFn],
-  )
 
   const [tellStep] = useState(gameClockStep)
   const sim = useMemo(
@@ -118,11 +128,14 @@ export default function GiantScorpion(props: BossProps) {
       heading: new THREE.Vector3(),
       headed: false,
       perch: { x: 0, z: 0, slot: 0, sign: 1 } as Perch,
+      lead: { x: 0, z: -1, sign: 1 as 1 | -1 },
       perched: false,
       placed: false,
       /** Its age when it last burst out of the sand, and how long no weak point has been in the rider's frame. */
       riseFrom: 0,
       unseen: 0,
+      /** How tall it stands for `inFrame`: the raised tail, or the bare stub once only the stinger is left. */
+      top: STINGER_HEIGHT,
       yaw: 0,
       gait: 0,
       lastX: 0,
@@ -141,6 +154,12 @@ export default function GiantScorpion(props: BossProps) {
     [],
   )
 
+  /** The same slots, only those in the frame: for when its perch has left the frame. */
+  const seenInput = useMemo<PerchInput>(
+    () => ({ ...input, camera: { x: 0, z: 0 }, seen: (x, z) => inFrame(camera, groundFn, x, z, sim.top) }),
+    [input, camera, groundFn, sim],
+  )
+
   /** Keeps a clear perch ahead of the rider; once it has one it stays put when every slot is blocked. True when it should
    * burrow and burst out again at a new perch: none of its exposed weak points has been in the rider's frame for
    * `BURROW_AFTER_S` and a slot in the frame, against the rider's look as it is now, is clear (#937: on level 2's final
@@ -148,15 +167,20 @@ export default function GiantScorpion(props: BossProps) {
   const aim = useCallback(
     (dt: number, frame: BossFrame | null): boolean => {
       aimAtRider(camera, _cam, sim, input, dt)
-      sim.unseen = !frame || !sim.placed || weakPointSeen(camera, groundFn, frame.parts, frame.state) ? 0 : sim.unseen + dt
+      sim.unseen = !frame || !sim.placed || weakPointSeen(camera, groundFn, frame) ? 0 : sim.unseen + dt
       const risen = frame !== null && frame.age - sim.riseFrom > SCORPION_RISE.riseS
       if (risen && sim.unseen > BURROW_AFTER_S) {
+        sim.top = currentPhase(frame.state) > 0 ? STUB_HEIGHT : STINGER_HEIGHT
+        const lagX = sim.heading.x
+        const lagZ = sim.heading.z
         sim.headed = false
         aimAtRider(camera, _cam, sim, input, 0)
+        leadLook(sim.lead, lagX, lagZ, input.forwardX, input.forwardZ, sim.perch.sign)
+        sim.perch.sign = sim.lead.sign
         seenInput.camera.x = input.camera.x
         seenInput.camera.z = input.camera.z
-        seenInput.forwardX = input.forwardX
-        seenInput.forwardZ = input.forwardZ
+        seenInput.forwardX = sim.lead.x
+        seenInput.forwardZ = sim.lead.z
         if (pickSeenPerch(sim.perch, seenInput)) return true
       }
       // A far slot (`SEEN_PERCH` only) is held: `pickPerch` doesn't know it and would pull the perch back under the frame.
@@ -198,7 +222,7 @@ export default function GiantScorpion(props: BossProps) {
 
   const move = useCallback(
     (frame: BossFrame) => {
-      const { root, parts, state, dt, age, sinceDefeat } = frame
+      const { root, parts, state, retract, dt, age, sinceDefeat } = frame
       const limbs = limbsRef.current
       if (!limbs) return
       const fighting = sinceDefeat < 0
@@ -268,6 +292,8 @@ export default function GiantScorpion(props: BossProps) {
       }
 
       const lunge = fighting ? lungeAmount(age) : 0
+      const wps = state.spec.weakPoints
+      for (let i = 0; i < wps.length; i++) retract(wps[i].id, fighting && scorpionPartShut(wps, state.hp, i, age))
       for (let s = 0; s < 2; s++) {
         const side = s === 0 ? 1 : -1
         const id = s === 0 ? 'claw-l' : 'claw-r'

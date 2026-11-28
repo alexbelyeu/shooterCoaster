@@ -4,13 +4,16 @@ import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
 import { WATER_Y } from '@/entities/spawning/enemyPlacement'
 import { useMarch } from './useMarch'
+import { SEA_DIVE } from './seaDive.hot'
 import { FFISH_GEO, FFISH_MAT, FFISH_WING_GEO, FFISH_WING_MAT } from './SharedEnemyAssets'
+import { useSeaDive } from './useSeaDive'
 
 const GRAVITY = 0.08
 
 /**
  * A flying fish in three draw calls: its painted body (lathe body and belly, dorsal fin, forked tail, eyes) and two
- * swept-back wing-fins. Leaps in parabolic arcs, wings spread when airborne, folded when submerged.
+ * swept-back wing-fins. Leaps in parabolic arcs, wings spread when airborne, folded when submerged; left too long, it
+ * leaps no more and swims away under the surface (`useSeaDive`).
  */
 export default function FlyingFish(props: EnemyProps) {
   // One speed for the whole school, or it strings out.
@@ -26,10 +29,13 @@ export default function FlyingFish(props: EnemyProps) {
   const bodyRef = useRef<THREE.Group>(null)
   const vyRef = useRef(launchSpeed)
   const submergedTime = useRef(0)
+  const dive = useSeaDive('flyingFish', props.onEscape !== undefined)
+  const underFor = useRef(0)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
       const dt = delta * 60
+      const sunk = dive(mesh, time)
       const speed = moving() ? moveSpeed : 0
       mesh.position.x += Math.cos(moveAngle) * speed * dt
       mesh.position.z += Math.sin(moveAngle) * speed * dt
@@ -39,7 +45,13 @@ export default function FlyingFish(props: EnemyProps) {
 
       const inWater = mesh.position.y < WATER_Y
 
-      if (inWater) {
+      if (inWater && sunk > 0) {
+        // Its last splash: under and away.
+        vyRef.current = 0
+        underFor.current += delta
+        mesh.position.y = WATER_Y - (underFor.current / SEA_DIVE.diveS) * SEA_DIVE.depth
+        if (underFor.current >= SEA_DIVE.diveS) return 'escaped' as const
+      } else if (inWater) {
         mesh.position.y = WATER_Y
         submergedTime.current += delta
         if (submergedTime.current > 0.3 + rng() * 0.4) {
@@ -60,7 +72,7 @@ export default function FlyingFish(props: EnemyProps) {
         bodyRef.current.rotation.x = THREE.MathUtils.clamp(vyRef.current * -0.15, -0.4, 0.4)
       }
     },
-    [moveAngle, moveSpeed, moving, launchSpeed],
+    [moveAngle, moveSpeed, moving, launchSpeed, dive],
   )
 
   return (

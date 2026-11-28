@@ -167,7 +167,7 @@ export function layoutDesert(groundFn: HeightFunction, track: ArcTable): DesertL
     scaleRange: [0.85, 1.2],
     spacing: 520,
     avoid: LANDMARK_FOOTPRINTS,
-    rng: createRng(23),
+    rng: createRng(24),
     fixed: CANYON_MESAS,
   })
   const devils = placeDustDevils(track, {

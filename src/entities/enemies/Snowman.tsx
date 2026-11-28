@@ -3,7 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import EnemyBase, { type EnemyProps } from './EnemyBase'
 import { useEnemyRandom } from './enemyRandom'
-import { useSnowSink } from './useSnowSink'
+import { useSlipAway } from './useSlipAway'
+import { SNOW_SINK } from './slipAway.hot'
 import { leashedTurnRate, orbitStep } from './wanderLeash.hot'
 import { TerrainContext } from '@/levels/environments/TerrainContext'
 import {
@@ -25,7 +26,7 @@ export default function Snowman(props: EnemyProps) {
   const rightArmRef = useRef<THREE.Group>(null)
   const camera = useThree((s) => s.camera)
   const heightFn = useContext(TerrainContext)
-  const sink = useSnowSink()
+  const sink = useSlipAway(SNOW_SINK)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {

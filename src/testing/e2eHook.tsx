@@ -58,7 +58,7 @@ import { droppedSounds } from '@/audio/soundGuard'
 import { musicState, type MusicFade } from '@/audio/musicBus'
 import { scrimPlayer } from '@/audio/musicEngine'
 import type { AudioRenderRequest, AudioRenderResult } from './audioRender'
-import { exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
+import { currentPhase, exposedWeakPoints, hpFraction, weakPointHp, type BossState } from '@/entities/bosses/bossModel'
 import { clipboardText, sharePayload } from '@/ui/share'
 import { setOnlineEndpointOverride } from '@/app/onlineLeaderboard'
 import { scoreCardFileName, scoreCardRun, type CardSize } from '@/ui/scoreCard'
@@ -413,6 +413,8 @@ export interface E2ESwitch {
   open: boolean
   /** The run's kill-count total: a hard-route wave joins it when it arrives (#720). */
   totalEnemies: number
+  /** Enemies gone unscored so far this run, which the kill count's total leaves out. */
+  escaped: number
   /** The level's hard-route wave (`EnemyWave.route` 'hard', from its roster's `branch`): banner, size and second; null without one. */
   branchWave: { label: string; count: number; at: number } | null
   x: number
@@ -460,6 +462,8 @@ export interface E2EBoss {
   stage: E2EBossStage
   hpFraction: number | null
   weakPointsLeft: number
+  /** The phase being fought (`currentPhase`); null before the boss. */
+  phase: number | null
   /** Exposed weak points: id, hp left, CSS px (origin top-left), NDC, and whether inside the viewport. */
   exposed: { id: string; hp: number; x: number; y: number; ndcX: number; ndcY: number; onScreen: boolean }[]
   /** Projected bounds of the body (CSS px) and its width / height as fractions of the canvas. */
@@ -601,12 +605,18 @@ export function registerE2EEnemy(id: string, type: EnemyType | 'goldenBalloon', 
  * points before the combo multiplier (weak points and goldens in), the score `maxScore` is the kill-everything total of. Reset by
  * `startLevel` and `restartLevel`.
  */
-const runTally = { spawned: new Set<string>(), killed: new Set<string>(), basePoints: 0 }
+const runTally = { spawned: new Set<string>(), killed: new Set<string>(), escaped: new Set<string>(), basePoints: 0 }
 const countsInTally = (id: string) => !id.startsWith('bystander-') && !isBossId(id) && enemyRegistry.get(id)?.type !== 'goldenBalloon'
 function resetRunTally() {
   runTally.spawned.clear()
   runTally.killed.clear()
+  runTally.escaped.clear()
   runTally.basePoints = 0
+}
+
+/** An enemy gone unscored (`onEscape`: one that slipped away, a climber topped out): off the kill count's total (#1059). */
+export function recordE2EEscape(id: string) {
+  if (isE2E) runTally.escaped.add(id)
 }
 export function unregisterE2EEnemy(id: string) {
   if (isE2E) enemyRegistry.delete(id)
@@ -772,6 +782,7 @@ function readSwitch(): E2ESwitch | null {
     riding,
     open: s.open(),
     totalEnemies: useGameStore.getState().totalEnemies,
+    escaped: runTally.escaped.size,
     branchWave: readBranchWave(),
     x: ((_v.x + 1) / 2) * probeSize.width,
     y: ((1 - _v.y) / 2) * probeSize.height,
@@ -871,11 +882,12 @@ const _corner = new THREE.Vector3()
 
 function readBoss(): E2EBoss {
   const h = e2eBoss.handle
-  const out: E2EBoss = { stage: e2eBoss.stage, hpFraction: null, weakPointsLeft: 0, exposed: [], box: null, projectiles: [] }
+  const out: E2EBoss = { stage: e2eBoss.stage, hpFraction: null, weakPointsLeft: 0, phase: null, exposed: [], box: null, projectiles: [] }
   if (!h) return out
   const state = h.state()
   out.hpFraction = hpFraction(state)
   out.weakPointsLeft = state.hp.filter((hp) => hp > 0).length
+  out.phase = currentPhase(state)
   const cam = probeCamera
   if (!cam) return out
   const { width, height } = probeSize
@@ -1591,7 +1603,8 @@ function collectSceneStats(scene: THREE.Scene): SceneStats {
   }
   scene.traverseVisible((o) => {
     const m = o as THREE.Mesh & { isInstancedMesh?: boolean; count?: number }
-    if (!m.isMesh || !m.geometry) return
+    // A fleet's enemy (`enemyFleet.ts`) is on no layer while the fleet's instances draw it.
+    if (!m.isMesh || !m.geometry || m.layers.mask === 0) return
     const g = m.geometry
     const verts = g.index ? g.index.count : (g.attributes.position?.count ?? 0)
     const tris = Math.floor(verts / 3) * (m.isInstancedMesh ? (m.count ?? 1) : 1)

@@ -11,7 +11,8 @@ export const BALLOON_FLIGHT = {
   /** Side-to-side sway: half-width in units, radians a second. */
   sway: 45,
   swayRate: 1.3,
-  near: 1000,
+  /** Seen from this far: further than the balloons a player pops first, so the far ones of a wave slip away unpopped. */
+  near: 2000,
   /** Cosine off the rider's look within which it counts as seen. */
   seenCos: 0.7,
   linger: 5.5,

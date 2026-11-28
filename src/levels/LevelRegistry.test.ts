@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getAllLevels, getLevelConfig, previousLevel } from './LevelRegistry'
 import { SCORE_VALUES, computeMaxScore, computeStars, nextStar, runNextStar, runStars, shownScore } from './scoring'
-import type { EnemyType } from '@/types/level'
+import type { EnemyType, EnemyWave, LevelConfig } from '@/types/level'
 import { BOSS_SPECS } from '@/entities/bosses/bossSpecs'
 import { bossMaxScore } from '@/entities/bosses/bossModel'
 import { RUN_SECONDS, pacingTimes } from './pacing'
@@ -46,19 +46,19 @@ describe('LevelRegistry', () => {
     },
   )
 
-  it('the finales and maxScores: Blimp 2675, Giant Scorpion 2745, Kraken 3164, Yeti 4620, Magma Titan 3828, Medusa 2976, Helicopter 1875, Jungle Ruins (Blimp placeholder) 1970', () => {
+  it('the finales and maxScores: Blimp 2805, Giant Scorpion 3460, Kraken 3322, Yeti 4530, Magma Titan 3828, Medusa 3174, Helicopter 2505, Jungle Ruins (Blimp placeholder) 2615', () => {
     const finales = levels.map((l) => [l.id, l.boss?.type ?? l.enemies[l.enemies.length - 1].type, l.maxScore])
     expect(finales).toEqual([
-      ['level1', 'goldenBlimp', 2675],
-      ['level2', 'giantScorpion', 2745],
-      ['level3', 'kraken', 3164],
-      ['level4', 'yeti', 4620],
+      ['level1', 'goldenBlimp', 2805],
+      ['level2', 'giantScorpion', 3460],
+      ['level3', 'kraken', 3322],
+      ['level4', 'yeti', 4530],
       ['level5', 'magmaTitan', 3828],
-      ['level6', 'medusa', 2976],
-      ['level7', 'helicopter', 1875],
-      ['level8', 'goldenBlimp', 1970],
+      ['level6', 'medusa', 3174],
+      ['level7', 'helicopter', 2505],
+      ['level8', 'goldenBlimp', 2615],
     ])
-    expect(getLevelConfig('level1')!.maxScore).toBe(150 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
+    expect(getLevelConfig('level1')!.maxScore).toBe(160 * 13 + bossMaxScore(BOSS_SPECS.goldenBlimp))
   })
 
   it("counts the hard route's wave in maxScore (#720): every wave and the boss, the gym's V8 rats included", () => {
@@ -67,20 +67,24 @@ describe('LevelRegistry', () => {
   })
 
   it.each(levels.map((l) => [l.id, l] as const))(
-    '%s: waves from 0 s, the last one shootable by 35 s, then a 18–22 s boss fight (or a finale wave) ending the run',
+    '%s: waves from 0 s, the last one shootable by 35 s, then a 18–28 s boss fight (or a finale wave) ending the run',
     (_id, level) => {
       expect(RUN_SECONDS).toBe(60)
-      // A hard-route wave is timed by its junction, outside the waves every run meets.
-      const delays = level.enemies.filter((w) => !w.route).map((w) => w.spawnDelay ?? 0)
+      // A hard-route wave is timed by its junction, outside the waves every run meets, and a fight wave (#1059) by the boss.
+      const delays = level.enemies.filter((w) => !w.route && !inFight(level, w)).map((w) => w.spawnDelay ?? 0)
       expect(delays[0]).toBe(0)
       expect([...delays].sort((a, b) => a - b)).toEqual(delays)
       const finaleAt = level.boss ? level.boss.at : delays[delays.length - 1]
       const waves = level.boss ? delays : delays.slice(0, -1)
       expect(Math.max(...waves) + ENTRY_SECONDS_MAX).toBeLessThanOrEqual(35)
-      expect(finaleAt).toBe(pacingTimes().bossAt)
+      // The template's second, or sooner where a level's ride leaves the boss too little in view (level3, #1059).
+      expect(finaleAt).toBeLessThanOrEqual(pacingTimes().bossAt)
       expect(RUN_SECONDS - finaleAt).toBeGreaterThanOrEqual(18)
-      expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(22)
+      // Up to 28 s where the boss comes sooner (level2, #1059: the Giant Scorpion before the final lift turns the view away).
+      expect(RUN_SECONDS - finaleAt).toBeLessThanOrEqual(28)
       if (level.boss) expect(level.boss.at - BOSS_SPECS[level.boss.type].tell.seconds).toBeGreaterThan(Math.max(...waves))
+      // A fight wave (`withFight`) at a whole second of the fight, before the run ends.
+      for (const fight of level.enemies.filter((w) => inFight(level, w))) expect(Number.isInteger(fight.spawnDelay) && fight.spawnDelay! < RUN_SECONDS).toBe(true)
     },
   )
 
@@ -93,9 +97,9 @@ describe('LevelRegistry', () => {
     expect(level5.enemies.some((w) => w.type === 'infernalDrake')).toBe(true)
   })
 
-  it('every level comes at 2–4 enemies a second of the waves before the finale; Theme Park, the bar, keeps its 50-balloon waves', () => {
+  it('every level comes at 2–4 enemies a second of the waves before the finale', () => {
     for (const l of levels) {
-      const waves = l.boss ? l.enemies : l.enemies.slice(0, -1)
+      const waves = l.boss ? l.enemies.filter((w) => !inFight(l, w)) : l.enemies.slice(0, -1)
       const perSecond = waves.reduce((n, w) => n + w.count, 0) / pacingTimes().bossAt
       expect(perSecond, l.id).toBeGreaterThanOrEqual(2)
       expect(perSecond, l.id).toBeLessThanOrEqual(4)
@@ -272,3 +276,8 @@ describe('nextStar', () => {
     }
   })
 })
+
+/** A wave that arrives during the boss's fight (`withFight` in LevelRegistry.ts, #1059). */
+function inFight(level: LevelConfig, wave: EnemyWave): boolean {
+  return !!level.boss && (wave.spawnDelay ?? 0) > level.boss.at
+}

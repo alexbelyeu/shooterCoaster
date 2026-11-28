@@ -7,6 +7,8 @@ import { flyBack } from './leftBehind.hot'
 import { useGameStore } from '@/store/useGameStore'
 import { setFlashMaterial } from './hitFlash'
 import { useMarch } from './useMarch'
+import { useSlipAway } from './useSlipAway'
+import type { SlipAway } from './slipAway.hot'
 import { BIRD_EYE_MAT, CROW_FLINCH_MAT, createBirdFeatherMaterial, birdWingPose } from './SharedEnemyAssets'
 
 /** Flap rates (radians of flap phase per game second) while hovering and in a dive. */
@@ -20,7 +22,10 @@ const tagFlinch = (mesh: THREE.Mesh | null) => {
   if (mesh) setFlashMaterial(mesh, CROW_FLINCH_MAT)
 }
 
-type FlapBirdProps = EnemyProps & (
+type FlapBirdProps = EnemyProps & {
+  /** Climbs out of the frame, unscored, once seen this long (the crow, #1059); without it, it stays. */
+  flee?: SlipAway
+} & (
   | {
       /** Its feathers, painted, with the crow's wings (`aWing`), and its unlit eyes. */
       body: THREE.BufferGeometry
@@ -38,7 +43,8 @@ type FlapBirdProps = EnemyProps & (
  * A bird with the crow's wings in two draw calls, feathers and eyes (the crow, the toucan); its wings flap in the
  * feather material's vertex shader. It takes turns hovering (slow flap, body bob) and diving (fast flap, nose down),
  * banking into its sway. One the rider has gone past unshot flies back round in front of it (`flyBack`; every crow and toucan
- * flies in a formation wave, placed ahead of the rider for that stretch alone).
+ * flies in a formation wave, placed ahead of the rider for that stretch alone). With `flee`, one left too long once seen
+ * climbs out of the frame instead, unscored, and never flies back.
  */
 export default function FlapBird(props: FlapBirdProps) {
   const pose = 'model' in props ? props.pose : undefined
@@ -59,7 +65,8 @@ export default function FlapBird(props: FlapBirdProps) {
   const phase = useRef(flapOffset)
   const camera = useThree((s) => s.camera)
   // Its fly-back state, and where the rider's eye was last frame: a bird flying back outpaces the ride.
-  const back = useMemo(() => ({ flying: false, lastEye: camera.position.clone() }), [camera])
+  const back = useMemo(() => ({ flying: false, lastEye: camera.position.clone(), fled: 0 }), [camera])
+  const flee = useSlipAway(props.flee)
 
   const updatePosition = useCallback(
     (mesh: THREE.Object3D, _spawnPos: THREE.Vector3, time: number, delta: number) => {
@@ -68,8 +75,15 @@ export default function FlapBird(props: FlapBirdProps) {
       const rode = back.lastEye.distanceTo(camera.position)
       back.lastEye.copy(camera.position)
       // None starts back during the boss fight: the rider's shots belong to the boss then.
+      const fled = flee(mesh.position, time)
+      if (fled < 0) return 'escaped'
+      mesh.position.y += fled - back.fled
+      back.fled = fled
+      // A fleeing bird stops flying back, even mid-flight: the fly-back's pull toward the eye would cancel the climb.
+      if (fled > 0) back.flying = false
       const game = useGameStore.getState()
-      const facing = flyBack(back, mesh.position, camera.position, camera.getWorldDirection(LOOK), delta, rode, game.bossArrivedAt === null || game.bossSeconds !== null) ?? moveAngle
+      const start = game.bossArrivedAt === null || game.bossSeconds !== null
+      const facing = (fled === 0 ? flyBack(back, mesh.position, camera.position, camera.getWorldDirection(LOOK), delta, rode, start) : null) ?? moveAngle
       if (!back.flying) {
         const speed = moving() ? moveSpeed : 0
         mesh.position.x += (Math.cos(moveAngle) * speed + wobble) * dt
@@ -92,7 +106,7 @@ export default function FlapBird(props: FlapBirdProps) {
         rig.position.y = -0.35 * (1 - dive) * Math.cos(phase.current)
       }
     },
-    [moveAngle, moveSpeed, moving, flapOffset, flap, sway, camera, back, pose],
+    [moveAngle, moveSpeed, moving, flapOffset, flap, sway, camera, back, pose, flee],
   )
 
   return (

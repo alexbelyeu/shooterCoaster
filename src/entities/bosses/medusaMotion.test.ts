@@ -3,7 +3,7 @@ import { bossMaxScore, maxHp } from './bossModel'
 import { MEDUSA } from './bossSpecs'
 import {
   MEDUSA_BODY, MEDUSA_DEFEAT, MEDUSA_RISE, SNAKE, SNAKE_SLOTS, bodyPlacement, defeatSink, laughShake, laySnake, riseAmount,
-  snakeLength, strikeLandsBetween, strikePose,
+  snakeLength, snakeShut, strikeLandsBetween, strikePose,
 } from './medusaMotion'
 
 const N = SNAKE.segments
@@ -13,14 +13,33 @@ const head = () => [pts[N * 3], pts[N * 3 + 1], pts[N * 3 + 2]]
 const dist = (a: readonly number[], b: readonly number[]) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2])
 
 describe('Medusa spec', () => {
-  it('four snakes, four more, then the crown snake; 900 points; a 20 hp fight', () => {
+  it('four snakes, four more, then the crown snake; 900 points; a 28 hp fight', () => {
     expect(MEDUSA.weakPoints.map((w) => w.phase)).toEqual([0, 0, 0, 0, 1, 1, 1, 1, 2])
     expect(MEDUSA.weakPoints[MEDUSA.weakPoints.length - 1].id).toBe('crown')
     expect(MEDUSA.weakPoints.length).toBe(SNAKE_SLOTS.length)
     expect(bossMaxScore(MEDUSA)).toBe(900)
-    // 2 hits a second (the smoke's rate) plus her rise and each phase uncoiling stay well inside the 20 s fight.
-    const seconds = maxHp(MEDUSA) / 2 + MEDUSA_RISE.riseS + 2 * SNAKE.emergeS
+    // The pacing step's 3 hits a second plus her rise and each phase uncoiling: 12 s or more, inside the 20 s fight (#1059).
+    const seconds = maxHp(MEDUSA) / 3 + MEDUSA_RISE.riseS + 2 * SNAKE.emergeS
+    expect(seconds).toBeGreaterThan(12)
     expect(seconds).toBeLessThan(15)
+  })
+})
+
+describe('snakeShut', () => {
+  const alive = MEDUSA.weakPoints.map((w) => w.hp)
+  it('a snake is shut while it sways coiled and another of its phase strikes, open from rearing to recoil', () => {
+    const s = SNAKE_SLOTS[0]
+    expect(snakeShut(0, -s.offset + 0.1 * s.period, alive)).toBe(true)
+    expect(snakeShut(0, -s.offset + 0.6 * s.period, alive)).toBe(false)
+  })
+  it('always leaves one of the first four open, alone or with the rest dead; the next four and the crown never shut', () => {
+    for (let t = 0; t < 12; t += 0.05) {
+      const ids = SNAKE_SLOTS.flatMap((s, i) => (s.phase === 0 ? [i] : []))
+      expect(ids.some((i) => !snakeShut(i, t, alive))).toBe(true)
+      const lastOne = alive.map((h, i) => (i === ids[0] ? h : 0))
+      expect(snakeShut(ids[0], t, lastOne)).toBe(false)
+      SNAKE_SLOTS.forEach((s, i) => { if (s.phase > 0) expect(snakeShut(i, t, alive)).toBe(false) })
+    }
   })
 })
 

@@ -28,6 +28,11 @@ export type PacedWave = Omit<EnemyWave, 'spawnDelay'> & { weight?: number }
 export interface Roster {
   waves: PacedWave[]
   boss?: BossType
+  /**
+   * The boss's second, when the template's (2/3 of the run) leaves it too little of the ride in view: level 3's Kraken from
+   * 38 s, so a fight of 12 s or more ends before the track dives under the sea at ~52 s (#1059). After the last wave.
+   */
+  bossAt?: number
   /** For a level without a boss: arrives in the boss's place. */
   finale?: Omit<EnemyWave, 'spawnDelay'>
   /**
@@ -47,16 +52,19 @@ export function paceLevel(roster: Roster, runSeconds = RUN_SECONDS): PacedLevel 
   const { waves, boss, finale, branch } = roster
   if (!waves.length) throw new Error('no waves')
   if (boss && finale) throw new Error('a boss or a finale, not both')
-  const { bossAt, waveSpan, lastWaveBy } = pacingTimes(runSeconds)
+  const times = pacingTimes(runSeconds)
+  const { waveSpan, lastWaveBy } = times
+  const bossAt = roster.bossAt ?? times.bossAt
   const total = waves.reduce((sum, w) => sum + weightOf(w), 0)
   let before = 0
   const enemies: EnemyWave[] = waves.map(({ weight, ...wave }) => {
     const spawnDelay = Math.round((waveSpan * before) / total)
-    before += weightOf({ weight })
+    before += weight ?? 1 // checked by `total`
     return { ...wave, spawnDelay }
   })
   const last = enemies[enemies.length - 1].spawnDelay!
   if (last > lastWaveBy) throw new Error(`last wave at ${last} s, after ${lastWaveBy} s`)
+  if (!Number.isInteger(bossAt) || bossAt <= last) throw new Error(`boss at ${bossAt} s: a whole second after the last wave`)
   if (finale) enemies.push({ ...finale, spawnDelay: bossAt })
   if (branch) {
     const { at, ...wave } = branch

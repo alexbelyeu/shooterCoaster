@@ -31,7 +31,7 @@ no enemy is on screen at that probe, or fewer than min(2, on screen) are ≥ 12 
 enemies, the `killNearest` hits never produce an `enemy:killed` (skipped if the
 level timer already ran out), the level's boss arrives during these checks (they are the boss step's), the camera translates off the track pose at all
 (kill feedback is rotation-only trauma, ≤ 1°, back to 0), the first-person weapon is off
-screen / covers the centre / overlaps the HUD / points > 25° off the tracer of the frozen fixed-point shot or of a second shot on the far side of the screen without `holdFeedback` (`aimJump=`; the gun snaps to every shot) (also
+screen / covers the centre / overlaps the HUD (on the kill frame, then at four extreme aims with game time frozen under the widest combo meter, 5× with a two-digit chain, #1079) / points > 25° off the tracer of the frozen fixed-point shot or of a second shot on the far side of the screen without `holdFeedback` (`aimJump=`; the gun snaps to every shot) (also
 checked in mobile portrait + landscape, and in portrait at four extreme aims with the combo meter showing),
 the camera aspect doesn't match the canvas (±0.01), any drawn bullet's screen radius exceeds 2% of the
 canvas height (also checked on the phone run), a fresh shot isn't drawn at the muzzle tip, or the results screen never finishes its
@@ -90,7 +90,7 @@ A `daily` step (two fresh pages, no `?seed=`) clicks the Daily card: the run mus
 daily mode, a second load must give the same `spawnDigest()`, the results must show the Daily badge, New best, no Next Level and no initials entry (the campaign boards stay empty),
 send the new best once to the stubbed online board with `daily` = today and the last initials and show the day's World board it answers (#854, `data-source="today"`, `daily-results.png`); the second load's
 run, with the stub answering 503, must show no board, New best and save the local record (`daily-results-offline.png`), and no ghost crosshair
-(#1042). The first load's run fetches the day's ghost from the stub (`?ghost=1`, once, for today), which aims at the shot step's
+(#1042). Each load kills its nearest enemies until the run has a score (`scoreSomething`, at most 20 s, else a `scored nothing` failure; #1074). The first load's run fetches the day's ghost from the stub (`?ghost=1`, once, for today), which aims at the shot step's
 `GHOST_AT`: its ring must show there, translucent (`daily-ghost.png`), and the new best must go up with a ghost of its own
 ( its score cards `daily-card.png` / `daily-card-story.png` carry the Daily badge and date), save today's best and a 1-day streak without changing the campaign saves, and Replay must keep the seed.
 A `bossRush` step (#1011, nightly) saves 3 stars on every level, opens the Boss Rush ticket on level select, checks the first stage shows no wave enemies, beats its boss (`summonBoss` + `bossHit`), must move on to the next level's stage with the time carried and the HUD's "Boss 2 of N", then runs the timer out (`timerStep` 1): the rush's results (`bossrush-results.png`) must read 1 boss beaten and offer Replay, with the campaign saves, boards and the Boss Rush best untouched.
@@ -132,7 +132,7 @@ When level1 is in the run, a `boss` step summons the Golden Blimp (`summonBoss()
 hull must be ≥ 15% of the frame wide and ≥ 1 balloon on screen (every boss is summoned into a ride frozen where it stands, and
 moved alone until its first phase is on screen, at most 20 s: the blimp places itself off the camera's heading, which riding on
 through its arrival had turned away from on some runners, #905), with the boss bar clear of the HUD (`level1-boss.png`; a bar that never shows prints the phase, the screens mounted and the `runLog`, #938), only the balloons exposed; a real
-bullet must hit one (fired with `bulletsHitOnly: 'boss:'`, so no regular enemy crossing its path from the muzzle can take it: #1046, a bird in the way took the shot), `bossHit` clears them and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
+bullet must hit one (fired with `bulletsHitOnly: 'boss:'`, so no regular enemy crossing its path from the muzzle can take it: #1046, a bird in the way took the shot), `bossHit` clears them (in rounds of 0.5 s while a weak point is shut for now, `retract`: level3's pads while their arm slams, level6's snakes coiled between strikes, #1059; level6's second four too) and must expose only the gondola (`level1-boss-gondola.png`), then defeat it:
 `boss:defeated`, one kill per weak point and the big score popup over the confetti (`level1-boss-down.png`). The phone run
 resumes after its Pause tap with the boss summoned: the bar must sit inside the viewport and clear of the HUD in portrait and
 landscape (`mobile-level1-boss.png`).
@@ -208,7 +208,7 @@ the run with nothing on screen) and the gaps (`longestGapSeconds`, `longestGap` 
 `gaps` of 1 s or more); the first 2 s after GO and the boss tell are meant to be empty, so they count neither way and end a
 gap. It prints one line per level (`level2 pacing: no target 7% of 60 s, longest gap 2.0 s at 4 s (track 0.03)`) and
 writes `e2e-results/pacing.json`: those metrics per level plus a `timeline`, one row a level second (`t`, fewest and most
-targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`), which is where to look for where a gap is. Each step gets a
+targets on screen `min` / `max`, `track`, `waveTell`, `bossTell`, `bunch`: the most in one aim-assist circle), which is where to look for where a gap or a bunch is. Each step gets a
 wall-clock deadline (#535): a step still held after the frame deadline (`--seconds` × 4 s; the first step the level's 60 s
 load on top) fails with `never settled: step N held … frames` (React committing on every held frame) or `the level registered no
 waves` (`nextWave()` still null), and the ride step stops at that same deadline with the same no-waves line instead of

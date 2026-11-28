@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  WEAPON_MAX_TILT, WEAPON_MIN_AIM_DIST, WEAPON_MIN_DEPTH, WEAPON_MIN_TILT, WEAPON_RECOIL_PITCH, clampWeaponAim, recoilEnvelope, recoilKickAxis, weaponDepth, weaponLayout,
+  COMBO_HALF_PX, CORNER_BUTTON_PX, WEAPON_LANDSCAPE, WEAPON_REACH, WEAPON_MAX_TILT, WEAPON_MIN_AIM_DIST, WEAPON_MIN_DEPTH, WEAPON_MIN_TILT, WEAPON_RECOIL_PITCH, clampWeaponAim, recoilEnvelope, recoilKickAxis, weaponDepth, weaponLayout,
   type WeaponDepth, type WeaponLayout,
 } from './weaponLayout'
 
@@ -27,6 +27,20 @@ describe('weaponLayout', () => {
       expect(l.unitPx).toBeGreaterThan(50)
     })
   }
+
+  it('keeps a landscape gun clear of the widest combo meter where the bottom row has room (#1079)', () => {
+    for (const [w, h] of [[1280, 720], [1366, 768], [1920, 1080], [2560, 1080], [844, 390], [1024, 768]]) {
+      const m = Math.min(w, h)
+      const l = weaponLayout(w, h, layoutOut())
+      expect(l.x).toBeGreaterThanOrEqual(w - m * WEAPON_LANDSCAPE.right)
+      const room = w - CORNER_BUTTON_PX - m * WEAPON_REACH >= w / 2 + COMBO_HALF_PX + m * WEAPON_REACH
+      if (room) {
+        expect(l.x - m * WEAPON_REACH).toBeGreaterThanOrEqual(w / 2 + COMBO_HALF_PX - 1e-9)
+        expect(l.x + m * WEAPON_REACH).toBeLessThanOrEqual(w - CORNER_BUTTON_PX + 1e-9)
+      }
+    }
+    expect(weaponLayout(1280, 720, layoutOut()).x).toBeCloseTo(640 + COMBO_HALF_PX + 720 * WEAPON_REACH)
+  })
 
   it('keeps the gun beyond the near plane and matches the requested size', () => {
     for (const [, w, h] of VIEWPORTS) {

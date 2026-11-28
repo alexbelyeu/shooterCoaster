@@ -662,11 +662,12 @@ export interface TracksideBand {
 
 /**
  * Ground: spread evenly from 700 ahead over the wave's window, at least to 2200; water: ~1–14 s of
- * Ocean's ~250 units/s ride, about its gap between waves (#316).
+ * Ocean's ~250 units/s ride, about its gap between waves (#316), and 200–700 to the side: at 160–400 the far sharks of a
+ * shoal stood in one aim-assist circle down the tunnel's straight (#1059).
  */
 export const TRACKSIDE: Record<'ground' | 'water', TracksideBand> = {
   ground: { aheadMin: 700, aheadMax: 2200, sideMin: 60, sideMax: 400, spread: true },
-  water: { aheadMin: 300, aheadMax: 3600, sideMin: 60, sideMax: 400, near: { share: 0.5, max: 1500 } },
+  water: { aheadMin: 300, aheadMax: 1400, sideMin: 200, sideMax: 700, near: { share: 0.5, max: 900 } },
 }
 
 export const tracksideBand = (surface: Surface): TracksideBand => TRACKSIDE[surface === 'water' ? 'water' : 'ground']
@@ -1026,16 +1027,17 @@ const SWARM_GROUP_SECONDS = 1.5
 /**
  * A swarm's groups land evenly from the wave's tell to this long after its window closes (#948, #957): the rider clears a
  * small group in about a second, so the late ones hold the stretch while the next wave is still out of sight (on level 6,
- * the Shield's top, its stop and the auto belay's fall to the pit, where the pack is first seen).
+ * the Shield's top, its stop and the auto belay's fall to the pit, where the pack is first seen: 5.5 s left the car's tip
+ * over the top of the fall with nothing in frame, #1039).
  */
-const SWARM_LAST_LATE = 5.5
+const SWARM_LAST_LATE = 7.5
 /**
  * A swarm splits into groups of at least `SWARM_GROUP_MIN`, up to `SWARM_GROUPS`, each round the spot the rider sees most
  * while that group is in play (#768), from the moment it arrives (#928): on level 6, one after another on the walls beside
  * the car up Alaska, then on the roof over its top as it rolls over (#948), the last ones on the Starr and the Shield the
  * car looks at from the Shield's top and on its fall (#957), so new ones keep landing in frame through the wave, not one burst.
  */
-const SWARM_GROUPS = 12
+const SWARM_GROUPS = 14
 const SWARM_GROUP_MIN = 3
 /** Candidate centres across and up each wall, about this far apart. */
 const SWARM_CANDIDATE_STEP = 80

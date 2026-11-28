@@ -43,7 +43,7 @@ const blimpBalloons: WeakPointSpec[] = BLIMP_LAYOUT.balloons.map(([x, y], i) => 
   id: `balloon-${i}`,
   radius: 62,
   offset: [x, y, 0],
-  hp: 4,
+  hp: 5,
   score: GOLDEN_BALLOON_SCORE,
   phase: 0,
 }))
@@ -63,16 +63,20 @@ const krakenPads: WeakPointSpec[] = Array.from({ length: KRAKEN_TENTACLE.count }
   id: `pad-${i}`,
   radius: 40,
   offset: [0, 0, 0],
-  hp: 2,
+  hp: 4,
   score: 60,
   phase: 0,
 }))
 
+/**
+ * The pads first (each shut while its arm slams, `padShut`, #1059), then the eye. Hp for a fight of 12 s or more at the pacing
+ * step's `PLAYER_HITS_PER_SECOND`.
+ */
 export const KRAKEN: BossSpec = {
   name: 'The Kraken',
   tell: { seconds: 2, label: 'The Kraken Rises!' },
   reward: 400,
-  weakPoints: [...krakenPads, { id: 'eye', radius: KRAKEN_HEAD.eyeRadius, offset: [0, 0, 0], hp: 3, score: 0, phase: 1 }],
+  weakPoints: [...krakenPads, { id: 'eye', radius: KRAKEN_HEAD.eyeRadius, offset: [0, 0, 0], hp: 7, score: 0, phase: 1 }],
 }
 
 /** Placed every frame on its arm or along the tail (GiantScorpion.tsx), so no offset. */
@@ -85,7 +89,8 @@ const scorpionTail: WeakPointSpec[] = Array.from({ length: SCORPION_TAIL.segment
   phase: 0,
 }))
 
-const scorpionClaw = (id: string): WeakPointSpec => ({ id, radius: 80, offset: [0, 0, 0], hp: 2, score: 60, phase: 0 })
+/** Claws 3 and the stinger 6, each open only in its moment of the strike (`scorpionShut`): ~12 s on level 2 (#1059), from the flats' slalom until just before the final lift turns the view away. */
+const scorpionClaw = (id: string): WeakPointSpec => ({ id, radius: 80, offset: [0, 0, 0], hp: 3, score: 60, phase: 0 })
 
 export const GIANT_SCORPION: BossSpec = {
   name: 'The Giant Scorpion',
@@ -95,7 +100,7 @@ export const GIANT_SCORPION: BossSpec = {
     scorpionClaw('claw-l'),
     scorpionClaw('claw-r'),
     ...scorpionTail,
-    { id: 'stinger', radius: 62, offset: [0, 0, 0], hp: 3, score: 0, phase: 1 },
+    { id: 'stinger', radius: 62, offset: [0, 0, 0], hp: 6, score: 0, phase: 1 },
   ],
 }
 
@@ -141,11 +146,14 @@ export const MAGMA_TITAN: BossSpec = {
 /** Placed every frame at the head of its snake (Medusa.tsx), so no offset; the crown snake (the last slot) is bigger. */
 const medusaSnakes: WeakPointSpec[] = SNAKE_SLOTS.map((s, i) =>
   s.phase === 2
-    ? { id: 'crown', radius: 58 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 4, score: 0, phase: 2 }
+    ? { id: 'crown', radius: 58 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 12, score: 0, phase: 2 }
     : { id: `snake-${i}`, radius: 42 * MEDUSA_SIZE, offset: [0, 0, 0], hp: 2, score: 50, phase: s.phase },
 )
 
-/** Four snakes, four more, then the crown snake: shoot every snake in her hair. */
+/**
+ * Four snakes, four more, then the crown snake: shoot every snake in her hair, each only as it strikes (`snakeShut`, #1059).
+ * Hp for a fight of 12 s or more at the pacing step's `PLAYER_HITS_PER_SECOND`.
+ */
 export const MEDUSA: BossSpec = {
   name: 'Medusa',
   tell: { seconds: 2.5, label: 'The Starr Awakens!' },
@@ -168,9 +176,9 @@ export const HELICOPTER: BossSpec = {
   tell: { seconds: 2.5, label: 'Searchlight Incoming!' },
   reward: 400,
   weakPoints: [
-    { id: 'searchlight', radius: 36, offset: [...HELI_LAYOUT.searchlight], hp: 2, score: 60, phase: 0 },
-    { id: 'tail-rotor', radius: 42, offset: [...HELI_LAYOUT.tailRotor], hp: 2, score: 60, phase: 0 },
-    { id: 'hub', radius: 40, offset: [...HELI_LAYOUT.hub], hp: 4, score: 0, phase: 1 },
+    { id: 'searchlight', radius: 36, offset: [...HELI_LAYOUT.searchlight], hp: 3, score: 60, phase: 0 },
+    { id: 'tail-rotor', radius: 42, offset: [...HELI_LAYOUT.tailRotor], hp: 3, score: 60, phase: 0 },
+    { id: 'hub', radius: 40, offset: [...HELI_LAYOUT.hub], hp: 14, score: 0, phase: 1 },
   ],
 }
 

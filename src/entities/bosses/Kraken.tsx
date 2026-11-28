@@ -20,7 +20,7 @@ import {
   KRAKEN_EYE_GEO, KRAKEN_EYE_MAT, KRAKEN_HEAD_GEO, KRAKEN_PAD_GEO, KRAKEN_PAD_MAT, KRAKEN_SEGMENT_GEO, KRAKEN_SKIN_MAT,
 } from './bossAssets'
 import {
-  KRAKEN_HEAD, KRAKEN_TENTACLE, behind, createChain, headFrame, layChain, pickSpot, segmentRadius, slamImpactBetween,
+  KRAKEN_HEAD, KRAKEN_TENTACLE, behind, createChain, headFrame, layChain, padShut, pickSpot, segmentRadius, slamImpactBetween,
   tentacleFrame, type Chain, type HeadFrame, type Spot, type TentacleFrame,
 } from './krakenMotion'
 
@@ -195,7 +195,7 @@ export default function Kraken(props: BossProps) {
   }, [])
 
   const move = useCallback(
-    ({ root, parts, camera, state, dt, age, sinceDefeat }: BossFrame) => {
+    ({ root, parts, camera, state, dt, age, sinceDefeat, retract }: BossFrame) => {
       const segments = segmentsRef.current
       const foamRings = foamRef.current
       const head = headRef.current
@@ -263,6 +263,7 @@ export default function Kraken(props: BossProps) {
             run.wait = T.gapS
           } else impact = slamImpactBetween(prev, run.tau, run.sinkAt, i)
         }
+        retract(KRAKEN.weakPoints[i].id, alive && run.mode === 'up' && padShut(run.tau, run.sinkAt, i))
 
         const base = i * T.segments
         if (run.mode !== 'up') {

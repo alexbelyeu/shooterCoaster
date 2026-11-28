@@ -547,6 +547,11 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   // target and the recoil depend on frame timing (#158).
   const weapon = await weaponProblems(page, 'desktop', { aim: false })
   problems.push(...weapon.problems)
+  // That box depends on which enemy the last shot hit and how wide the meter was then (#1079): the HUD
+  // check proper is the sweep's fixed aims, game time frozen, under the widest live meter (5x, two digits).
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
+  problems.push(...(await weaponAimSweepProblems(page, 'desktop', COMBO_WIDEST_PRIME)))
+  await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
   // Release the hold and let the trauma decay; it must return exactly to 0.
   await page.evaluate(() => { window.__SC_TEST__.holdFeedback = false })
   const settleStart = await getFrames(page)
@@ -575,6 +580,11 @@ async function playLevel(page, id, { frenzy = false, leaderboard = false, online
   const played = await page.evaluate(() => ({ levelTime: window.__SC_TEST__.nextWave()?.levelTime ?? null, boss: window.__SC_TEST__.boss().stage }))
   if (played.boss !== 'none' && played.boss !== 'waiting') problems.push(`the boss arrived during play (stage ${played.boss} at ${played.levelTime?.toFixed(1)} s of level time)`)
 
+  // The medal kill below needs an enemy still in play: level 1's balloons slip away (#1059), so wait for one if none is up.
+  if (resultsScreen && (await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1).length === 0))) {
+    await frozenEnemyTarget(page)
+    await page.evaluate(() => window.__SC_TEST__.setTimeScale(1))
+  }
   // With `leaderboard`, seed nine entries so this run places 4th, in the same turn as the end so the score can't move.
   const seeding = await page.evaluate(
     ([lid, seed, endpoint, medal]) => {
@@ -840,17 +850,24 @@ async function ghostProblems(page, id) {
  * the ride between waves with nothing on screen, so game time runs until an enemy shows (up to 20 s wall clock),
  * then freezes and reads it again once the frozen frame has rendered. The combat checks hold the level timer, so no
  * wave comes due: when they have shot every enemy in view, the search lets the level timer run too (#1028: on a slow
- * runner it found nothing for 20 s at a held 11 s of level1), and holds it again as it returns.
+ * runner it found nothing for 20 s at a held 11 s of level1), and holds it again as it returns. Level 1's balloons slip
+ * away a few game seconds after they are seen (#1059), so on a slow runner the screen can be empty until the next wave:
+ * past 20 s the search goes on (up to 90 s) while that wave is not yet in and a few seconds old.
  */
 async function frozenEnemyTarget(page) {
-  const deadline = Date.now() + 20000
+  const start = Date.now()
   const held = await page.evaluate(() => window.__SC_TEST__.holdLevelTime)
+  let waitFor = null
   try {
     for (;;) {
       await page.evaluate(() => window.__SC_TEST__.setTimeScale(0))
       await waitFrames(page, 2, { maxMs: 8000, pollMs: 40 })
       const [target] = await page.evaluate(() => window.__SC_TEST__.enemyScreenPoints(1))
-      if (target || Date.now() > deadline || (await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return target ?? null
+      if (target || (await page.evaluate(() => window.__SC_TEST__.phase())) !== 'playing') return target ?? null
+      const wave = await page.evaluate(() => window.__SC_TEST__.nextWave())
+      waitFor ??= wave?.due ?? null
+      const waveDue = waitFor !== null && wave !== null && wave.levelTime < waitFor + 4
+      if (Date.now() - start > (waveDue ? 90000 : 20000)) return null
       await page.evaluate(() => { window.__SC_TEST__.holdLevelTime = false; window.__SC_TEST__.setTimeScale(1) })
       await waitFrames(page, 2, { minMs: 250, maxMs: 4000, pollMs: 40 })
     }
@@ -1515,9 +1532,12 @@ async function weaponProblems(page, label, { aim = true } = {}) {
 /** Shot points (NDC) that swing the gun furthest: the screen's left edge high, mid and low, and the top right. */
 const WEAPON_SWEEP_AIMS = [[-0.95, 0.9], [-0.95, 0], [-0.95, -0.85], [0.95, 0.9]]
 
-/** The gun's box depends on its aim (#223): weapon checks at each sweep aim, combo meter showing (leaves a live chain). */
-async function weaponAimSweepProblems(page, label) {
-  await page.evaluate(() => window.__SC_TEST__.primeCombo(3))
+/** A chain in the top tier with a two-digit count: the widest live combo meter (src/combat/comboTiers.ts). */
+const COMBO_WIDEST_PRIME = 20
+
+/** The gun's box depends on its aim (#223): weapon checks at each sweep aim, combo meter showing (leaves a live chain of `combo`). */
+async function weaponAimSweepProblems(page, label, combo = 3) {
+  await page.evaluate((n) => window.__SC_TEST__.primeCombo(n), combo)
   if (!(await waitVisible(page, '.hud-combo', 15000))) return [`${label}: combo meter never showed for the aim sweep`]
   const problems = []
   for (const [x, y] of WEAPON_SWEEP_AIMS) {
@@ -2707,18 +2727,29 @@ async function bossCheck(page, check) {
     bulletKills = (await getStats(page)).kills - killsBefore
   }
 
-  // Clear the first phase through processHit: what is left of its hp.
-  const firstHp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
-  const phaseOneHits = await page.evaluate((n) => window.__SC_TEST__.bossHit(n), firstHp)
-  // Phases between the first and the last (the Medusa's second four snakes): each let surface, then cleared.
+  // Clear the first phase through processHit: what is left of its hp, in rounds while a weak point shut for now (`retract`:
+  // the Kraken's pads while their arm slams, #1059) is no target until it opens again.
+  const openingPhase = (await boss()).phase
+  let phaseOneHits = 0
+  for (let round = 0; round < 8 && (await boss()).phase === openingPhase; round++) {
+    if (round > 0) await stepBoss(page, 0.5, { exposed: 1 })
+    const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
+    phaseOneHits += await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
+  }
+  // Phases between the first and the last (the Medusa's second four snakes): each let surface, then cleared, in rounds
+  // while a snake is shut between its strikes (`snakeShut`, #1059).
   let midHits = 0
   let midSurfaced = 0
   for (let i = 0; i < midPhases; i++) {
     await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
     midSurfaced += (await stepBoss(page, midSettleS, { exposed: 1 })) ?? midSettleS
-    const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
-    midHits += hp
-    await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
+    const midPhase = (await boss()).phase
+    for (let round = 0; round < 8 && (await boss()).phase === midPhase; round++) {
+      if (round > 0) await stepBoss(page, 0.5, { exposed: 1 })
+      const hp = (await boss()).exposed.reduce((sum, e) => sum + e.hp, 0)
+      midHits += hp
+      await page.evaluate((n) => window.__SC_TEST__.bossHit(n), hp)
+    }
   }
   const midway = await boss()
   await waitFrames(page, 2, { maxMs: 20000, pollMs: 100 })
@@ -3096,7 +3127,9 @@ async function switchCheck(page, { darkShots = false } = {}) {
     const before = await branchArrivals()
     await toLevelTime(branchWave.at)
     if ((await branchArrivals()) === before) problems.push(`the hard route's wave (${branchWave.label}) never arrived at ${branchWave.at} s`)
-    result.totals.hard = (await read()).totalEnemies
+    // The total leaves out the ones that slipped away (#1059), which differ run to run: counted back in.
+    const hardCount = await read()
+    result.totals.hard = hardCount.totalEnemies + hardCount.escaped
     await rideTo(mid)
     sw = await read()
     result.hard = sw.riding
@@ -3122,7 +3155,8 @@ async function switchCheck(page, { darkShots = false } = {}) {
   const before = await branchArrivals()
   await toLevelTime(branchWave.at)
   if ((await branchArrivals()) !== before) problems.push(`the easy route met the hard route's wave (${branchWave.label})`)
-  result.totals.easy = (await read()).totalEnemies
+  const easyCount = await read()
+  result.totals.easy = easyCount.totalEnemies + easyCount.escaped
   if (result.totals.hard != null && result.totals.hard - result.totals.easy !== branchWave.count)
     problems.push(`the hard run's kill count has ${result.totals.hard} enemies, the easy run's ${result.totals.easy}: not ${branchWave.count} apart`)
   return { id: 'switch', problems, trackSwitch: result, darkSection: dark.result }
@@ -3309,6 +3343,24 @@ async function startDailyFromCard(page, savedScores) {
 }
 
 /**
+ * Kill up to three of the nearest enemies, again every half second until the run has a score (at most `timeoutMs`), so a
+ * run ended next is a New best. The daily's level opens with nothing in reach on a slow runner sometimes; a 0 score is
+ * no record and sends nothing (the 2026-11-26 nightly's `record null, 0 submission(s)`, #1074). Returns the score.
+ */
+async function scoreSomething(page, timeoutMs = 20000) {
+  const until = Date.now() + timeoutMs
+  for (;;) {
+    const score = await page.evaluate(() => {
+      const s = window.__SC_TEST__
+      if (s.stats().score <= 0) s.killNearest(3)
+      return s.stats().score
+    })
+    if (score > 0 || Date.now() > until) return score
+    await page.waitForTimeout(500)
+  }
+}
+
+/**
  * Daily Run (#184): the card starts today's level on today's seed in daily mode, two loads spawn the same,
  * the results say Daily Run / New best with no Next Level, Replay keeps the seed, and campaign saves stay as they were.
  */
@@ -3337,11 +3389,9 @@ async function dailyCheck(newPage) {
     problems.push(`daily ghost: fetched for ${JSON.stringify(online.ghostGets)}, expected once for ${run?.dateKey}`)
 
   // Score something so the day's first result is a new best, then end the run: it goes on the (stubbed) day's World board (#854).
-  await first.page.evaluate(() => {
-    const s = window.__SC_TEST__
-    s.setLeaderboards({}, 'DAY')
-    s.killNearest(3)
-  })
+  await first.page.evaluate(() => window.__SC_TEST__.setLeaderboards({}, 'DAY'))
+  const firstScore = await scoreSomething(first.page)
+  if (!(firstScore > 0)) problems.push(`the daily's first run scored nothing in 20 s (killNearest found no enemy), so its results can't be a New best`)
   await waitFrames(first.page, 2, { maxMs: 20000 })
   await first.page.evaluate(() => window.__SC_TEST__.endLevel())
   const resultsShown = await first.page
@@ -3405,7 +3455,8 @@ async function dailyCheck(newPage) {
   // No ghost from a board that's down, and nothing errors.
   const noGhost = await readGhost(second.page)
   if (noGhost.shown || down.ghostGets.length !== 1) problems.push(`daily ghost with the board's API down: ${down.ghostGets.length} fetch(es), ring ${noGhost.shown ? 'shown' : 'hidden'}; expected 1, hidden`)
-  await second.page.evaluate(() => window.__SC_TEST__.killNearest(3))
+  const secondScore = await scoreSomething(second.page)
+  if (!(secondScore > 0)) problems.push(`the daily's second load scored nothing in 20 s (killNearest found no enemy), so its results can't be a New best`)
   await waitFrames(second.page, 2, { maxMs: 20000 })
   await second.page.evaluate(() => window.__SC_TEST__.endLevel())
   await second.page
