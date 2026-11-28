@@ -78,7 +78,8 @@ export default function ControlsSettings() {
   function wait(next: NonNullable<Waiting>) {
     if (waiting?.kind === next.kind && waiting.action === next.action) return done()
     setWaiting(next)
-    setNote(`Press a ${next.kind === 'key' ? 'key' : 'pad button'} for ${LABELS[next.action]}. Esc keeps it.`)
+    const pad = next.kind === 'pad'
+    setNote(`Press a ${pad ? 'pad button' : 'key'} for ${LABELS[next.action]}. Esc${pad ? ' or ' + padLabel(bindings().pad.back) : ''} keeps it.`)
   }
 
   function cell(row: ControlRow, kind: 'key' | 'pad') {

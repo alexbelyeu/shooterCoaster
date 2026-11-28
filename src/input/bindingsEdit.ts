@@ -41,9 +41,12 @@ export function bindKey(b: Bindings, action: KeyAction, key: string): Bindings {
   return !isBindableKey(k) || (keys.pause !== 'Escape' && Object.values(keys).includes('Escape')) ? b : { ...b, keys }
 }
 
-/** Bind a pad button to `action` (`b` itself when refused); a button another action holds swaps the two. */
+/**
+ * Bind a pad button to `action`; a button another action holds swaps the two. Returns `b` itself when refused: an
+ * unbindable button, or the bound back button, which keeps the binding (it backs out of the prompt, as Esc does).
+ */
 export function bindPadButton(b: Bindings, action: PadBindAction, button: number): Bindings {
-  return isBindablePadButton(button) ? { ...b, pad: rebind(b.pad, action, button) } : b
+  return isBindablePadButton(button) && button !== b.pad.back ? { ...b, pad: rebind(b.pad, action, button) } : b
 }
 
 export function isDefault(b: Bindings): boolean {

@@ -1989,10 +1989,6 @@ async function photoModeProblems(page, levelId) {
   }
 }
 
-/**
- * The pause menu (#36), opened through the hook: a card inside the viewport with the level name, Resume focused (pause.png);
- * ArrowDown moves focus, Esc resumes through the Ready / GO countdown, and Restart starts the level over.
- */
 /** Pause rebound to P in the pause menu's Settings (#998): P pauses mid-ride and Esc doesn't; Reset gives Esc back. */
 async function rebindPauseInRun(page) {
   const problems = []
@@ -2024,6 +2020,10 @@ async function rebindPauseInRun(page) {
   return problems
 }
 
+/**
+ * The pause menu (#36), opened through the hook: a card inside the viewport with the level name, Resume focused (pause.png);
+ * ArrowDown moves focus, Esc resumes through the Ready / GO countdown, and Restart starts the level over.
+ */
 async function pauseMenuCheck(page, levelId) {
   const problems = []
   if (!(await startLevelReady(page, levelId))) return { id: 'pause-menu', problems: [NOT_LOADED(levelId)] }

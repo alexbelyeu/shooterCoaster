@@ -111,6 +111,16 @@ describe('bindPadButton', () => {
   })
 })
 
+describe('bindPadButton: the back button', () => {
+  it('keeps the binding when the bound back button answers the prompt', () => {
+    expect(bindPadButton(DEFAULT_BINDINGS, 'fire', PAD.B)).toBe(DEFAULT_BINDINGS)
+    const moved = bindPadButton(DEFAULT_BINDINGS, 'back', 3)
+    expect(moved.pad.back).toBe(3)
+    expect(bindPadButton(moved, 'pause', 3)).toBe(moved)
+    expect(bindPadButton(moved, 'pause', PAD.B).pad.pause).toBe(PAD.B)
+  })
+})
+
 describe('load / save', () => {
   it('round-trips through storage', () => {
     const storage = memoryStorage()
