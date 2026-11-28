@@ -6,7 +6,7 @@ import { useGameStore } from '@/store/useGameStore'
 import { CAMERA_TRAUMA_EVENT } from '@/combat/screenShake.hot'
 import { isFeedbackHeld } from '@/combat/hitFeedback'
 import { createRng } from '@/utils/rng'
-import { e2eFireworks, isE2E } from '@/testing/e2eHook'
+import { e2eFireworks, isE2E } from '@/testing/e2eState'
 import {
   BURST_AHEAD,
   BURST_COLORS,

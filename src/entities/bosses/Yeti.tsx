@@ -11,7 +11,7 @@ import { BOSS_DEFEAT_DEATH_STYLE, SNOWBALL_DEATH_STYLE, SNOW_BURST_DEATH_STYLE, 
 import { buildTrackIndex } from '@/levels/environments/shared/trackClearance'
 import { sightClear, type HeightFunction } from '@/utils/terrainNoise'
 import { AURORA_DEFAULT_INTENSITY, AURORA_INTENSITY_EVENT } from '@/levels/environments/biomes/arctic/aurora'
-import { BOSS_PROJECTILE_PREFIX, e2eBoss, isE2E } from '@/testing/e2eHook'
+import { BOSS_PROJECTILE_PREFIX, e2eBoss, isE2E } from '@/testing/e2eState'
 import { SNOWBALL_SPLAT_EVENT } from '@/ui/hud/SnowSplat'
 import BossBase, { type BossFrame, type BossProps } from './BossBase'
 import { setLimb } from './bossLimbs'
