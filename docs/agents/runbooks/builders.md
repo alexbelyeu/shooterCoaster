@@ -29,7 +29,8 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
    d. If nothing is left, take the top item of the "Idea backlog" in
       `docs/agents/VISION.md`, create a well-formed issue for it per the issue contract
       in PROTOCOL.md (labels `agent:ready`, `P3`, a `type:*`), and use that.
-   If there is still nothing to do, reply "Queue empty" and stop.
+   If there is still nothing to do, post the ledger line with `--ref none` (step 7) and reply
+   "Queue empty": the control center flags a Builders run that never reports.
    Don't pair two assignments that will clearly edit the same functions in the same
    files (their issues' Scope sections say so); take the next candidate instead.
    Rank from the listing's numbers, titles and labels; to compare Scopes, print just that
@@ -40,11 +41,18 @@ Read only what picking and claiming needs: this runbook, the runbooks README rul
    `agent:in-progress` and comment `Claimed by builder run <ISO timestamp>`; for
    returned PRs comment `Builder run <ISO timestamp> is on it`.
 4. **Verify every claim.** Wait about 20 seconds, then re-read each issue's/PR's
-   comments. Back off if, for an issue, another run's claim comment is earlier than
-   yours or another run claimed it within the last 6 hours; for a returned PR, only if
+   comments, ordered by their GitHub `created_at` (as in runbooks README "Live claims").
+   For an issue, back off only if another run's claim is **live and earlier than yours**.
+   Check every `Claimed by builder run` comment before yours, not just the newest: it is
+   live while it is under 6 hours old and its run hasn't ended it. A `Handoff:` or
+   `Blocked:` comment ends every claim posted before it (the work it held has stopped); a
+   `Backing off` comment ends only the claim of the run it names. On 25 Nov the 6-hour rule
+   alone held #937, the only ready issue, for hours after its run had handed it back, and
+   four Builders runs did nothing. For a returned PR, back off only if
    another *live* `Builder run … is on it` claim (runbooks README, "Live claims") is
    earlier than yours (the previous round's claim has ended). To back off,
-   comment `Backing off — already claimed by another run`, leave its labels alone, and
+   comment `Backing off — builder run <your claim's ISO timestamp>, already claimed by another run`,
+   leave its labels alone, and
    replace it with the next candidate (claim and verify that one the same way).
 5. Pause checkpoint. Then spawn all builders **in a single message** with the Agent
    tool, one call per verified assignment: `subagent_type: "general-purpose"`,
