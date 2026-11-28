@@ -367,6 +367,10 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   `deep` wave / weather / boss / pickup / switch / dark / audio, `pacing`; `shards.test.ts` holds the parts to the full run and to the workflow's matrix).
   A fifth, `slow` (#539), is an `extra` part outside that count: level1 and level3's ride + results again under `--cpu-throttle 4`
   (the part sets it), writing `throttle.json`. `slow` and `pacing` set `gatePrograms`: a shader compiled after the warm-up fails the level.
+  The parts check out **the commit production serves** (the `prod-ref` job, `scripts/deployedRef.cjs`: the newest `Production`
+  deployment whose newest status is `success`; main's head if none is found), not main's head: production deploys once a day,
+  so main's newer checks would otherwise run against an older build and fail on what it never had (#1074). A fix to a check
+  therefore reaches the nightly with the next deploy.
   Each part's artifact is `prod-e2e-results-<part>` (its screenshots, `results.json` and `exit-code`); the `nightly` job folds
   them into one verdict with `scripts/nightlyParts.cjs` (a part that hit its cap or left nothing shows as a failed `part <name>`).
   A part that nears its cap splits again the same way. A step that throws (a dropped connection to production, a page
@@ -374,7 +378,7 @@ Two suites watch https://scoaster.com, each under GNU `timeout` (exit 124 = it h
   with the contexts it opened closed (`e2e/runStep.mjs`, #707: one `ERR_CONNECTION_RESET` in `daily` used to cost the
   `main` part every step after it). An exception outside a step (the title's page, a level's ride) still escapes the run,
   which writes `results.json` with what finished, plus a failed `crash` check naming it.
-  **Production redeploys mid-run** (#822): `main` deploys whenever an approved PR merges, and Vercel's atomic deploy removes
+  **Production redeploys mid-run** (#822): `deploy.yml` can deploy main at any time (the daily deploy, Deploy now), and Vercel's atomic deploy removes
   the old build's hashed chunks, so a part can fail on a lazy chunk that no longer exists (`Failed to fetch dynamically
   imported module`). With `--url`, the smoke fingerprints the deployed build at the start (`index.html`'s entry script and
   modulepreloads, `e2e/buildFingerprint.mjs`, printed as `build under test: …`) and again when the run fails or throws.
